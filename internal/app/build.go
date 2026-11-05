@@ -58,9 +58,9 @@ func (application *App) Build(context *ui.Context) {
 
 func (application *App) applyTheme(context *ui.Context) {
 	if application.dark {
-		context.Theme = ui.DarkTheme()
+		context.Theme = application.designs.dark
 	} else {
-		context.Theme = ui.LightTheme()
+		context.Theme = application.designs.light
 	}
 	application.setPalette()
 }
@@ -168,11 +168,7 @@ func (application *App) buildToolbar(context *ui.Context) {
 		context.IconSized("git-compare", 18, context.Theme.Primary)
 		context.Text(application.title(), ui.TextStyle{Weight: draw2d.Bold})
 		context.Spacer()
-		onlyIcon := "square"
-		if application.onlyChanged {
-			onlyIcon = "square-check"
-		}
-		if context.FlatIconButton(onlyIcon, "Only changed projects") {
+		if toggleIcon(context, "square-check", "square", "Only changed projects", application.onlyChanged) {
 			application.setOnlyChanged(!application.onlyChanged)
 		}
 		context.Tooltip("h: hide the projects the development did not change, in the sidebar and the finder")
@@ -184,11 +180,7 @@ func (application *App) buildToolbar(context *ui.Context) {
 			application.openBaseDialog()
 		}
 		context.Tooltip("b: compare against another branch, tag or commit")
-		workingIcon := "square"
-		if application.settings.WorkingTree {
-			workingIcon = "square-check"
-		}
-		if context.FlatIconButton(workingIcon, "Uncommitted") {
+		if toggleIcon(context, "square-check", "square", "Uncommitted", application.settings.WorkingTree) {
 			application.settings.WorkingTree = !application.settings.WorkingTree
 			application.clearDocuments()
 			application.reloadAll()

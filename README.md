@@ -5,8 +5,13 @@ Open a folder of projects, see which ones a development changed against their ba
 read each changed file's diff, coloured, without leaving the keyboard.
 
 Built with [go-ui](https://github.com/akrck02/go-ui) over
-[go-renderer](https://github.com/akrck02/go-renderer); code is coloured with
-[chroma](https://github.com/alecthomas/chroma), as papiro-indexer colours its code blocks.
+[go-renderer](https://github.com/akrck02/go-renderer), dressed in
+[Bubble 4](https://github.com/akrck02/bubble)'s paper theme (light and dark, compact);
+code is coloured with [chroma](https://github.com/alecthomas/chroma),
+as papiro-indexer colours its code blocks.
+
+> Bubble 4 is still on its `feature/v4` branch and its `goui` module points at its neighbours
+> through local paths, so `go.mod` replaces Bubble's and go-ui's `v0.0.0` with real versions.
 
 ## 🤖 AI disclosure
 

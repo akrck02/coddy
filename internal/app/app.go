@@ -63,6 +63,7 @@ type App struct {
 	// onlyChanged hides the projects with no changes, in the sidebar and the finder
 	onlyChanged bool
 	palette     *highlight.Palette
+	designs     designs
 	tap         *inputTap
 	keys        keys
 	toast       string
@@ -86,6 +87,7 @@ func New(settings Settings) *App {
 		dark:          settings.Dark,
 		onlyChanged:   settings.OnlyChanged,
 		focus:         sidebarPane,
+		designs:       newDesigns(),
 	}
 	application.sidebar = newSidebar()
 	application.editor = newEditor()

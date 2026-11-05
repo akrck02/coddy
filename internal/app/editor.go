@@ -297,17 +297,19 @@ func (editor *editorState) buildHeader(context *ui.Context, application *App) {
 		context.Caption(document.Language)
 		if document.Changed {
 			if editor.mode == diffView {
-				label := "All lines"
+				icon, tip := "unfold-vertical", "Show every unchanged line (f)"
 				if editor.fullContext {
-					label = "Changes only"
+					icon, tip = "fold-vertical", "Fold the unchanged lines (f)"
 				}
-				if context.FlatButton(label) {
+				if context.FlatIconButton(icon, "") {
 					editor.toggleContext()
 				}
-				context.Tooltip("f: fold or show the unchanged lines")
+				context.Tooltip(tip)
 			}
 			mode := int(editor.mode)
-			if context.Tabs("view mode", &mode, "Diff", "File") {
+			if iconSwitch(context, "view mode", &mode, []iconChoice{
+				{"file-diff", "The changes (d)"}, {"file-code", "The whole file (d)"},
+			}) {
 				editor.setMode(viewMode(mode))
 			}
 		}
@@ -340,10 +342,9 @@ func (editor *editorState) measure(context *ui.Context) {
 // and removed lines on green and red.
 func (editor *editorState) paint(context *ui.Context, application *App, drawing *draw2d.List) {
 	theme := context.Theme
-	palette := application.palette
 	area := editor.list.area
 	document := editor.document
-	drawing.Rectangle(area, 0, palette.Background, draw2d.Color{}, 0)
+	drawing.Rectangle(area, 0, theme.Sunken, draw2d.Color{}, 0) // Bubble's ground for code
 	if document == nil {
 		return
 	}

@@ -312,7 +312,9 @@ func (sidebar *sidebarState) build(context *ui.Context, application *App) {
 	context.Frame(ui.Layout{Direction: ui.Vertical, Width: ui.Grow(), Height: ui.Grow()}, ui.Look{Fill: theme.Surface}, func() {
 		context.Box(ui.Layout{Width: ui.Grow(), Padding: ui.PadXY(8, 6), Gap: 6, AlignY: ui.Center}, func() {
 			mode := int(sidebar.mode)
-			if context.Tabs("sidebar mode", &mode, "Changes", "Files") {
+			if iconSwitch(context, "sidebar mode", &mode, []iconChoice{
+				{"git-compare", "Changes only (c)"}, {"folder-tree", "Every file (c)"},
+			}) {
 				sidebar.mode = sidebarMode(mode)
 				sidebar.stale = true
 			}
