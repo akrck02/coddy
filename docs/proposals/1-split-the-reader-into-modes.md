@@ -1,6 +1,6 @@
 # 1. Split the reader into packages, one per mode
 
-> Status: proposed · Author's approval: proposal ☑ plan ☐
+> Status: building · Author's approval: proposal ☑ plan ☑
 
 ## Why
 
@@ -110,7 +110,7 @@ Alternatives not taken:
 
 Each task leaves the reader working and every test passing.
 
-- [ ] T1 — Pin today's behaviour: a test for each shortcut of each mode · `internal/app/app_test.go` · serves R1
+- [x] T1 — Pin today's behaviour: a test for each shortcut of each mode · `internal/app/app_test.go` · serves R1
 - [ ] T2 — Move `main.go` to `cmd/code-review/` · serves R1 · test: `go build ./...`
 - [ ] T3 — Move `failure` to its own module and give `git` and `workspace` error codes · `errors.go` per package · serves R5 · test: `errors_test.go`
 - [ ] T4 — Turn `review`'s domain files into `workspace` · serves R4 · test: `TestTheWorkspaceImportsNoInterface`
