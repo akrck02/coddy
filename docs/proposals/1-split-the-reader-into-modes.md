@@ -1,6 +1,6 @@
 # 1. Split the reader into packages, one per mode
 
-> Status: building · Author's approval: proposal ☑ plan ☑ (T8 change ☑, T9 change ☑)
+> Status: done · Author's approval: proposal ☑ plan ☑ (T8 change ☑, T9 change ☑)
 
 ## Why
 
@@ -174,4 +174,29 @@ Each task leaves the reader working and every test passing.
 
 ## Result
 
-Not built yet.
+The reader is thirteen packages instead of one `app` of 3,802 lines. The window, the largest, is
+1,528 lines and knows neither mode. A third mode is a package and one line in `main`: it gets the
+next place on the rail and the next number key.
+
+| Id | Check | Result |
+|---|---|---|
+| R1 | Today's tests, and one test for every shortcut of each mode | Pass |
+| R2 | `TestOnlyReadOnlyCommandsRun` | Pass, unchanged |
+| R3 | `TestTheWindowImportsNoMode`, and `TestNoPaneImportsTheWindow` | Pass |
+| R4 | `TestTheWorkspaceImportsNoInterface` | Pass |
+| R5 | `errors_test.go` in `git`, `review` and `window`; `TestNoErrorIsMadeWithoutACode` | Pass |
+| R6 | `TestMarksSavedBeforeTheSplitAreRead` | Pass |
+| R7 | `TestNoTwoCommandsShareAKeyInOneMode`, `TestTheHelpListsEveryCommand` | Pass |
+| R8 | `TestANewerSearchCancelsTheOlderOne` | Pass |
+
+The plan changed twice while building, as the design says: T8 was split into steps, and a mode
+answers what the panes ask instead of building their contents, from its own package, `mode`.
+
+A review of the finished change found what the tests had not. A reading replaced by a newer one
+never took back its count, so "Reading the projects…" could stay on. The files mode had lost the
+Viewed button, and Esc, Tab, `[` and `]` no longer answered with a modifier held. These are
+fixed, each with a test where one fits.
+
+Left for later: a few functions moved as they were are still far over 40 lines (the sidebar's and
+the viewer's `paint`, the viewer's header, the finder's content search, the title bar). Splitting
+them changes no behaviour and belongs in a change of its own.
