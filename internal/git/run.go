@@ -17,6 +17,7 @@ import (
 var readOnlyCommands = map[string]bool{
 	"cat-file":     true,
 	"diff":         true,
+	"grep":         true,
 	"ls-files":     true,
 	"ls-tree":      true,
 	"merge-base":   true,

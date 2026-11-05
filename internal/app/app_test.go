@@ -316,3 +316,28 @@ func TestTheFilesModeCanListOnlyTheChangedFiles(test *testing.T) {
 		test.Error("g again did not list every file")
 	}
 }
+
+func TestTheFinderFindsATextAndOpensItsLine(test *testing.T) {
+	application := New(Settings{Folders: []string{makeRepository(test)}, WorkingTree: true, Synchronous: true})
+	window := newWindow(test, application)
+	window.HoldKey(input.KeySuper)
+	window.HoldKey(input.KeyShift)
+	window.PressKey(input.KeyF)
+	window.ReleaseKey(input.KeyShift)
+	window.ReleaseKey(input.KeySuper)
+	window.Frames(2)
+	if !application.finder.open || application.finder.scope != contentScope {
+		test.Fatal("⌘⇧F did not open the finder on the files' content")
+	}
+	window.Type("Beam")
+	window.Frames(2)
+	if len(application.finder.hits) != 1 {
+		test.Fatalf("found %d lines holding Beam, want 1: %+v", len(application.finder.hits), application.finder.hits)
+	}
+	window.PressKey(input.KeyEnter)
+	window.Frames(2)
+	editor := application.editor
+	if editor.document == nil || editor.document.Path != "src/beam.go" || editor.markedLine != 3 {
+		test.Fatalf("Enter opened %+v at line %d, want src/beam.go at line 3", editor.document, editor.markedLine)
+	}
+}

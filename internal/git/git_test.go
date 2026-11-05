@@ -63,3 +63,13 @@ func TestNumStatReadsRenamesAndBinaries(test *testing.T) {
 		test.Errorf("the picture is not marked binary")
 	}
 }
+
+func TestGrepOutputIsReadIntoHits(test *testing.T) {
+	hits := parseGrep([]byte("HEAD:src/a.go\x0012\x005\x00\treturn lamp\nnotes.txt\x003\x001\x00lamp: on\n"), true)
+	if len(hits) != 2 {
+		test.Fatalf("read %d hits, want 2", len(hits))
+	}
+	if hits[0] != (Hit{Path: "src/a.go", Line: 12, Column: 4, Text: "\treturn lamp"}) {
+		test.Errorf("read %+v", hits[0])
+	}
+}

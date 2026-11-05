@@ -81,6 +81,7 @@ go build -o bin/code-review .
 | `-committed` | Compare the last commit only, leaving out changes not committed yet |
 | `-open project/path` | Open a file at the start |
 | `-review` | Start in the review mode |
+| `-find text` | Start with the finder searching the files' content for a text |
 | `-code-font file.ttf` | Read the code in this TrueType face (default SF Mono, from macOS; Go Mono where there is none) |
 | `-all` | Show every project, not only those with changes |
 | `-light` | Start in the light theme (dark by default) |
@@ -94,7 +95,8 @@ go vet ./... && go test ./...     # the interface tests drive the window with no
 
 | Key | |
 |---|---|
-| `⌘P` (or `Shift+P`) | Find a file in any project; changed files first |
+| `⌘P` (or `Shift+P`) | Find a file by its name, in any project; changed files first |
+| `⌘⇧F` (or `/`) | Find a text in the files of every project; `Tab` in the finder switches between names and content |
 | `n` / `m` | Next / previous changed file, across every project |
 | `]` / `[` | Next / previous change in the file (the diff, or the marked lines) |
 | `1` / `2` (`c` switches) | Files mode / Review mode |

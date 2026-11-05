@@ -35,6 +35,7 @@ func main() {
 	committed := flag.Bool("committed", false, "compare the last commit only, leaving out changes not committed yet")
 	light := flag.Bool("light", false, "start in the light theme")
 	open := flag.String("open", "", "open this file at the start, as project/path/in/it")
+	find := flag.String("find", "", "open the finder at the start, searching the files' content for this text")
 	reviewing := flag.Bool("review", false, "start in the review mode: the changed files, as diffs")
 	codeFont := flag.String("code-font", "", "a TrueType file to read the code in (default: SF Mono, else Go Mono)")
 	allProjects := flag.Bool("all", false, "show every project, not only those with changes (the choice is remembered otherwise)")
@@ -60,6 +61,7 @@ func main() {
 		OnlyChanged: onlyChanged(*allProjects),
 		Open:        *open,
 		Review:      *reviewing,
+		Find:        *find,
 		// the files marked as viewed are kept in the reader's own folder, never in the repositories
 		ReviewedPath: review.DefaultReviewedPath(),
 		Synchronous:  options.CapturePath != "",

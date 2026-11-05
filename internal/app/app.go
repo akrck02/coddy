@@ -23,6 +23,8 @@ type Settings struct {
 	OnlyChanged bool
 	// Open names a file to open at the start, as "project/path/in/it".
 	Open string
+	// Find opens the finder at the start, searching the files' content for this text.
+	Find string
 	// Review starts in the review mode (the changed files, as diffs) instead of reading the files.
 	Review bool
 	// ReviewedPath is the file the files marked as viewed are kept in; empty keeps them only while
@@ -105,6 +107,10 @@ func New(settings Settings) *App {
 	application.openFolders(settings.Folders)
 	if settings.Open != "" {
 		application.openByLabel(settings.Open)
+	}
+	if settings.Find != "" {
+		application.finder.show(contentScope)
+		application.finder.query = settings.Find
 	}
 	return application
 }
@@ -318,6 +324,16 @@ func (application *App) openFile(reference fileReference) {
 			}
 		}
 	})
+}
+
+// openFileAt opens a file and shows one of its lines, marked; 0 shows its top (or first change).
+func (application *App) openFileAt(reference fileReference, line int) {
+	application.editor.goTo = line
+	application.openFile(reference)
+	editor := &application.editor
+	if editor.goTo > 0 && editor.document != nil && editor.reference == reference {
+		editor.revealLine(editor.goTo)
+	}
 }
 
 // stepChangedFile opens the next (or previous) changed file of the whole development.

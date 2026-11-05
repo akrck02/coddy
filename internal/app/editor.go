@@ -45,6 +45,10 @@ type editorState struct {
 	gone  int
 	// inline are the words that changed inside a replaced line, by row of the diff
 	inline map[int]review.Span
+	// goTo is a line to show once the file is read, from the finder; markedLine is the line shown
+	// that way, painted as the line the reader is on
+	goTo       int
+	markedLine int
 	// marks say, in the file view, which lines the development added or changed and where it
 	// removed some, as Zed marks them in its gutter
 	marks map[int]review.Mark
@@ -78,6 +82,7 @@ func (editor *editorState) start(reference fileReference, project *review.Projec
 	editor.request++
 	editor.reference = reference
 	editor.project = project
+	editor.markedLine = 0
 	editor.document = nil
 	editor.showing = true
 	editor.openedFolds = map[int]bool{}
@@ -96,8 +101,43 @@ func (editor *editorState) show(document *review.Document, reviewing bool) {
 		}
 	}
 	editor.layOut()
+	if editor.goTo > 0 {
+		editor.revealLine(editor.goTo)
+		return
+	}
 	if !keepPlace && editor.mode == diffView && len(editor.hunks) > 0 {
 		editor.list.revealNearTop(editor.hunks[0])
+	}
+}
+
+// revealLine scrolls to a line of the file as it is now and marks it, opening the fold it is in
+// when the diff is shown.
+func (editor *editorState) revealLine(number int) {
+	editor.goTo = 0
+	editor.markedLine = number
+	if editor.mode != diffView || !editor.document.Changed {
+		editor.list.revealNearTop(max(min(number-1, editor.rowCount()-1), 0))
+		return
+	}
+	for attempt := 0; attempt < 2; attempt++ {
+		for index, row := range editor.rows {
+			if !row.IsFold() && row.Line.Kind != git.Removal && row.Line.NewNumber == number {
+				editor.list.revealNearTop(index)
+				return
+			}
+		}
+		// the line is folded away: open its fold and look again
+		for _, row := range editor.rows {
+			if !row.IsFold() {
+				continue
+			}
+			for offset := 0; offset < row.Folded; offset++ {
+				if line := editor.document.Diff[row.FoldStart+offset]; line.NewNumber == number {
+					editor.openedFolds[row.FoldStart] = true
+				}
+			}
+		}
+		editor.layOut()
 	}
 }
 
@@ -476,7 +516,14 @@ func (editor *editorState) paint(context *ui.Context, application *App, drawing 
 		baseline := top + (editor.rowHeight+editor.codeAscent-editor.codeDescent)/2
 		if !diff {
 			number := index + 1
-			editor.paintNumber(drawing, number, area.X, numberWidth, baseline, look.lineNumber)
+			if number == editor.markedLine {
+				drawing.Rectangle(draw2d.Rectangle{X: area.X, Y: top, Width: area.Width, Height: editor.rowHeight}, 0, look.hover, draw2d.Color{}, 0)
+			}
+			numberInk := look.lineNumber
+			if number == editor.markedLine {
+				numberInk = look.activeLineNumber
+			}
+			editor.paintNumber(drawing, number, area.X, numberWidth, baseline, numberInk)
 			editor.paintMark(drawing, look, editor.marks[number], area.X+numberWidth+4, top)
 			editor.paintCode(drawing, application, editor.lines()[index], codeArea, baseline)
 			continue
@@ -518,6 +565,10 @@ func (editor *editorState) paint(context *ui.Context, application *App, drawing 
 			}
 		}
 		numberInk := look.lineNumber
+		if line.Kind != git.Removal && line.NewNumber == editor.markedLine && editor.markedLine > 0 {
+			drawing.Rectangle(rowArea, 0, look.hover.WithAlpha(0.8), draw2d.Color{}, 0)
+			numberInk = look.activeLineNumber
+		}
 		if line.Kind != git.Context {
 			numberInk = signColour.WithAlpha(0.75)
 		}

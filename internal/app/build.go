@@ -82,8 +82,10 @@ func (application *App) handleKeys(context *ui.Context) {
 		return
 	}
 	switch {
+	case keys.command() && keys.shift() && keys.pressed(input.KeyF), strings.Contains(keys.typedText(), "/"):
+		application.finder.show(contentScope)
 	case keys.command() && keys.pressed(input.KeyP), keys.plain(input.KeyP) && keys.shift():
-		application.finder.show()
+		application.finder.show(namesScope)
 	case keys.command() && keys.pressed(input.KeyO), keys.plain(input.KeyO):
 		application.pickerOpen = true
 	case keys.command() && keys.pressed(input.KeyR), keys.plain(input.KeyR):
@@ -253,7 +255,7 @@ func (application *App) buildTitleBar(context *ui.Context) {
 				context.Text("⌘P", ui.TextStyle{Size: theme.SmallTextSize, Color: theme.InkSoft, Weight: draw2d.Medium})
 			})
 		}) {
-			application.finder.show()
+			application.finder.show(namesScope)
 		}
 		context.Box(ui.Layout{Width: ui.Grow(), Gap: 4, AlignY: ui.Center}, func() {
 			context.Spacer()
@@ -423,7 +425,8 @@ func (application *App) buildBaseDialog(context *ui.Context) {
 }
 
 var helpKeys = [][2]string{
-	{"⌘P  or  Shift+P", "Find a file in any project"},
+	{"⌘P  or  Shift+P", "Find a file by its name, in any project"},
+	{"⌘⇧F  or  /", "Find a text in the files of every project (Tab switches in the finder)"},
 	{"n  /  m", "Next / previous changed file, across every project"},
 	{"]  /  [", "Next / previous change in the file"},
 	{"1  /  2  ·  c", "Files mode (read any file) / Review mode (the changes, as diffs)"},
