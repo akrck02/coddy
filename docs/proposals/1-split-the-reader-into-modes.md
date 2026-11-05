@@ -168,9 +168,9 @@ Each task leaves the reader working and every test passing.
 - [x] T8c — `viewer` as a package, with the interface it needs from the window · serves R1 · test: the tests of T1
 - [x] T8d — `finder` as a package, with the fuzzy search · serves R1 · test: the tests of T1
 - [x] T8e — `sidebar` as a package; `app` becomes `window` · serves R1 · test: the tests of T1
-- [x] T9a — The `Mode` interface in `window`; `files` as a package; the sidebar and the viewer ask the mode instead of checking it · serves R3 · test: `TestTheWindowImportsNoMode`
+- [x] T9a — The `Mode` interface in `mode`; `files` as a package; the sidebar and the viewer ask the mode instead of checking it · serves R3 · test: `TestTheWindowImportsNoMode`
 - [x] T9b — `review` as the review mode: marks, progress, overview, `v`; `main` registers both modes · serves R3, R6 · test: `TestMarksSavedBeforeTheSplitAreRead`
-- [ ] T10 — Describe the packages in `docs/8-contributing.md` · serves R3
+- [x] T10 — Describe the packages in `docs/8-contributing.md` · serves R3
 
 ## Result
 

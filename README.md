@@ -158,6 +158,9 @@ The interface follows what review tools have settled on, and keeps colour for me
 | `internal/mode` | What a mode is, and what it asks of the window |
 | `internal/files`, `internal/review` | The two modes: read any file; review the changes, marking each viewed |
 
+How the packages talk to each other, how to add a mode and how to propose a change:
+[docs/8-contributing.md](docs/8-contributing.md).
+
 go-ui describes the window again at every frame. The sidebar, the code and the finder's results
 are painted by the program (`Context.Paint`) as lists that only draw the rows in sight, with their
 own scrolling, so the keyboard can move them; go-ui's window hands the program the keys through
