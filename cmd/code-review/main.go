@@ -15,6 +15,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/akrck02/code-review/internal/files"
 	"github.com/akrck02/code-review/internal/review"
 	"github.com/akrck02/code-review/internal/window"
 	"github.com/akrck02/go-renderer/opengl/overlay"
@@ -60,12 +61,14 @@ func main() {
 		Dark:        options.Dark || !*light,
 		OnlyChanged: onlyChanged(*allProjects),
 		Open:        *open,
-		Review:      *reviewing,
 		Find:        *find,
+		Mode:        startMode(*reviewing),
+		Synchronous: options.CapturePath != "",
+	},
+		files.New(),
 		// the files marked as viewed are kept in the reader's own folder, never in the repositories
-		ReviewedPath: review.DefaultReviewedPath(),
-		Synchronous:  options.CapturePath != "",
-	})
+		review.New(review.DefaultReviewedPath()),
+	)
 	options.Driver = reader.Driver()
 	options.Hidden = func() {
 		reader.Closed()
@@ -117,4 +120,12 @@ func existing(folders []string) []string {
 		}
 	}
 	return found
+}
+
+// startMode is the mode to start in: the review mode when asked for, else the first.
+func startMode(reviewing bool) string {
+	if reviewing {
+		return "Review"
+	}
+	return ""
 }

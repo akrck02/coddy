@@ -9,8 +9,8 @@ import (
 	"github.com/akrck02/code-review/internal/finder"
 	"github.com/akrck02/code-review/internal/git"
 	"github.com/akrck02/code-review/internal/java"
+	"github.com/akrck02/code-review/internal/mode"
 	"github.com/akrck02/code-review/internal/pane"
-	"github.com/akrck02/code-review/internal/review"
 	"github.com/akrck02/code-review/internal/sidebar"
 	"github.com/akrck02/code-review/internal/theme"
 	"github.com/akrck02/code-review/internal/viewer"
@@ -30,11 +30,8 @@ type Settings struct {
 	Open string
 	// Find opens the finder at the start, searching the files' content for this text.
 	Find string
-	// Review starts in the review mode (the changed files, as diffs) instead of reading the files.
-	Review bool
-	// ReviewedPath is the file the files marked as viewed are kept in; empty keeps them only while
-	// the reader runs.
-	ReviewedPath string
+	// Mode names the mode to start in; empty starts in the first.
+	Mode string
 	// Synchronous reads everything before the first frame instead of in the background: for
 	// capturing a frame to a picture, where there is only one frame.
 	Synchronous bool
@@ -74,10 +71,11 @@ type Window struct {
 	dark       bool
 	// onlyChanged hides the projects with no changes, in the sidebar and the finder
 	onlyChanged bool
-	// reviewed keeps the changed files marked as viewed
-	reviewed *review.Reviewed
-	look     theme.Look
-	designs  theme.Designs
+	// modes are the ways of looking at the workspace, in the rail's order; mode is the one on
+	modes   []mode.Mode
+	mode    mode.Mode
+	look    theme.Look
+	designs theme.Designs
 	// classKinds are what the Java and Kotlin files declare, read as they come into sight;
 	// kindsWanted are those asked for since the last frame
 	classKinds  map[workspace.FileReference]java.ClassKind
@@ -88,8 +86,9 @@ type Window struct {
 	themeSet    bool
 }
 
-// New makes a reader for these settings; Driver must be given to the window it runs in.
-func New(settings Settings) *Window {
+// New makes a reader for these settings, with its modes in the rail's order; Driver must be given
+// to the window it runs in.
+func New(settings Settings, modes ...mode.Mode) *Window {
 	application := &Window{
 		settings:      settings,
 		projectBases:  map[string]string{},
@@ -100,13 +99,10 @@ func New(settings Settings) *Window {
 		onlyChanged:   settings.OnlyChanged,
 		focus:         sidebarPane,
 		designs:       theme.NewDesigns(),
-		reviewed:      review.OpenReviewed(settings.ReviewedPath),
 		classKinds:    map[workspace.FileReference]java.ClassKind{},
 	}
 	application.sidebar = sidebar.New()
-	if settings.Review {
-		application.sidebar.Mode = sidebar.ReviewMode
-	}
+	application.startModes(modes, settings.Mode)
 	application.editor = viewer.New()
 	application.setLook()
 	application.openFolders(settings.Folders)
@@ -261,7 +257,7 @@ func (application *Window) openFile(reference workspace.FileReference) {
 	project := application.projects[reference.Project]
 	application.editor.Start(reference, project)
 	if document, cached := application.documentCache[reference]; cached {
-		application.editor.Show(document, application.sidebar.Mode == sidebar.ReviewMode)
+		application.editor.Show(document, application.mode.ShowsChanges())
 		return
 	}
 	workingTree := application.settings.WorkingTree
@@ -274,7 +270,7 @@ func (application *Window) openFile(reference workspace.FileReference) {
 			}
 			application.documentCache[reference] = document
 			if application.editor.Request == request {
-				application.editor.Show(document, application.sidebar.Mode == sidebar.ReviewMode)
+				application.editor.Show(document, application.mode.ShowsChanges())
 			}
 		}
 	})

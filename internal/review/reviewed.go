@@ -1,4 +1,5 @@
-// Package review is the review mode's own state: which changed files a reviewer has viewed.
+// Package review is the review mode: only the changed files, opened on their diffs, each marked as
+// viewed once read, the marks kept in a file of the reader's own.
 package review
 
 import (

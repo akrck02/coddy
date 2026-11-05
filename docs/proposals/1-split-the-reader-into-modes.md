@@ -1,6 +1,6 @@
 # 1. Split the reader into packages, one per mode
 
-> Status: building, plan changed at T9 · Author's approval: proposal ☑ plan ☑ (T8 change ☑, T9 change to approve)
+> Status: building · Author's approval: proposal ☑ plan ☑ (T8 change ☑, T9 change ☑)
 
 ## Why
 
@@ -48,6 +48,7 @@ internal/pane/            what every pane shares: the frame's keys and a list of
                           scrolls
 internal/window/          title bar, mode rail, status bar, layout, commands and keys,
                           background work
+internal/mode/            what a mode is, and what it asks of the window
 internal/viewer/          the code view both modes share: rows, scrolling, gutter, painting
 internal/sidebar/         the tree pane; each mode says which files it lists, and how it marks them
 internal/finder/          search by name and by content, with its view
@@ -71,38 +72,39 @@ Where today's files go:
 | `app/theme.go`, `app/fileicons.go` | `theme` |
 | `app/app.go`, `build.go`, `work.go`, `commands.go`, the input tap of `input.go` | `window` |
 
-**Modes.** `window` declares what a mode is; `files` and `review` implement it; `main` registers
-them. `window` imports no mode, and the panes import `theme` instead of `window`, so the arrows only
-point down: modes, then `window`, then the panes, then `theme`, `workspace` and `git`.
+**Modes.** `mode` declares what a mode is; `files` and `review` implement it; `main` registers
+them. `window` holds the modes it is given and imports none of them, and the panes import `theme`
+instead of `window`, so the arrows only point down: modes, then `window`, then `mode` and the panes,
+then `theme`, `workspace` and `git`.
 
 Both modes list the same tree and open the same files; what differs is which files are listed,
 how a changed file opens, and what each row shows beside its name. So a mode answers those
-questions, and the sidebar and the viewer ask them instead of checking which mode is on:
+questions, and the sidebar and the viewer ask them instead of checking which mode is on. The
+sidebar declares the part it asks, `sidebar.Listing`; a mode is that and a little more:
 
 ```go
 // Mode is one way of looking at the workspace, chosen from the mode rail and by its number.
 type Mode interface {
-	Name() string // the sidebar's title and the rail's tooltip
+	sidebar.Listing // Name, ChangesOnly, Header, Decorate(row), Press(file, moveOn)
 	Icon() string
-	ChangesOnly() bool  // lists only the files the development changed
-	ShowsChanges() bool // opens a changed file on its changes, not whole
-	// Decorate says what a row of the sidebar shows besides its name: a mark before a file,
-	// the name in its status's colour, words and a progress bar on the right.
-	Decorate(row sidebar.Row) sidebar.Decoration
-	Header() string // words beside the sidebar's title, such as "3 of 7 viewed"
+	Description() string // the rail's tooltip
+	Start(window Window) // the window the mode works in, once
+	ShowsChanges() bool  // opens a changed file on its changes, not whole
 	// FileButton is the mode's button in the viewer's header, such as Viewed.
 	FileButton(file workspace.FileReference) (viewer.Button, bool)
-	Press(file workspace.FileReference)
-	BuildInsteadOfAFile(context *ui.Context) bool // what shows while no file is open
-	Commands() []Command                          // the mode's own keys, such as v
+	Progress() (done, total int) // for the status bar
+	BuildInsteadOfAFile(context *ui.Context) bool
+	Commands() []Command // the mode's own keys, such as v
 }
 ```
 
 The review mode keeps its marks (`reviewed.json`), the progress, the overview and the `v` key; the
-files mode keeps the only-changed filter and its `g` key. *Changed while building: the first
+files mode keeps the `g` key of the only-changed filter. *Changed while building: the first
 design had a mode build the sidebar's rows (`Rows`) and the viewer's presentation (`Show`). The
 rows are the same tree in both modes, only filtered and marked differently, so a mode now answers
-what the panes ask instead of building their contents. T9 is split in two for that.*
+what the panes ask instead of building their contents. T9 is split in two for that. And the
+interface lives in a small package, `mode`, rather than in `window`: a mode that imported `window`
+could not be used by `window`'s own tests, which drive the real modes.*
 
 **How a pane talks to the window.** A pane never imports `window`. Each pane package declares,
 as an interface, the little it needs from the window, and `window` implements it. The sidebar,
@@ -166,8 +168,8 @@ Each task leaves the reader working and every test passing.
 - [x] T8c — `viewer` as a package, with the interface it needs from the window · serves R1 · test: the tests of T1
 - [x] T8d — `finder` as a package, with the fuzzy search · serves R1 · test: the tests of T1
 - [x] T8e — `sidebar` as a package; `app` becomes `window` · serves R1 · test: the tests of T1
-- [ ] T9a — The `Mode` interface in `window`; `files` as a package; the sidebar and the viewer ask the mode instead of checking it · serves R3 · test: `TestTheWindowImportsNoMode`
-- [ ] T9b — `review` as the review mode: marks, progress, overview, `v`; `main` registers both modes · serves R3, R6 · test: `TestMarksSavedBeforeTheSplitAreRead`
+- [x] T9a — The `Mode` interface in `window`; `files` as a package; the sidebar and the viewer ask the mode instead of checking it · serves R3 · test: `TestTheWindowImportsNoMode`
+- [x] T9b — `review` as the review mode: marks, progress, overview, `v`; `main` registers both modes · serves R3, R6 · test: `TestMarksSavedBeforeTheSplitAreRead`
 - [ ] T10 — Describe the packages in `docs/8-contributing.md` · serves R3
 
 ## Result

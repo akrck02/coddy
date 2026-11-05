@@ -5,7 +5,6 @@ import (
 
 	"github.com/akrck02/code-review/internal/finder"
 	"github.com/akrck02/code-review/internal/pane"
-	"github.com/akrck02/code-review/internal/sidebar"
 	"github.com/akrck02/code-review/internal/viewer"
 	"github.com/akrck02/go-renderer/input"
 	ui "github.com/akrck02/go-ui"
@@ -38,7 +37,7 @@ type command struct {
 // whose key was pressed and that can act now. While a dialog is open, the dialog reads the keys.
 func (application *Window) handleKeys(context *ui.Context) {
 	dialogOpen := application.ModalOpen() || context.WantsKeyboard()
-	for _, command := range commands {
+	for _, command := range application.allCommands() {
 		if dialogOpen && !command.inDialogs {
 			continue
 		}
@@ -92,8 +91,6 @@ var commands = []command{
 			application.sidebar.Leave(application)
 			application.focus = sidebarPane
 		}},
-	{description: "Files mode: only the changed files, or every file", keys: []pane.Press{pane.Key(input.KeyG, "g")},
-		do: func(application *Window, _ *ui.Context, _ int) { application.sidebar.ToggleChangedFilter() }},
 	{description: "Enter the project: the sidebar lists only its tree", keys: []pane.Press{pane.Key(input.KeyE, "e")},
 		do: func(application *Window, _ *ui.Context, _ int) { application.enterCurrentProject() }},
 	{description: "Move between the sidebar and the editor", keys: []pane.Press{pane.Key(input.KeyTab, "Tab")},
@@ -112,24 +109,9 @@ var commands = []command{
 				application.editor.ToggleContext()
 			}
 		}},
-	{description: "Files mode (read any file) / Review mode (the changes, as diffs) / the other one",
+	{description: "The first mode, the second, or the next one: files, review",
 		keys: []pane.Press{{Key: input.Key1, Label: "1", Step: 1}, {Key: input.Key2, Label: "2", Step: 2}, pane.Key(input.KeyC, "c")},
-		do: func(application *Window, _ *ui.Context, step int) {
-			switch step {
-			case 1:
-				application.setMode(sidebar.FilesMode)
-			case 2:
-				application.setMode(sidebar.ReviewMode)
-			default:
-				application.setMode(1 - application.sidebar.Mode)
-			}
-		}},
-	{description: "Mark the file as viewed and open the next one not viewed", keys: []pane.Press{pane.Key(input.KeyV, "v")},
-		do: func(application *Window, _ *ui.Context, _ int) {
-			if reference, ok := application.markTarget(); ok {
-				application.ToggleViewed(reference, application.focus == editorPane || application.editor.Reference == reference)
-			}
-		}},
+		do:   func(application *Window, _ *ui.Context, step int) { application.stepMode(step) }},
 	{description: "Only the projects with changes, or every project (sidebar and finder)", keys: []pane.Press{pane.Key(input.KeyH, "h")},
 		do: func(application *Window, _ *ui.Context, _ int) { application.setOnlyChanged(!application.onlyChanged) }},
 	{description: "Count the changes not committed yet, or only commits", keys: []pane.Press{pane.Key(input.KeyW, "w")},
@@ -192,9 +174,9 @@ var commands = []command{
 type helpRow struct{ keys, description string }
 
 // helpRows lists the commands of a place for the help.
-func helpRows(where place) []helpRow {
+func (application *Window) helpRows(where place) []helpRow {
 	var rows []helpRow
-	for _, command := range commands {
+	for _, command := range application.allCommands() {
 		if command.place != where {
 			continue
 		}

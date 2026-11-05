@@ -36,11 +36,20 @@ type Window interface {
 	FocusViewer()
 	HasProjects() bool
 	OpenFolder()
-	IsViewed(file workspace.FileReference) bool
-	ToggleViewed(file workspace.FileReference, moveOn bool)
+	// FileButton is the button the mode that is on puts in the header, such as Viewed;
+	// PressFileButton presses it.
+	FileButton(file workspace.FileReference) (Button, bool)
+	PressFileButton(file workspace.FileReference)
 	// BuildInsteadOfAFile builds what the window shows while no file is open, and tells whether it
 	// had anything; if not, the view shows how to start.
 	BuildInsteadOfAFile(context *ui.Context) bool
+}
+
+// Button is a button of the header a mode adds, such as Viewed: its icon, its tooltip, and
+// whether it is on.
+type Button struct {
+	Icon, Tip string
+	On        bool
 }
 
 // codeRowHeight is a line of code: 13 pixels of a monospaced face on lines 1.7 times as tall, as roomy as
@@ -462,13 +471,10 @@ func (view *Viewer) buildHeader(context *ui.Context, window Window) {
 		}) {
 			view.SetMode(Mode(mode))
 		}
-		viewed := window.IsViewed(view.Reference)
-		icon := "circle"
-		if viewed {
-			icon = "circle-check"
-		}
-		if theme.ToolButton(context, "Viewed (v)", icon, viewed) {
-			window.ToggleViewed(view.Reference, true)
+		if button, shown := window.FileButton(view.Reference); shown {
+			if theme.ToolButton(context, button.Tip, button.Icon, button.On) {
+				window.PressFileButton(view.Reference)
+			}
 		}
 	})
 }

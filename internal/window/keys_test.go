@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	"github.com/akrck02/code-review/internal/finder"
-	"github.com/akrck02/code-review/internal/sidebar"
 	"github.com/akrck02/code-review/internal/viewer"
 	"github.com/akrck02/go-renderer/input"
 	"github.com/akrck02/go-ui/uitest"
@@ -119,7 +118,7 @@ func (key shortcut) run(test *testing.T) {
 	if key.long {
 		addLongRepository(test, folder)
 	}
-	application := New(Settings{Folders: []string{folder}, WorkingTree: true, Synchronous: true, Open: key.open, Review: key.review})
+	application := newReader(Settings{Folders: []string{folder}, WorkingTree: true, Synchronous: true, Open: key.open, Mode: startIn(key.review)})
 	window := newWindow(test, application)
 	clipboard := &memoryClipboard{}
 	application.tap.state.Clipboard = clipboard
@@ -242,12 +241,12 @@ func TestEveryWindowShortcutDoesItsJob(test *testing.T) {
 		{name: "c switches between the two modes",
 			press: func(window *uitest.Window) { press(window, input.KeyC) },
 			holds: func(application *Window) string {
-				return unless(application.sidebar.Mode == sidebar.ReviewMode, "the review mode is not on")
+				return unless(application.mode.Name() == "Review", "the review mode is not on")
 			}},
 		{name: "1 goes to the files mode", review: true,
 			press: func(window *uitest.Window) { press(window, input.Key1) },
 			holds: func(application *Window) string {
-				return unless(application.sidebar.Mode == sidebar.FilesMode, "the files mode is not on")
+				return unless(application.mode.Name() == "Files", "the files mode is not on")
 			}},
 		{name: "w compares the last commit only",
 			press: func(window *uitest.Window) { press(window, input.KeyW) },

@@ -19,6 +19,7 @@ func sameKeys(first, second pane.Press) bool {
 }
 
 func TestNoTwoCommandsShareAKeyInOneMode(test *testing.T) {
+	commands := newReader(Settings{Synchronous: true}).allCommands()
 	for firstIndex, first := range commands {
 		for secondIndex := firstIndex; secondIndex < len(commands); secondIndex++ {
 			second := commands[secondIndex]
@@ -40,11 +41,11 @@ func TestNoTwoCommandsShareAKeyInOneMode(test *testing.T) {
 }
 
 func TestTheHelpListsEveryCommand(test *testing.T) {
-	application := New(Settings{Folders: []string{makeRepository(test)}, WorkingTree: true, Synchronous: true})
+	application := newReader(Settings{Folders: []string{makeRepository(test)}, WorkingTree: true, Synchronous: true})
 	window := newWindow(test, application)
 	press(window, input.KeyF1)
 	shown := strings.Join(strings.Fields(strings.Join(window.Texts(), " ")), " ")
-	for _, command := range commands {
+	for _, command := range application.allCommands() {
 		if !strings.Contains(shown, command.description) {
 			test.Errorf("the help does not say %q", command.description)
 		}

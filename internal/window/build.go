@@ -6,7 +6,6 @@ import (
 
 	"github.com/akrck02/code-review/internal/finder"
 	"github.com/akrck02/code-review/internal/pane"
-	"github.com/akrck02/code-review/internal/sidebar"
 	"github.com/akrck02/code-review/internal/theme"
 	"github.com/akrck02/code-review/internal/viewer"
 	"github.com/akrck02/go-renderer/draw2d"
@@ -120,19 +119,13 @@ func (application *Window) copyPath(context *ui.Context) {
 	application.toast = "Copied " + path
 }
 
-// buildModeRail is the strip on the far left that chooses what the reader is doing: reading the
-// files, or reviewing the changes. Two places, always in sight, one key each.
+// buildModeRail is the strip on the far left that chooses what the reader is doing, such as reading
+// the files or reviewing the changes: one place per mode, always in sight, one key each.
 func (application *Window) buildModeRail(context *ui.Context) {
 	palette := context.Theme
 	context.Box(ui.Layout{Direction: ui.Vertical, Width: ui.Fixed(48), Height: ui.Grow(), Padding: ui.PadXY(0, 10), Gap: 6, AlignX: ui.Center}, func() {
-		for _, place := range []struct {
-			mode       sidebar.Mode
-			icon, name string
-		}{
-			{sidebar.FilesMode, "folder-tree", "Files (1): read any file, the changes marked beside the lines"},
-			{sidebar.ReviewMode, "git-pull-request", "Review (2): only the changed files, as diffs, marked as viewed one by one"},
-		} {
-			chosen := application.sidebar.Mode == place.mode
+		for _, place := range application.modes {
+			chosen := application.mode == place
 			ink, normal := palette.InkQuiet, ui.Look{Radius: 8}
 			if chosen {
 				ink, normal = palette.Ink, ui.Look{Fill: application.look.Chosen, Radius: 8}
@@ -142,12 +135,12 @@ func (application *Window) buildModeRail(context *ui.Context) {
 				hovered.Fill = application.look.Hover
 			}
 			layout := ui.Layout{Width: ui.Fixed(36), Height: ui.Fixed(36), AlignX: ui.Center, AlignY: ui.Center}
-			if context.Clickable(place.name, layout, ui.Looks{Normal: normal, Hovered: hovered, Pressed: hovered}, func() {
-				context.IconSized(place.icon, 20, ink)
+			if context.Clickable(place.Description(), layout, ui.Looks{Normal: normal, Hovered: hovered, Pressed: hovered}, func() {
+				context.IconSized(place.Icon(), 20, ink)
 			}) {
-				application.setMode(place.mode)
+				application.setMode(place)
 			}
-			context.Tooltip(place.name)
+			context.Tooltip(place.Description())
 		}
 		context.Spacer()
 		if theme.ToolButton(context, "Keys (?)", "keyboard", false) {
@@ -240,7 +233,7 @@ func (application *Window) buildStatusBar(context *ui.Context) {
 	context.Box(ui.Layout{Width: ui.Grow(), Height: ui.Fixed(28), Padding: ui.PadXY(14, 0), Gap: 16, AlignY: ui.Center}, func() {
 		context.Text(fmt.Sprintf("%d projects · %d with changes · %d changed files",
 			len(application.projects), application.projectsWithChanges(), len(application.changedOrder)), small)
-		if viewed, total := application.reviewProgress(); total > 0 {
+		if viewed, total := application.progress(); total > 0 {
 			context.Box(ui.Layout{Gap: 6, AlignY: ui.Center}, func() {
 				colour := palette.InkQuiet
 				if viewed == total {
@@ -359,10 +352,10 @@ func (application *Window) buildHelp(context *ui.Context) {
 	dismissed := context.Sheet("Keys", ui.SheetOptions{Width: ui.Fixed(helpSheetWidth)}, func() {
 		context.Caption("The reader never changes a repository: it only runs git commands that read.")
 		context.Box(ui.Layout{Width: ui.Grow(), Gap: helpColumnGap}, func() {
-			application.buildHelpColumn(context, "Anywhere", helpRows(anywhere))
+			application.buildHelpColumn(context, "Anywhere", application.helpRows(anywhere))
 			context.Box(ui.Layout{Direction: ui.Vertical, Gap: 16}, func() {
-				application.buildHelpColumn(context, "In the sidebar", helpRows(inSidebar))
-				application.buildHelpColumn(context, "In the file", helpRows(inEditor))
+				application.buildHelpColumn(context, "In the sidebar", application.helpRows(inSidebar))
+				application.buildHelpColumn(context, "In the file", application.helpRows(inEditor))
 			})
 		})
 		context.Row(func() {

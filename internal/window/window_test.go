@@ -7,7 +7,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/akrck02/code-review/internal/files"
 	"github.com/akrck02/code-review/internal/finder"
+	"github.com/akrck02/code-review/internal/review"
 	"github.com/akrck02/code-review/internal/sidebar"
 	"github.com/akrck02/code-review/internal/viewer"
 	"github.com/akrck02/code-review/internal/workspace"
@@ -65,7 +67,7 @@ func newWindow(test *testing.T, application *Window) *uitest.Window {
 }
 
 func TestAWorkspaceListsTheChangedFilesOfItsRepositories(test *testing.T) {
-	application := New(Settings{Folders: []string{makeRepository(test)}, WorkingTree: true, Synchronous: true, Review: true})
+	application := newReader(Settings{Folders: []string{makeRepository(test)}, WorkingTree: true, Synchronous: true, Mode: "Review"})
 	newWindow(test, application)
 	if len(application.projects) != 1 {
 		test.Fatalf("found %d projects, want 1", len(application.projects))
@@ -90,7 +92,7 @@ func TestAWorkspaceListsTheChangedFilesOfItsRepositories(test *testing.T) {
 }
 
 func TestNOpensTheChangedFilesOneAfterTheOther(test *testing.T) {
-	application := New(Settings{Folders: []string{makeRepository(test)}, WorkingTree: true, Synchronous: true})
+	application := newReader(Settings{Folders: []string{makeRepository(test)}, WorkingTree: true, Synchronous: true})
 	window := newWindow(test, application)
 	var opened []string
 	for range 3 {
@@ -112,8 +114,8 @@ func TestNOpensTheChangedFilesOneAfterTheOther(test *testing.T) {
 }
 
 func TestTheDiffOfAChangedFileMarksItsLines(test *testing.T) {
-	application := New(Settings{Folders: []string{makeRepository(test)}, WorkingTree: true, Synchronous: true,
-		Open: "lighthouse/src/lamp.go", Review: true})
+	application := newReader(Settings{Folders: []string{makeRepository(test)}, WorkingTree: true, Synchronous: true,
+		Open: "lighthouse/src/lamp.go", Mode: "Review"})
 	newWindow(test, application)
 	if application.editor.Mode != viewer.DiffView {
 		test.Fatalf("a changed file opened in the file view")
@@ -131,7 +133,7 @@ func TestTheDiffOfAChangedFileMarksItsLines(test *testing.T) {
 }
 
 func TestTheFinderOpensAnUnchangedFileByPartOfItsName(test *testing.T) {
-	application := New(Settings{Folders: []string{makeRepository(test)}, WorkingTree: true, Synchronous: true, Review: true})
+	application := newReader(Settings{Folders: []string{makeRepository(test)}, WorkingTree: true, Synchronous: true, Mode: "Review"})
 	window := newWindow(test, application)
 	window.HoldKey(input.KeySuper)
 	window.PressKey(input.KeyP)
@@ -151,7 +153,7 @@ func TestTheFinderOpensAnUnchangedFileByPartOfItsName(test *testing.T) {
 	if document == nil || document.Path != "src/keeper.go" || document.Changed {
 		test.Fatalf("the finder opened %+v, want the unchanged src/keeper.go", document)
 	}
-	if application.sidebar.Mode != sidebar.FilesMode {
+	if application.mode.Name() != "Files" {
 		test.Errorf("the sidebar did not switch to every file to show an unchanged one")
 	}
 }
@@ -198,15 +200,15 @@ func finderFinds(application *Window, label string) bool {
 func TestOnlyTheProjectsWithChangesAreShownInBothModesAndTheFinder(test *testing.T) {
 	folder := makeRepository(test)
 	addUntouchedRepository(test, folder)
-	application := New(Settings{Folders: []string{folder}, WorkingTree: true, Synchronous: true, OnlyChanged: true})
+	application := newReader(Settings{Folders: []string{folder}, WorkingTree: true, Synchronous: true, OnlyChanged: true})
 	window := newWindow(test, application)
 	if len(application.projects) != 2 {
 		test.Fatalf("found %d projects, want 2", len(application.projects))
 	}
-	for _, mode := range []sidebar.Mode{sidebar.ReviewMode, sidebar.FilesMode} {
-		application.sidebar.Mode = mode
+	for _, each := range application.modes {
+		application.setMode(each)
 		if sidebarShows(application, "harbour") || !sidebarShows(application, "lighthouse") {
-			test.Errorf("in mode %d the sidebar does not show only the changed project", mode)
+			test.Errorf("in the %s mode the sidebar does not show only the changed project", each.Name())
 		}
 	}
 	if finderFinds(application, "harbour") || !finderFinds(application, "lighthouse") {
@@ -220,10 +222,10 @@ func TestOnlyTheProjectsWithChangesAreShownInBothModesAndTheFinder(test *testing
 }
 
 func TestTheFilesModeShowsAChangedFileWholeWithItsChangesMarked(test *testing.T) {
-	application := New(Settings{Folders: []string{makeRepository(test)}, WorkingTree: true, Synchronous: true,
+	application := newReader(Settings{Folders: []string{makeRepository(test)}, WorkingTree: true, Synchronous: true,
 		Open: "lighthouse/src/lamp.go"})
 	window := newWindow(test, application)
-	if application.sidebar.Mode != sidebar.FilesMode {
+	if application.mode.Name() != "Files" {
 		test.Fatal("the reader did not start in the files mode")
 	}
 	editor := &application.editor
@@ -238,7 +240,7 @@ func TestTheFilesModeShowsAChangedFileWholeWithItsChangesMarked(test *testing.T)
 	}
 	window.PressKey(input.Key2)
 	window.Frames(2)
-	if application.sidebar.Mode != sidebar.ReviewMode || editor.Mode != viewer.DiffView {
+	if application.mode.Name() != "Review" || editor.Mode != viewer.DiffView {
 		test.Errorf("2 did not move to the review mode with the file as its diff")
 	}
 	if span, found := editor.Inline[editor.Hunks[0]]; !found || span.Start != 11 {
@@ -247,20 +249,21 @@ func TestTheFilesModeShowsAChangedFileWholeWithItsChangesMarked(test *testing.T)
 }
 
 func TestMarkingAFileViewedOpensTheNextOneNotViewed(test *testing.T) {
-	application := New(Settings{Folders: []string{makeRepository(test)}, WorkingTree: true, Synchronous: true,
-		Open: "lighthouse/src/lamp.go", Review: true})
+	application := newReader(Settings{Folders: []string{makeRepository(test)}, WorkingTree: true, Synchronous: true,
+		Open: "lighthouse/src/lamp.go", Mode: "Review"})
 	window := newWindow(test, application)
 	window.PressKey(input.KeyTab)
 	window.Frames(1)
 	window.PressKey(input.KeyV)
 	window.Frames(2)
-	if !application.IsViewed(workspace.FileReference{Project: 0, Path: "src/lamp.go"}) {
+	reviewing := application.mode.(*review.Mode)
+	if !reviewing.IsViewed(workspace.FileReference{Project: 0, Path: "src/lamp.go"}) {
 		test.Fatal("v did not mark lamp.go as viewed")
 	}
 	if document := application.editor.Document; document == nil || document.Path != "notes.txt" {
 		test.Fatalf("v did not open the next file not viewed, notes.txt")
 	}
-	if viewed, total := application.reviewProgress(); viewed != 1 || total != 3 {
+	if viewed, total := reviewing.Progress(); viewed != 1 || total != 3 {
 		test.Errorf("the progress is %d of %d, want 1 of 3", viewed, total)
 	}
 }
@@ -268,7 +271,7 @@ func TestMarkingAFileViewedOpensTheNextOneNotViewed(test *testing.T) {
 func TestEnteringAProjectListsOnlyItsTree(test *testing.T) {
 	folder := makeRepository(test)
 	addUntouchedRepository(test, folder)
-	application := New(Settings{Folders: []string{folder}, WorkingTree: true, Synchronous: true})
+	application := newReader(Settings{Folders: []string{folder}, WorkingTree: true, Synchronous: true})
 	window := newWindow(test, application)
 	tree := &application.sidebar
 	tree.Rebuild(application)
@@ -302,7 +305,7 @@ func TestEnteringAProjectListsOnlyItsTree(test *testing.T) {
 }
 
 func TestTheFilesModeCanListOnlyTheChangedFiles(test *testing.T) {
-	application := New(Settings{Folders: []string{makeRepository(test)}, WorkingTree: true, Synchronous: true})
+	application := newReader(Settings{Folders: []string{makeRepository(test)}, WorkingTree: true, Synchronous: true})
 	window := newWindow(test, application)
 	if !sidebarShows(application, "src") {
 		test.Fatal("the project is not open in the files mode")
@@ -321,7 +324,7 @@ func TestTheFilesModeCanListOnlyTheChangedFiles(test *testing.T) {
 }
 
 func TestTheFinderFindsATextAndOpensItsLine(test *testing.T) {
-	application := New(Settings{Folders: []string{makeRepository(test)}, WorkingTree: true, Synchronous: true})
+	application := newReader(Settings{Folders: []string{makeRepository(test)}, WorkingTree: true, Synchronous: true})
 	window := newWindow(test, application)
 	window.HoldKey(input.KeySuper)
 	window.HoldKey(input.KeyShift)
@@ -343,4 +346,17 @@ func TestTheFinderFindsATextAndOpensItsLine(test *testing.T) {
 	if editor.Document == nil || editor.Document.Path != "src/beam.go" || editor.MarkedLine != 3 {
 		test.Fatalf("Enter opened %+v at line %d, want src/beam.go at line 3", editor.Document, editor.MarkedLine)
 	}
+}
+
+// newReader makes a reader with the program's two modes, keeping the viewed marks only in memory.
+func newReader(settings Settings) *Window {
+	return New(settings, files.New(), review.New(""))
+}
+
+// startIn names the mode a test starts in: the review mode, or the first.
+func startIn(reviewing bool) string {
+	if reviewing {
+		return "Review"
+	}
+	return ""
 }

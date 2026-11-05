@@ -79,6 +79,7 @@ func TestTheWorkspaceImportsNoInterface(test *testing.T) {
 		"github.com/akrck02/code-review/internal/theme",
 		"github.com/akrck02/code-review/internal/pane",
 		"github.com/akrck02/code-review/internal/window",
+		"github.com/akrck02/code-review/internal/mode",
 		"github.com/akrck02/code-review/internal/files",
 		"github.com/akrck02/code-review/internal/review",
 	}
@@ -94,5 +95,14 @@ func TestNoPaneImportsTheWindow(test *testing.T) {
 		if found := importsAny(test, pane, "github.com/akrck02/code-review/internal/window"); found != "" {
 			test.Errorf("%s imports %s", pane, found)
 		}
+	}
+}
+
+// A mode is one package and one line in main: the window holds the modes it is given and imports
+// none of them.
+func TestTheWindowImportsNoMode(test *testing.T) {
+	modes := []string{"github.com/akrck02/code-review/internal/files", "github.com/akrck02/code-review/internal/review"}
+	if found := importsAny(test, "window", modes...); found != "" {
+		test.Errorf("window imports %s", found)
 	}
 }

@@ -15,14 +15,6 @@ import (
 	ui "github.com/akrck02/go-ui"
 )
 
-// Mode is what the sidebar lists.
-type Mode int
-
-const (
-	FilesMode  Mode = iota // every file, to read the code: the default
-	ReviewMode             // only what the development changed, to review it file by file
-)
-
 type RowKind int
 
 const (
@@ -52,12 +44,9 @@ type Window interface {
 	FocusViewer()
 	FocusSidebar()
 	SidebarFocused() bool
-	IsViewed(file workspace.FileReference) bool
-	ToggleViewed(file workspace.FileReference, moveOn bool)
-	// ReviewProgress counts the changed files viewed, and all of them, in the projects shown;
-	// ProjectProgress counts them in one project.
-	ReviewProgress() (viewed, total int)
-	ProjectProgress(project *workspace.Project) (viewed, total int)
+	// ListEveryFile turns to a mode that lists every file, to show one the development did not
+	// change.
+	ListEveryFile()
 	// ClassKind is what a Java or Kotlin file declares, once read; asking for one not read yet
 	// has it read in the background.
 	ClassKind(file workspace.FileReference) java.ClassKind
@@ -81,9 +70,10 @@ type Row struct {
 }
 
 type Sidebar struct {
-	Mode Mode
+	// Listing is the mode that is on, which says what the sidebar lists and how; the window sets it.
+	Listing Listing
 	// expanded keeps the folders and projects opened or closed by hand, by key; the others follow
-	// the mode's default (everything open in the review mode, closed in the files mode).
+	// the default (everything open when only the changes are listed, closed otherwise).
 	expanded map[string]bool
 	trees    map[treeKey]*workspace.Folder
 	Rows     []Row
@@ -94,14 +84,14 @@ type Sidebar struct {
 	// entered is the project the sidebar was taken into, by its path: then only its tree is
 	// listed, from its top, as if it were the only project open. Empty lists every project.
 	Entered string
-	// onlyChanged lists, in the files mode, only the files the development changed, still opened
-	// whole with their changes marked: a lighter way in than the review mode.
+	// onlyChanged lists, in a mode that lists every file, only the files the development changed,
+	// still opened as that mode opens them: a lighter way in than a mode of changes only.
 	onlyChanged bool
 }
 
 type treeKey struct {
 	project int
-	mode    Mode
+	mode    string
 	changed bool
 }
 
@@ -115,7 +105,7 @@ func (sidebar *Sidebar) Invalidate() {
 }
 
 func (sidebar *Sidebar) expandedKey(project int, path string) string {
-	return fmt.Sprintf("%d|%t|%d|%s", sidebar.Mode, sidebar.listsChangesOnly(), project, path)
+	return fmt.Sprintf("%s|%t|%d|%s", sidebar.Listing.Name(), sidebar.listsChangesOnly(), project, path)
 }
 
 func (sidebar *Sidebar) isExpanded(window Window, project int, path string, isProject bool) bool {
@@ -129,7 +119,7 @@ func (sidebar *Sidebar) isExpanded(window Window, project int, path string, isPr
 }
 
 func (sidebar *Sidebar) tree(window Window, project int) *workspace.Folder {
-	key := treeKey{project, sidebar.Mode, sidebar.listsChangesOnly()}
+	key := treeKey{project, sidebar.Listing.Name(), sidebar.listsChangesOnly()}
 	if tree, built := sidebar.trees[key]; built {
 		return tree
 	}
@@ -274,8 +264,8 @@ func (sidebar *Sidebar) RevealFile(window Window, reference workspace.FileRefere
 	if !changed {
 		sidebar.onlyChanged = false
 	}
-	if sidebar.Mode == ReviewMode && !changed {
-		sidebar.Mode = FilesMode
+	if sidebar.Listing.ChangesOnly() && !changed {
+		window.ListEveryFile()
 	}
 	sidebar.expanded[sidebar.expandedKey(reference.Project, "")] = true
 	folder := sidebar.tree(window, reference.Project)
@@ -429,20 +419,14 @@ func (sidebar *Sidebar) Build(context *ui.Context, window Window) {
 				sidebar.buildEnteredHeader(context, window)
 				return
 			}
-			title := "Files"
-			if sidebar.Mode == ReviewMode {
-				title = "Review"
-			}
+			title := sidebar.Listing.Name()
 			titleStyle := ui.TextStyle{Weight: draw2d.Medium, Color: palette.InkSoft}
 			context.Text(title, titleStyle)
 			room := sidebar.headerRoom() - theme.TextWidth(context, title, titleStyle) - toolButtonWidth*2 - headerGap*3
-			if sidebar.Mode == ReviewMode {
-				viewed, total := window.ReviewProgress()
+			if header := sidebar.Listing.Header(); header != "" {
 				progressStyle := ui.TextStyle{Size: palette.SmallTextSize, Color: palette.InkQuiet}
-				if total > 0 {
-					if progress := theme.FitText(context, fmt.Sprintf("%d of %d viewed", viewed, total), progressStyle, room); progress != "" {
-						context.Text(progress, progressStyle)
-					}
+				if progress := theme.FitText(context, header, progressStyle, room); progress != "" {
+					context.Text(progress, progressStyle)
 				}
 			}
 			context.Spacer()
@@ -462,7 +446,7 @@ func (sidebar *Sidebar) Build(context *ui.Context, window Window) {
 				if sidebar.onEnter(index, x) {
 					sidebar.Enter(window, sidebar.Rows[index].Project)
 				} else if sidebar.onCheck(index, x) {
-					window.ToggleViewed(workspace.FileReference{Project: sidebar.Rows[index].Project, Path: sidebar.Rows[index].Path}, false)
+					sidebar.Listing.Press(workspace.FileReference{Project: sidebar.Rows[index].Project, Path: sidebar.Rows[index].Path}, false)
 				} else {
 					sidebar.activate(window, index)
 				}
@@ -488,18 +472,21 @@ func (sidebar *Sidebar) buildEnteredHeader(context *ui.Context, window Window) {
 		return
 	}
 	count, countStyle := "", ui.TextStyle{Size: palette.SmallTextSize, Weight: draw2d.Mono, Color: palette.Warning}
-	if sidebar.Mode == ReviewMode && len(project.Changes) > 0 {
-		viewed, total := window.ProjectProgress(project)
-		count, countStyle.Color = fmt.Sprintf("%d/%d", viewed, total), palette.InkQuiet
-	} else if len(project.Changes) > 0 {
-		count = fmt.Sprint(len(project.Changes))
+	if len(project.Changes) > 0 {
+		decoration := sidebar.Listing.Decorate(Row{Kind: ProjectRow, Project: index, Changed: len(project.Changes)})
+		if len(decoration.Words) > 0 {
+			count, countStyle.Color = decoration.Words[0].Text, decoration.Words[0].Ink.colour(palette)
+		}
+		if decoration.Progress != nil {
+			countStyle.Color = palette.InkQuiet // the header keeps the bar's colour for the rows
+		}
 	}
 	// what is left for the name and the branch once the buttons and the count have their room
 	room := sidebar.headerRoom() - toolButtonWidth - headerGap
 	if count != "" {
 		room -= theme.TextWidth(context, count, countStyle) + headerGap
 	}
-	if sidebar.Mode == FilesMode {
+	if !sidebar.Listing.ChangesOnly() {
 		room -= toolButtonWidth + headerGap
 	}
 	nameStyle := ui.TextStyle{Weight: draw2d.Medium}
@@ -529,15 +516,16 @@ func (sidebar *Sidebar) headerRoom() float32 {
 	return sidebar.Width - 2*headerPadding - 4
 }
 
-// listsChangesOnly tells whether the tree lists only the changed files: always in the review mode,
-// and in the files mode when asked.
+// listsChangesOnly tells whether the tree lists only the changed files: always in a mode of changes
+// only, and in the others when asked.
 func (sidebar *Sidebar) listsChangesOnly() bool {
-	return sidebar.Mode == ReviewMode || sidebar.onlyChanged
+	return sidebar.Listing.ChangesOnly() || sidebar.onlyChanged
 }
 
-// ToggleChangedFilter lists only the changed files in the files mode, or every file again.
+// ToggleChangedFilter lists only the changed files, or every file again, in a mode that lists
+// every file.
 func (sidebar *Sidebar) ToggleChangedFilter() {
-	if sidebar.Mode != FilesMode {
+	if sidebar.Listing.ChangesOnly() {
 		return
 	}
 	sidebar.onlyChanged = !sidebar.onlyChanged
@@ -545,9 +533,10 @@ func (sidebar *Sidebar) ToggleChangedFilter() {
 	sidebar.list.Offset = 0
 }
 
-// buildChangedFilter is the files mode's button that lists only the changed files.
+// buildChangedFilter is the button that lists only the changed files, in a mode that lists every
+// file.
 func (sidebar *Sidebar) buildChangedFilter(context *ui.Context) {
-	if sidebar.Mode != FilesMode {
+	if sidebar.Listing.ChangesOnly() {
 		return
 	}
 	if theme.ToolButton(context, "Only the changed files (g)", "file-diff", sidebar.onlyChanged) {
@@ -565,10 +554,10 @@ func (sidebar *Sidebar) onEnter(index int, x float32) bool {
 	return sidebar.Rows[index].Kind == ProjectRow && x >= right-enterButtonWidth && x <= right
 }
 
-// onCheck tells whether a click at x on a row fell on its viewed mark, in the review mode.
+// onCheck tells whether a click at x on a row fell on its mark, when the mode marks files.
 func (sidebar *Sidebar) onCheck(index int, x float32) bool {
 	row := sidebar.Rows[index]
-	if sidebar.Mode != ReviewMode || row.Kind != FileRow {
+	if row.Kind != FileRow || sidebar.Listing.Decorate(row).Mark == NoMark {
 		return false
 	}
 	left := sidebar.rowLeft(row)
@@ -644,13 +633,14 @@ func (sidebar *Sidebar) paint(context *ui.Context, window Window, drawing *draw2
 			drawing.Icon(icon, x, iconTop, treeIconSize, iconInk)
 			x += treeIconSize + 7
 		case FileRow:
-			// in the review mode the room a folder gives its chevron holds the viewed mark
-			if sidebar.Mode == ReviewMode {
-				check, checkInk := "circle", palette.InkQuiet
-				if window.IsViewed(reference) {
-					check, checkInk, ink = "circle-check", palette.InkSoft, palette.InkQuiet
-				}
-				drawing.Icon(check, x, iconTop, treeIconSize, checkInk)
+			// when the mode marks files, the room a folder gives its chevron holds the mark
+			decoration := sidebar.Listing.Decorate(row)
+			switch decoration.Mark {
+			case OpenMark:
+				drawing.Icon("circle", x, iconTop, treeIconSize, palette.InkQuiet)
+			case DoneMark:
+				ink = palette.InkQuiet
+				drawing.Icon("circle-check", x, iconTop, treeIconSize, palette.InkSoft)
 			}
 			x += treeIconSize + 4
 			// a Java or Kotlin class is named without its extension and drawn by its kind, as
@@ -666,9 +656,9 @@ func (sidebar *Sidebar) paint(context *ui.Context, window Window, drawing *draw2
 				drawing.Icon(icon, x, iconTop, treeIconSize, iconInk)
 			}
 			x += treeIconSize + 7
-			// in the files mode the name says how the file changed, as Zed's project panel does;
-			// in the review mode every file changed, and the colour is kept for its counts
-			if row.Status != git.Unchanged && sidebar.Mode == FilesMode {
+			// the name may say how the file changed, as Zed's project panel does; where every file
+			// listed changed, the colour is kept for its counts
+			if row.Status != git.Unchanged && decoration.Tinted {
 				ink = theme.StatusColour(palette, row.Status)
 			}
 		case NoteRow:
@@ -710,8 +700,7 @@ func (sidebar *Sidebar) paint(context *ui.Context, window Window, drawing *draw2
 }
 
 // paintRight paints what a row shows on its right, from right to left, and returns where it ends:
-// a file's status letter and, in the review mode, the lines it adds and removes; a project's
-// changed files, or how many of them were viewed.
+// a file's status letter, a project still being read, and what the mode adds.
 func (sidebar *Sidebar) paintRight(context *ui.Context, window Window, drawing *draw2d.List, row Row, right, baseline, top float32) float32 {
 	palette := context.Theme
 	measurer := context.Measurer()
@@ -728,58 +717,36 @@ func (sidebar *Sidebar) paintRight(context *ui.Context, window Window, drawing *
 			return right
 		}
 		text(row.Status.Letter(), theme.StatusColour(palette, row.Status))
-		if sidebar.Mode == ReviewMode {
-			project := window.Projects()[row.Project]
-			counts := project.Counts[row.Path]
-			if counts.Binary {
-				text("bin", palette.InkQuiet)
-				break
-			}
-			viewed := window.IsViewed(workspace.FileReference{Project: row.Project, Path: row.Path})
-			removedInk, addedInk := palette.Danger, palette.Positive
-			if viewed {
-				removedInk, addedInk = palette.InkQuiet, palette.InkQuiet
-			}
-			if counts.Removed > 0 {
-				text(fmt.Sprintf("−%d", counts.Removed), removedInk)
-			}
-			if counts.Added > 0 {
-				text(fmt.Sprintf("+%d", counts.Added), addedInk)
-			}
-		}
 	case ProjectRow:
-		project := window.Projects()[row.Project]
-		if !project.Loaded {
+		if !window.Projects()[row.Project].Loaded {
 			text("…", palette.InkQuiet)
-			break
+			return right
 		}
 		if row.Changed == 0 {
-			break
+			return right
 		}
-		if sidebar.Mode == FilesMode {
-			text(fmt.Sprint(row.Changed), palette.Warning)
-			break
-		}
-		viewed, total := window.ProjectProgress(project)
-		colour := palette.InkQuiet
-		if viewed == total {
-			colour = palette.Positive
-		}
-		text(fmt.Sprintf("%d/%d", viewed, total), colour)
+	case FolderRow:
+	default:
+		return right
+	}
+	decoration := sidebar.Listing.Decorate(row)
+	for _, word := range decoration.Words {
+		text(word.Text, word.Ink.colour(palette))
+	}
+	if progress := decoration.Progress; progress != nil {
 		bar := draw2d.Rectangle{X: right - 28, Y: top + RowHeight/2 - 1.5, Width: 28, Height: 3}
 		drawing.Rectangle(bar, 1.5, window.Look().Hover.Mix(palette.Ink, 0.12), draw2d.Color{}, 0)
-		if total > 0 && viewed > 0 {
+		if progress.Total > 0 && progress.Done > 0 {
 			done := bar
-			done.Width = bar.Width * float32(viewed) / float32(total)
-			drawing.Rectangle(done, 1.5, colour, draw2d.Color{}, 0)
+			done.Width = bar.Width * float32(progress.Done) / float32(progress.Total)
+			drawing.Rectangle(done, 1.5, progress.Ink.colour(palette), draw2d.Color{}, 0)
 		}
 		right -= 36
-	case FolderRow:
-		if row.Changed > 0 && sidebar.Mode == FilesMode {
-			dot := draw2d.Rectangle{X: right - 6, Y: top + RowHeight/2 - 3, Width: 6, Height: 6}
-			drawing.Rectangle(dot, 3, palette.Warning.WithAlpha(0.8), draw2d.Color{}, 0)
-			right -= 14
-		}
+	}
+	if decoration.Dot {
+		dot := draw2d.Rectangle{X: right - 6, Y: top + RowHeight/2 - 3, Width: 6, Height: 6}
+		drawing.Rectangle(dot, 3, palette.Warning.WithAlpha(0.8), draw2d.Color{}, 0)
+		right -= 14
 	}
 	return right
 }
