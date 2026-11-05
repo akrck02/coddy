@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/akrck02/code-review/internal/pane"
 	"github.com/akrck02/go-renderer/input"
 )
 
@@ -13,8 +14,8 @@ func overlaps(first, second place) bool {
 }
 
 // sameKeys tells whether two key presses are the same keys, so one would hide the other.
-func sameKeys(first, second keyPress) bool {
-	return first.key == second.key && first.text == second.text && first.command == second.command && first.shift == second.shift
+func sameKeys(first, second pane.Press) bool {
+	return first.Key == second.Key && first.Text == second.Text && first.Command == second.Command && first.Shift == second.Shift
 }
 
 func TestNoTwoCommandsShareAKeyInOneMode(test *testing.T) {
@@ -30,7 +31,7 @@ func TestNoTwoCommandsShareAKeyInOneMode(test *testing.T) {
 						continue
 					}
 					if sameKeys(firstKey, secondKey) {
-						test.Errorf("%s is the key of both %q and %q", firstKey.label, first.description, second.description)
+						test.Errorf("%s is the key of both %q and %q", firstKey.Label, first.description, second.description)
 					}
 				}
 			}
@@ -48,8 +49,8 @@ func TestTheHelpListsEveryCommand(test *testing.T) {
 			test.Errorf("the help does not say %q", command.description)
 		}
 		for _, press := range command.keys {
-			if press.label == "" || !strings.Contains(shown, press.label) {
-				test.Errorf("the help does not show the key %q of %q", press.label, command.description)
+			if press.Label == "" || !strings.Contains(shown, press.Label) {
+				test.Errorf("the help does not show the key %q of %q", press.Label, command.description)
 			}
 		}
 	}
