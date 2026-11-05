@@ -1,6 +1,6 @@
 # 1. Split the reader into packages, one per mode
 
-> Status: building · Author's approval: proposal ☑ plan ☑
+> Status: building, plan changed at T8 · Author's approval: proposal ☑ plan ☑ (T8 changed, to approve)
 
 ## Why
 
@@ -42,7 +42,10 @@ internal/workspace/       projects, changes, documents, diff rows, line marks, t
 internal/git/             the read-only runner, unchanged
 internal/highlight/       unchanged
 internal/java/            the IntelliJ-style tree and class kinds
-internal/theme/           Zed One colours, light and dark, and the icon of each file type
+internal/theme/           Zed One colours, light and dark, the icon of each file type, and
+                          the reader's own controls (tool buttons, switches, fitted text)
+internal/pane/            what every pane shares: the frame's keys and a list of rows that
+                          scrolls
 internal/window/          title bar, mode rail, status bar, layout, commands and keys,
                           background work
 internal/viewer/          the code view both modes share: rows, scrolling, gutter, painting
@@ -61,10 +64,12 @@ Where today's files go:
 | `review/javatree.go`, `app/classes.go` | `java` (the badge painting moves to `sidebar`) |
 | `review/fuzzy.go`, `app/finder.go` | `finder` |
 | `review/reviewed.go`, `app/reviewing.go` | `review` |
-| `app/editor.go`, `app/scroller.go` | `viewer` |
+| `app/editor.go` | `viewer` |
+| `app/scroller.go`, the keys of `app/input.go` | `pane` |
+| `fileReference` in `app/app.go` | `workspace.FileReference` |
 | `app/sidebar.go` | `sidebar` |
 | `app/theme.go`, `app/fileicons.go` | `theme` |
-| `app/app.go`, `build.go`, `input.go` | `window` |
+| `app/app.go`, `build.go`, `work.go`, `commands.go`, the input tap of `input.go` | `window` |
 
 **Modes.** `window` declares what a mode is; `files` and `review` implement it; `main` registers
 them. `window` imports no mode, and the panes import `theme` instead of `window`, so the arrows only
@@ -80,6 +85,25 @@ type Mode interface {
 	Commands() []Command
 }
 ```
+
+**How a pane talks to the window.** A pane never imports `window`. Each pane package declares,
+as an interface, the little it needs from the window, and `window` implements it. The sidebar,
+for instance, asks for the projects, opens a file, and asks whether a file was viewed:
+
+```go
+// Window is what the sidebar needs from the window it sits in.
+type Window interface {
+	Projects() []*workspace.Project
+	Open(file workspace.FileReference)
+	IsViewed(file workspace.FileReference) bool
+	ClassKind(file workspace.FileReference) java.ClassKind
+}
+```
+
+Today each pane reaches into `App` in 10 to 15 ways; most are reads of state that becomes a
+method of one of these interfaces. *Changed while building: the first design did not say where
+the pieces every pane shares go (the scrolling list, the keys, a file's reference), nor how a pane
+asks the window for something. T8 is split into steps for that.*
 
 **Commands.** A command has a name, a key and the mode it belongs to, such as
 `{Name: "Mark as viewed", Key: "v", Mode: "review"}`. The window finds clashes at start and builds
@@ -119,7 +143,11 @@ Each task leaves the reader working and every test passing.
 - [x] T5 — Move the Java tree and class kinds into `java` · serves R1 · test: `TestAJavaTreeMarksRootsAndJoinsPackages`
 - [x] T6 — Background work with keys and cancelling · `app/work.go`, which becomes `window` · serves R8 · test: `TestANewerSearchCancelsTheOlderOne`
 - [x] T7 — Commands, keys and the help built from them · `app/commands.go`, which becomes `window` · serves R7 · tests: `TestNoTwoCommandsShareAKeyInOneMode`, `TestTheHelpListsEveryCommand`
-- [ ] T8 — `viewer`, `sidebar` and `finder` as packages · serves R1 · test: the tests of T1
+- [ ] T8a — `theme` as a package: looks, file icons, the reader's controls · serves R1 · test: the tests of T1
+- [ ] T8b — `pane` as a package, and `workspace.FileReference` · serves R1 · test: the tests of T1
+- [ ] T8c — `viewer` as a package, with the interface it needs from the window · serves R1 · test: the tests of T1
+- [ ] T8d — `finder` as a package, with the fuzzy search · serves R1 · test: the tests of T1
+- [ ] T8e — `sidebar` as a package; `app` becomes `window` · serves R1 · test: the tests of T1
 - [ ] T9 — The `Mode` interface; `files` and `review` as packages · serves R3, R6 · tests: `TestTheWindowImportsNoMode`, `TestMarksSavedBeforeTheSplitAreRead`
 - [ ] T10 — Describe the packages in `docs/8-contributing.md` · serves R3
 
