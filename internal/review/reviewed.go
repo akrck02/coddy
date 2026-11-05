@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+
+	"github.com/akrck02/go-renderer/failure"
 )
 
 // Reviewed remembers the changed files a reviewer has marked as viewed, as GitHub's "Viewed" box
@@ -24,7 +26,7 @@ func OpenReviewed(path string) *Reviewed {
 		return reviewed
 	}
 	if content, err := os.ReadFile(path); err == nil {
-		_ = json.Unmarshal(content, &reviewed.marked)
+		_ = json.Unmarshal(content, &reviewed.marked) // a damaged file starts empty, as its comment says
 	}
 	if reviewed.marked == nil {
 		reviewed.marked = map[string]map[string]string{}
@@ -71,13 +73,19 @@ func (reviewed *Reviewed) SetViewed(project *Project, path string, viewed bool) 
 	}
 	content, err := json.MarshalIndent(reviewed.marked, "", "  ")
 	reviewed.mutex.Unlock()
-	if err != nil || reviewed.path == "" {
-		return err
+	if err != nil {
+		return failure.Wrap(MarksNotKept, reviewed.path, err)
+	}
+	if reviewed.path == "" {
+		return nil
 	}
 	if err := os.MkdirAll(filepath.Dir(reviewed.path), 0o755); err != nil {
-		return err
+		return failure.Wrap(MarksNotKept, reviewed.path, err)
 	}
-	return os.WriteFile(reviewed.path, content, 0o644)
+	if err := os.WriteFile(reviewed.path, content, 0o644); err != nil {
+		return failure.Wrap(MarksNotKept, reviewed.path, err)
+	}
+	return nil
 }
 
 // Progress counts a project's changed files viewed so far.

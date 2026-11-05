@@ -3,9 +3,10 @@ package git
 import (
 	"bufio"
 	"bytes"
-	"fmt"
 	"strconv"
 	"strings"
+
+	"github.com/akrck02/go-renderer/failure"
 )
 
 // Status is what happened to a file in a development.
@@ -215,7 +216,7 @@ func parseUnifiedDiff(output []byte) (FileDiff, error) {
 func parseHunkHeader(header string) (oldStart, newStart int, err error) {
 	fields := strings.Fields(header)
 	if len(fields) < 3 {
-		return 0, 0, fmt.Errorf("unreadable hunk header %q", header)
+		return 0, 0, failure.Wrap(UnreadableDiff, "hunk header "+strconv.Quote(header), nil)
 	}
 	oldStart, err = hunkStart(fields[1], "-")
 	if err != nil {
@@ -232,7 +233,7 @@ func hunkStart(field, sign string) (int, error) {
 	}
 	start, err := strconv.Atoi(field)
 	if err != nil {
-		return 0, fmt.Errorf("unreadable hunk start %q", field)
+		return 0, failure.Wrap(UnreadableDiff, "hunk start "+strconv.Quote(field), err)
 	}
 	if start == 0 {
 		start = 1 // an empty side starts at 0; its first line, if any, is line 1

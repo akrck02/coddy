@@ -7,7 +7,7 @@ import (
 
 func TestOnlyReadOnlyCommandsRun(test *testing.T) {
 	for _, command := range []string{"commit", "push", "fetch", "checkout", "reset", "add", "update-index", "gc", "status"} {
-		if _, err := run(".", command); !errors.Is(err, ErrNotReadOnly) {
+		if _, err := run(".", command); !errors.Is(err, CommandNotReadOnly) {
 			test.Errorf("git %s was allowed to run", command)
 		}
 	}

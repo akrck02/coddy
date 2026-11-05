@@ -15,7 +15,7 @@ now, while there are two modes to learn from, is cheaper than after the third.
 | Id | Requirement | Check |
 |---|---|---|
 | R1 | Everything a reviewer does today works the same after the split. | The tests of today pass, plus new ones for every shortcut of each mode (T1). |
-| R2 | The reader still never writes to a repository it reviews. | `TestOnlyReadOnlyCommandsRun` passes unchanged. |
+| R2 | The reader still never writes to a repository it reviews. | `TestOnlyReadOnlyCommandsRun` refuses the same commands as today. |
 | R3 | A mode lives in one package; adding one takes that package and one line in `main`. | `TestTheWindowImportsNoMode`: `window` imports neither `files` nor `review`. |
 | R4 | Dependencies point one way: the domain knows nothing of the window. | `TestTheWorkspaceImportsNoInterface`: `workspace` imports no `go-ui`, `window` or mode. |
 | R5 | Every error carries a code that programs check and people can search for. | Each package's `errors_test.go` checks its constructors; no `errors.New` or `fmt.Errorf` outside the error package. |
@@ -90,9 +90,11 @@ counter: work under a key that is already running cancels it through a `context.
 today's limit of six readers and the synchronous mode for captures and tests.
 
 **Errors.** Each package declares its codes in `errors.go`, such as
-`var CommandNotReadOnly = failure.Define("git.command-not-read-only", "the git command is not on the read-only list")`. Go Engine already
-has `failure`; the rules ask for one shared module instead of a copy, so `failure` moves to its
-own module that both use. That module is a new dependency and needs the author's yes.
+`var CommandNotReadOnly = failure.Define("git.command-not-read-only", "the git command is not on the read-only list")`.
+The codes come from Go Renderer's `failure` package: the reader already depends on Go Renderer,
+so this adds no dependency and copies nothing. *Changed while building: the plan first moved
+Go Engine's `failure` into a module of its own, which would have meant publishing a new
+repository; Go Renderer already publishes the same package.*
 
 **Read-only stays where it is.** The whitelist in `git` is the only guarantee today, and it stays
 the only one. No write interface or permission layer is added before a mode needs one.
@@ -110,9 +112,9 @@ Alternatives not taken:
 
 Each task leaves the reader working and every test passing.
 
-- [x] T1 — Pin today's behaviour: a test for each shortcut of each mode · `internal/app/app_test.go` · serves R1
+- [x] T1 — Pin today's behaviour: a test for each shortcut of each mode · `internal/app/keys_test.go` · serves R1
 - [x] T2 — Move `main.go` to `cmd/code-review/` · serves R1 · test: `go build ./...`
-- [ ] T3 — Move `failure` to its own module and give `git` and `workspace` error codes · `errors.go` per package · serves R5 · test: `errors_test.go`
+- [x] T3 — Give `git` and `review` error codes from Go Renderer's `failure` · `errors.go` per package · serves R5 · test: `errors_test.go`
 - [ ] T4 — Turn `review`'s domain files into `workspace` · serves R4 · test: `TestTheWorkspaceImportsNoInterface`
 - [ ] T5 — Move the Java tree and class kinds into `java` · serves R1 · test: `TestAJavaTreeMarksRootsAndJoinsPackages`
 - [ ] T6 — Background work with keys and cancelling · `window/work.go` · serves R8 · test: `TestANewerSearchCancelsTheOlderOne`

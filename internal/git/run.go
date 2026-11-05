@@ -5,11 +5,11 @@ package git
 
 import (
 	"bytes"
-	"errors"
-	"fmt"
 	"os"
 	"os/exec"
 	"strings"
+
+	"github.com/akrck02/go-renderer/failure"
 )
 
 // readOnlyCommands are the only git commands this package runs. None of them writes to a
@@ -26,9 +26,6 @@ var readOnlyCommands = map[string]bool{
 	"symbolic-ref": true,
 }
 
-// ErrNotReadOnly is returned when code asks for a git command that is not known to be read-only.
-var ErrNotReadOnly = errors.New("git command is not on the read-only list")
-
 // safetyOptions keep git from writing or from starting other programs while it reads: no optional
 // locks (so the index is not refreshed and written back), no file system monitor daemon, no
 // external diff or text conversion programs, no pager and no colours.
@@ -44,7 +41,7 @@ var safetyOptions = []string{
 // run runs a read-only git command in a repository and returns what it printed.
 func run(repository string, arguments ...string) ([]byte, error) {
 	if len(arguments) == 0 || !readOnlyCommands[arguments[0]] {
-		return nil, ErrNotReadOnly
+		return nil, CommandNotReadOnly
 	}
 	command := exec.Command("git", append(append([]string{}, safetyOptions...), arguments...)...)
 	command.Dir = repository
@@ -62,7 +59,7 @@ func run(repository string, arguments ...string) ([]byte, error) {
 		if message == "" {
 			message = err.Error()
 		}
-		return output.Bytes(), fmt.Errorf("git %s: %s", arguments[0], message)
+		return output.Bytes(), failure.Wrap(CommandFailed, "git "+arguments[0]+": "+message, err)
 	}
 	return output.Bytes(), nil
 }
