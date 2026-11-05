@@ -146,10 +146,16 @@ The interface follows what review tools have settled on, and keeps colour for me
 
 | Package | |
 |---|---|
+| `cmd/code-review` | The program: flags and wiring |
 | `internal/git` | The read-only git commands, and reading their output |
 | `internal/highlight` | Chroma's tokens, cut into lines of coloured pieces |
-| `internal/review` | Projects, changes, a file's two sides and its diff, folding, the tree, the fuzzy finder |
-| `internal/app` | The window: sidebar, editor, finder and dialogs |
+| `internal/workspace` | Projects, changes, a file's two sides and its diff, folding, the tree |
+| `internal/java` | The IntelliJ-style tree and the kinds of class |
+| `internal/review` | The marks of the files viewed, and their file |
+| `internal/theme` | Zed's One colours, file icons and the reader's own controls |
+| `internal/pane` | What every pane shares: the keys and a scrolling list |
+| `internal/viewer`, `internal/sidebar`, `internal/finder` | The panes |
+| `internal/window` | The window: layout, commands, dialogs and background work |
 
 go-ui describes the window again at every frame. The sidebar, the code and the finder's results
 are painted by the program (`Context.Paint`) as lists that only draw the rows in sight, with their

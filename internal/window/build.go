@@ -1,4 +1,4 @@
-package app
+package window
 
 import (
 	"fmt"
@@ -6,6 +6,7 @@ import (
 
 	"github.com/akrck02/code-review/internal/finder"
 	"github.com/akrck02/code-review/internal/pane"
+	"github.com/akrck02/code-review/internal/sidebar"
 	"github.com/akrck02/code-review/internal/theme"
 	"github.com/akrck02/code-review/internal/viewer"
 	"github.com/akrck02/go-renderer/draw2d"
@@ -22,7 +23,7 @@ type baseDialog struct {
 }
 
 // Build describes the whole window for a frame; give it to window.Run.
-func (application *App) Build(context *ui.Context) {
+func (application *Window) Build(context *ui.Context) {
 	if !application.themeSet {
 		application.applyTheme(context)
 		application.themeSet = true
@@ -43,10 +44,10 @@ func (application *App) Build(context *ui.Context) {
 			// when the window is made narrow
 			windowWidth, _ := context.Size()
 			widest := min(max(windowWidth*0.4, 220), 720)
-			application.sidebar.width = min(application.sidebar.width, widest)
-			context.Resizable("sidebar", ui.RightSide, &application.sidebar.width, 220, widest,
+			application.sidebar.Width = min(application.sidebar.Width, widest)
+			context.Resizable("sidebar", ui.RightSide, &application.sidebar.Width, 220, widest,
 				ui.Layout{Direction: ui.Vertical, Height: ui.Grow()}, func() {
-					application.sidebar.build(context, application)
+					application.sidebar.Build(context, application)
 				})
 			context.Frame(ui.Layout{Width: ui.Fixed(1), Height: ui.Grow()}, ui.Look{Fill: context.Theme.Line}, nil)
 			application.editor.Build(context, application)
@@ -65,23 +66,23 @@ func (application *App) Build(context *ui.Context) {
 	}
 }
 
-func (application *App) applyTheme(context *ui.Context) {
+func (application *Window) applyTheme(context *ui.Context) {
 	application.setLook()
 	context.Theme = application.look.Theme
 }
 
-func (application *App) ModalOpen() bool {
+func (application *Window) ModalOpen() bool {
 	return application.finder.Open || application.base.open || application.helpOpen || application.pickerOpen
 }
 
 // enterCurrentProject takes the sidebar into the project of the selected row, or of the file open.
-func (application *App) enterCurrentProject() {
-	if row, ok := application.sidebar.selectedRow(); ok && row.project >= 0 && application.focus == sidebarPane {
-		application.sidebar.enter(application, row.project)
+func (application *Window) enterCurrentProject() {
+	if row, ok := application.sidebar.SelectedRow(); ok && row.Project >= 0 && application.focus == sidebarPane {
+		application.sidebar.Enter(application, row.Project)
 		return
 	}
 	if application.editor.IsOpen() {
-		application.sidebar.enter(application, application.editor.Reference.Project)
+		application.sidebar.Enter(application, application.editor.Reference.Project)
 	}
 }
 
@@ -92,7 +93,7 @@ func workingTreeNote(on bool) string {
 	return "Comparing the last commit only"
 }
 
-func (application *App) toggleFocus() {
+func (application *Window) toggleFocus() {
 	if application.focus == sidebarPane && application.editor.IsOpen() {
 		application.focus = editorPane
 		return
@@ -100,7 +101,7 @@ func (application *App) toggleFocus() {
 	application.focus = sidebarPane
 }
 
-func (application *App) toggleView() {
+func (application *Window) toggleView() {
 	editor := &application.editor
 	if editor.Mode == viewer.DiffView {
 		editor.SetMode(viewer.FileView)
@@ -110,7 +111,7 @@ func (application *App) toggleView() {
 }
 
 // copyPath puts the open file's path, from the project's top, on the clipboard.
-func (application *App) copyPath(context *ui.Context) {
+func (application *Window) copyPath(context *ui.Context) {
 	if !application.editor.IsOpen() {
 		return
 	}
@@ -121,17 +122,17 @@ func (application *App) copyPath(context *ui.Context) {
 
 // buildModeRail is the strip on the far left that chooses what the reader is doing: reading the
 // files, or reviewing the changes. Two places, always in sight, one key each.
-func (application *App) buildModeRail(context *ui.Context) {
+func (application *Window) buildModeRail(context *ui.Context) {
 	palette := context.Theme
 	context.Box(ui.Layout{Direction: ui.Vertical, Width: ui.Fixed(48), Height: ui.Grow(), Padding: ui.PadXY(0, 10), Gap: 6, AlignX: ui.Center}, func() {
 		for _, place := range []struct {
-			mode       sidebarMode
+			mode       sidebar.Mode
 			icon, name string
 		}{
-			{filesMode, "folder-tree", "Files (1): read any file, the changes marked beside the lines"},
-			{reviewMode, "git-pull-request", "Review (2): only the changed files, as diffs, marked as viewed one by one"},
+			{sidebar.FilesMode, "folder-tree", "Files (1): read any file, the changes marked beside the lines"},
+			{sidebar.ReviewMode, "git-pull-request", "Review (2): only the changed files, as diffs, marked as viewed one by one"},
 		} {
-			chosen := application.sidebar.mode == place.mode
+			chosen := application.sidebar.Mode == place.mode
 			ink, normal := palette.InkQuiet, ui.Look{Radius: 8}
 			if chosen {
 				ink, normal = palette.Ink, ui.Look{Fill: application.look.Chosen, Radius: 8}
@@ -157,7 +158,7 @@ func (application *App) buildModeRail(context *ui.Context) {
 
 // buildTitleBar is the top of the window: the workspace on the left, a search field in the middle
 // that opens the finder, and the comparison's settings on the right, as icons.
-func (application *App) buildTitleBar(context *ui.Context) {
+func (application *Window) buildTitleBar(context *ui.Context) {
 	palette := context.Theme
 	context.Box(ui.Layout{Width: ui.Grow(), Height: ui.Fixed(44), Padding: ui.PadXY(14, 0), Gap: 8, AlignY: ui.Center}, func() {
 		context.Box(ui.Layout{Width: ui.Grow(), Gap: 8, AlignY: ui.Center}, func() {
@@ -221,7 +222,7 @@ func (application *App) buildTitleBar(context *ui.Context) {
 	})
 }
 
-func (application *App) title() string {
+func (application *Window) title() string {
 	switch len(application.folders) {
 	case 0:
 		return "Code review"
@@ -233,7 +234,7 @@ func (application *App) title() string {
 
 // buildStatusBar says where the development stands: its projects and changed files, how much of
 // it has been viewed, and where the open file's branch stands against its base.
-func (application *App) buildStatusBar(context *ui.Context) {
+func (application *Window) buildStatusBar(context *ui.Context) {
 	palette := context.Theme
 	small := ui.TextStyle{Size: palette.SmallTextSize, Color: palette.InkSoft}
 	context.Box(ui.Layout{Width: ui.Grow(), Height: ui.Fixed(28), Padding: ui.PadXY(14, 0), Gap: 16, AlignY: ui.Center}, func() {
@@ -278,15 +279,15 @@ func (application *App) buildStatusBar(context *ui.Context) {
 	})
 }
 
-func (application *App) openBaseDialog() {
+func (application *Window) openBaseDialog() {
 	dialog := &application.base
 	dialog.open = true
 	dialog.focusNext = true
 	dialog.forProject = ""
 	if application.editor.IsOpen() {
 		dialog.forProject = application.editor.Project.Path
-	} else if row, ok := application.sidebar.selectedRow(); ok && row.project >= 0 {
-		dialog.forProject = application.projects[row.project].Path
+	} else if row, ok := application.sidebar.SelectedRow(); ok && row.Project >= 0 {
+		dialog.forProject = application.projects[row.Project].Path
 	}
 	dialog.ref = application.settings.Base
 	if dialog.forProject != "" {
@@ -299,7 +300,7 @@ func (application *App) openBaseDialog() {
 	}
 }
 
-func (application *App) buildBaseDialog(context *ui.Context) {
+func (application *Window) buildBaseDialog(context *ui.Context) {
 	dialog := &application.base
 	if !dialog.open {
 		return
@@ -351,7 +352,7 @@ func (application *App) buildBaseDialog(context *ui.Context) {
 	application.projectsChanged()
 }
 
-func (application *App) buildHelp(context *ui.Context) {
+func (application *Window) buildHelp(context *ui.Context) {
 	if !application.helpOpen {
 		return
 	}
@@ -377,7 +378,7 @@ func (application *App) buildHelp(context *ui.Context) {
 }
 
 // buildHelpColumn lists the keys of one place, under its name.
-func (application *App) buildHelpColumn(context *ui.Context, title string, rows []helpRow) {
+func (application *Window) buildHelpColumn(context *ui.Context, title string, rows []helpRow) {
 	context.Box(ui.Layout{Direction: ui.Vertical, Gap: 4}, func() {
 		context.Text(title, ui.TextStyle{Weight: draw2d.Bold})
 		for _, row := range rows {
@@ -402,7 +403,7 @@ const (
 	helpSheetWidth = 2*(helpKeysWidth+12+helpTextWidth) + helpColumnGap + 48
 )
 
-func (application *App) buildPicker(context *ui.Context) {
+func (application *Window) buildPicker(context *ui.Context) {
 	if !application.pickerOpen {
 		return
 	}
@@ -419,11 +420,4 @@ func (application *App) buildPicker(context *ui.Context) {
 	if closed {
 		application.pickerOpen = false
 	}
-}
-
-func (sidebar *sidebarState) selectedRow() (treeRow, bool) {
-	if sidebar.selected < 0 || sidebar.selected >= len(sidebar.rows) {
-		return treeRow{}, false
-	}
-	return sidebar.rows[sidebar.selected], true
 }

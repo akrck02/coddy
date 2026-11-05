@@ -1,4 +1,4 @@
-package app
+package window
 
 import (
 	"os"
@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/akrck02/code-review/internal/finder"
+	"github.com/akrck02/code-review/internal/sidebar"
 	"github.com/akrck02/code-review/internal/viewer"
 	"github.com/akrck02/code-review/internal/workspace"
 	"github.com/akrck02/go-renderer/input"
@@ -53,7 +54,7 @@ func makeRepository(test *testing.T) string {
 	return folder
 }
 
-func newWindow(test *testing.T, application *App) *uitest.Window {
+func newWindow(test *testing.T, application *Window) *uitest.Window {
 	test.Helper()
 	window, err := uitest.New(application.Build, uitest.Driver(application.Driver()), uitest.Size(1200, 800))
 	if err != nil {
@@ -74,8 +75,8 @@ func TestAWorkspaceListsTheChangedFilesOfItsRepositories(test *testing.T) {
 		test.Fatalf("base %q with %d changes, want main with 3 (%s)", project.Base, len(project.Changes), project.Error)
 	}
 	var labels []string
-	for _, row := range application.sidebar.rows {
-		labels = append(labels, row.label)
+	for _, row := range application.sidebar.Rows {
+		labels = append(labels, row.Label)
 	}
 	shown := strings.Join(labels, ",")
 	for _, wanted := range []string{"lighthouse", "beam.go", "lamp.go", "notes.txt"} {
@@ -150,7 +151,7 @@ func TestTheFinderOpensAnUnchangedFileByPartOfItsName(test *testing.T) {
 	if document == nil || document.Path != "src/keeper.go" || document.Changed {
 		test.Fatalf("the finder opened %+v, want the unchanged src/keeper.go", document)
 	}
-	if application.sidebar.mode != filesMode {
+	if application.sidebar.Mode != sidebar.FilesMode {
 		test.Errorf("the sidebar did not switch to every file to show an unchanged one")
 	}
 }
@@ -175,17 +176,17 @@ func addUntouchedRepository(test *testing.T, folder string) {
 	}
 }
 
-func sidebarShows(application *App, label string) bool {
-	application.sidebar.rebuild(application)
-	for _, row := range application.sidebar.rows {
-		if row.label == label {
+func sidebarShows(application *Window, label string) bool {
+	application.sidebar.Rebuild(application)
+	for _, row := range application.sidebar.Rows {
+		if row.Label == label {
 			return true
 		}
 	}
 	return false
 }
 
-func finderFinds(application *App, label string) bool {
+func finderFinds(application *Window, label string) bool {
 	for _, candidate := range application.candidates {
 		if strings.HasPrefix(candidate.Label, label+"/") {
 			return true
@@ -202,8 +203,8 @@ func TestOnlyTheProjectsWithChangesAreShownInBothModesAndTheFinder(test *testing
 	if len(application.projects) != 2 {
 		test.Fatalf("found %d projects, want 2", len(application.projects))
 	}
-	for _, mode := range []sidebarMode{reviewMode, filesMode} {
-		application.sidebar.mode = mode
+	for _, mode := range []sidebar.Mode{sidebar.ReviewMode, sidebar.FilesMode} {
+		application.sidebar.Mode = mode
 		if sidebarShows(application, "harbour") || !sidebarShows(application, "lighthouse") {
 			test.Errorf("in mode %d the sidebar does not show only the changed project", mode)
 		}
@@ -222,7 +223,7 @@ func TestTheFilesModeShowsAChangedFileWholeWithItsChangesMarked(test *testing.T)
 	application := New(Settings{Folders: []string{makeRepository(test)}, WorkingTree: true, Synchronous: true,
 		Open: "lighthouse/src/lamp.go"})
 	window := newWindow(test, application)
-	if application.sidebar.mode != filesMode {
+	if application.sidebar.Mode != sidebar.FilesMode {
 		test.Fatal("the reader did not start in the files mode")
 	}
 	editor := &application.editor
@@ -237,7 +238,7 @@ func TestTheFilesModeShowsAChangedFileWholeWithItsChangesMarked(test *testing.T)
 	}
 	window.PressKey(input.Key2)
 	window.Frames(2)
-	if application.sidebar.mode != reviewMode || editor.Mode != viewer.DiffView {
+	if application.sidebar.Mode != sidebar.ReviewMode || editor.Mode != viewer.DiffView {
 		test.Errorf("2 did not move to the review mode with the file as its diff")
 	}
 	if span, found := editor.Inline[editor.Hunks[0]]; !found || span.Start != 11 {
@@ -269,25 +270,25 @@ func TestEnteringAProjectListsOnlyItsTree(test *testing.T) {
 	addUntouchedRepository(test, folder)
 	application := New(Settings{Folders: []string{folder}, WorkingTree: true, Synchronous: true})
 	window := newWindow(test, application)
-	sidebar := &application.sidebar
-	sidebar.rebuild(application)
-	for index, row := range sidebar.rows {
-		if row.kind == projectRow && row.label == "lighthouse" {
-			sidebar.selected = index
+	tree := &application.sidebar
+	tree.Rebuild(application)
+	for index, row := range tree.Rows {
+		if row.Kind == sidebar.ProjectRow && row.Label == "lighthouse" {
+			tree.Selected = index
 		}
 	}
 	window.PressKey(input.KeyEnter)
 	window.Frames(2)
-	if sidebar.entered == "" {
+	if tree.Entered == "" {
 		test.Fatal("Enter on a project did not enter it")
 	}
-	inside := application.projectIndex(sidebar.entered)
+	inside := application.projectIndex(tree.Entered)
 	if application.projects[inside].Name != "lighthouse" {
-		test.Fatalf("entered %s, want lighthouse", sidebar.entered)
+		test.Fatalf("entered %s, want lighthouse", tree.Entered)
 	}
-	for _, row := range sidebar.rows {
-		if row.kind == projectRow || row.project != inside {
-			test.Fatalf("inside lighthouse the sidebar still lists %q of project %d", row.label, row.project)
+	for _, row := range tree.Rows {
+		if row.Kind == sidebar.ProjectRow || row.Project != inside {
+			test.Fatalf("inside lighthouse the sidebar still lists %q of project %d", row.Label, row.Project)
 		}
 	}
 	if !sidebarShows(application, "src") || !sidebarShows(application, "notes.txt") {
@@ -295,7 +296,7 @@ func TestEnteringAProjectListsOnlyItsTree(test *testing.T) {
 	}
 	window.PressKey(input.KeyEscape)
 	window.Frames(2)
-	if sidebar.entered != "" || !sidebarShows(application, "harbour") {
+	if tree.Entered != "" || !sidebarShows(application, "harbour") {
 		test.Error("Esc did not go back to every project")
 	}
 }
@@ -313,7 +314,7 @@ func TestTheFilesModeCanListOnlyTheChangedFiles(test *testing.T) {
 	}
 	window.PressKey(input.KeyG)
 	window.Frames(2)
-	application.sidebar.setExpanded(treeRow{project: 0, path: "src"}, true)
+	application.sidebar.SetExpanded(sidebar.Row{Project: 0, Path: "src"}, true)
 	if !sidebarShows(application, "keeper.go") {
 		test.Error("g again did not list every file")
 	}

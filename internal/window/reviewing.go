@@ -1,8 +1,9 @@
-package app
+package window
 
 import (
 	"fmt"
 
+	"github.com/akrck02/code-review/internal/sidebar"
 	"github.com/akrck02/code-review/internal/viewer"
 	"github.com/akrck02/code-review/internal/workspace"
 	"github.com/akrck02/go-renderer/draw2d"
@@ -11,24 +12,24 @@ import (
 
 // setMode moves between reading the files and reviewing the changes. The file open stays open,
 // shown as the mode shows a file: whole in the files mode, as its diff in the review mode.
-func (application *App) setMode(mode sidebarMode) {
-	if application.sidebar.mode == mode {
+func (application *Window) setMode(mode sidebar.Mode) {
+	if application.sidebar.Mode == mode {
 		return
 	}
-	application.sidebar.mode = mode
-	application.sidebar.stale = true
-	if mode == reviewMode {
+	application.sidebar.Mode = mode
+	application.sidebar.Stale = true
+	if mode == sidebar.ReviewMode {
 		application.editor.SetMode(viewer.DiffView)
 	} else {
 		application.editor.SetMode(viewer.FileView)
 	}
 	if application.editor.IsOpen() {
-		application.sidebar.revealFile(application, application.editor.Reference)
+		application.sidebar.RevealFile(application, application.editor.Reference)
 	}
 }
 
 // IsViewed tells whether a changed file was marked as viewed as its text is now.
-func (application *App) IsViewed(reference workspace.FileReference) bool {
+func (application *Window) IsViewed(reference workspace.FileReference) bool {
 	if reference.Project < 0 || reference.Project >= len(application.projects) {
 		return false
 	}
@@ -36,7 +37,7 @@ func (application *App) IsViewed(reference workspace.FileReference) bool {
 }
 
 // reviewProgress counts the changed files viewed, in the projects shown.
-func (application *App) reviewProgress() (viewed, total int) {
+func (application *Window) reviewProgress() (viewed, total int) {
 	for _, project := range application.projects {
 		if application.hidden(project) {
 			continue
@@ -50,7 +51,7 @@ func (application *App) reviewProgress() (viewed, total int) {
 
 // ToggleViewed marks a changed file as viewed, or not. Marking the file open as viewed moves on to
 // the next file not viewed yet, as a reviewer who is done with one wants the next.
-func (application *App) ToggleViewed(reference workspace.FileReference, moveOn bool) {
+func (application *Window) ToggleViewed(reference workspace.FileReference, moveOn bool) {
 	if reference.Project < 0 || reference.Project >= len(application.projects) {
 		return
 	}
@@ -73,7 +74,7 @@ func (application *App) ToggleViewed(reference workspace.FileReference, moveOn b
 
 // openNextUnviewed opens the first changed file after this one that was not viewed yet, going
 // round to the start; false when there is none.
-func (application *App) openNextUnviewed(after workspace.FileReference) bool {
+func (application *Window) openNextUnviewed(after workspace.FileReference) bool {
 	order := application.changedOrder
 	start := 0
 	for index, reference := range order {
@@ -86,7 +87,7 @@ func (application *App) openNextUnviewed(after workspace.FileReference) bool {
 		reference := order[(start+step)%len(order)]
 		if application.inScope(reference) && !application.IsViewed(reference) {
 			application.openFile(reference)
-			application.sidebar.revealFile(application, reference)
+			application.sidebar.RevealFile(application, reference)
 			return true
 		}
 	}
@@ -94,10 +95,10 @@ func (application *App) openNextUnviewed(after workspace.FileReference) bool {
 }
 
 // markTarget is the file v marks: the one open, or the one selected in the sidebar.
-func (application *App) markTarget() (workspace.FileReference, bool) {
+func (application *Window) markTarget() (workspace.FileReference, bool) {
 	if application.focus == sidebarPane {
-		if row, ok := application.sidebar.selectedRow(); ok && row.kind == fileRow {
-			return workspace.FileReference{Project: row.project, Path: row.path}, true
+		if row, ok := application.sidebar.SelectedRow(); ok && row.Kind == sidebar.FileRow {
+			return workspace.FileReference{Project: row.Project, Path: row.Path}, true
 		}
 	}
 	if application.editor.IsOpen() {
@@ -109,7 +110,7 @@ func (application *App) markTarget() (workspace.FileReference, bool) {
 // buildOverview is what the review mode shows before a file is open: each project the development
 // changed, where its branch stands against its base, how much it changed and how much of it has
 // been viewed, to choose where to start.
-func (application *App) buildOverview(context *ui.Context) {
+func (application *Window) buildOverview(context *ui.Context) {
 	palette := context.Theme
 	look := application.look
 	context.Frame(ui.Layout{Direction: ui.Vertical, Width: ui.Grow(), Height: ui.Grow()}, ui.Look{Fill: look.Editor}, func() {
@@ -133,7 +134,7 @@ func (application *App) buildOverview(context *ui.Context) {
 	})
 }
 
-func (application *App) buildOverviewRow(context *ui.Context, index int, project *workspace.Project) {
+func (application *Window) buildOverviewRow(context *ui.Context, index int, project *workspace.Project) {
 	palette := context.Theme
 	look := application.look
 	viewed, total := application.reviewed.Progress(project)
@@ -178,7 +179,7 @@ func (application *App) buildOverviewRow(context *ui.Context, index int, project
 }
 
 // openFirstUnviewedOf opens a project's first changed file not viewed yet, or its first one.
-func (application *App) openFirstUnviewedOf(project int) {
+func (application *Window) openFirstUnviewedOf(project int) {
 	var first *workspace.FileReference
 	for _, reference := range application.changedOrder {
 		if reference.Project != project {
@@ -195,7 +196,7 @@ func (application *App) openFirstUnviewedOf(project int) {
 	}
 	if first != nil {
 		application.openFile(*first)
-		application.sidebar.revealFile(application, *first)
+		application.sidebar.RevealFile(application, *first)
 		application.focus = editorPane
 	}
 }

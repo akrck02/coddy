@@ -1,14 +1,15 @@
-package app
+package window
 
 import (
 	"strings"
 
 	"github.com/akrck02/code-review/internal/finder"
 	"github.com/akrck02/code-review/internal/pane"
+	"github.com/akrck02/code-review/internal/sidebar"
 	"github.com/akrck02/code-review/internal/viewer"
 	"github.com/akrck02/go-renderer/input"
 	ui "github.com/akrck02/go-ui"
-	"github.com/akrck02/go-ui/window"
+	platform "github.com/akrck02/go-ui/window"
 )
 
 // place is where a command works: anywhere in the window, or in the pane with the keyboard.
@@ -44,8 +45,8 @@ type command struct {
 	// inDialogs runs the command even while a dialog is open (quitting)
 	inDialogs bool
 	// applies tells whether the command can act now; nil means always
-	applies func(application *App) bool
-	do      func(application *App, context *ui.Context, step int)
+	applies func(application *Window) bool
+	do      func(application *Window, context *ui.Context, step int)
 }
 
 // matches tells which of a command's keys the frame's input pressed.
@@ -79,7 +80,7 @@ func commandKey(code input.Key, label string) keyPress {
 
 // handleKeys runs the command the frame's keys ask for: the first one, in the order of commands,
 // whose key was pressed and that can act now. While a dialog is open, the dialog reads the keys.
-func (application *App) handleKeys(context *ui.Context) {
+func (application *Window) handleKeys(context *ui.Context) {
 	dialogOpen := application.ModalOpen() || context.WantsKeyboard()
 	for _, command := range commands {
 		if dialogOpen && !command.inDialogs {
@@ -98,7 +99,7 @@ func (application *App) handleKeys(context *ui.Context) {
 }
 
 // isIn tells whether the keyboard is in a place.
-func (application *App) isIn(where place) bool {
+func (application *Window) isIn(where place) bool {
 	switch where {
 	case inSidebar:
 		return application.focus == sidebarPane
@@ -111,122 +112,124 @@ func (application *App) isIn(where place) bool {
 // commands are every shortcut of the reader, in the order they are tried. The help lists them.
 var commands = []command{
 	{description: "Quit", inDialogs: true, keys: []keyPress{commandKey(input.KeyQ, "⌘Q")},
-		do: func(*App, *ui.Context, int) { window.Quit() }},
+		do: func(*Window, *ui.Context, int) { platform.Quit() }},
 	{description: "Find a text in the files of every project (Tab switches in the finder)",
 		keys: []keyPress{{key: input.KeyF, command: true, shift: true, label: "⌘⇧F"}, {text: "/", label: "/"}},
-		do:   func(application *App, _ *ui.Context, _ int) { application.finder.Show(finder.ContentScope) }},
+		do:   func(application *Window, _ *ui.Context, _ int) { application.finder.Show(finder.ContentScope) }},
 	{description: "Find a file by its name, in any project",
 		keys: []keyPress{commandKey(input.KeyP, "⌘P"), {key: input.KeyP, shift: true, label: "Shift+P"}},
-		do:   func(application *App, _ *ui.Context, _ int) { application.finder.Show(finder.NamesScope) }},
+		do:   func(application *Window, _ *ui.Context, _ int) { application.finder.Show(finder.NamesScope) }},
 	{description: "Open a repository or a folder of repositories",
 		keys: []keyPress{key(input.KeyO, "o"), commandKey(input.KeyO, "⌘O")},
-		do:   func(application *App, _ *ui.Context, _ int) { application.pickerOpen = true }},
+		do:   func(application *Window, _ *ui.Context, _ int) { application.pickerOpen = true }},
 	{description: "Read every project again",
 		keys: []keyPress{key(input.KeyR, "r"), commandKey(input.KeyR, "⌘R")},
-		do: func(application *App, _ *ui.Context, _ int) {
+		do: func(application *Window, _ *ui.Context, _ int) {
 			application.reloadAll()
 			application.toast = "Reading the projects again"
 		}},
 	{description: "Compare against another branch, tag or commit", keys: []keyPress{key(input.KeyB, "b")},
-		do: func(application *App, _ *ui.Context, _ int) { application.openBaseDialog() }},
+		do: func(application *Window, _ *ui.Context, _ int) { application.openBaseDialog() }},
 	{description: "Back to every project", keys: []keyPress{key(input.KeyEscape, "Esc"), key(input.KeyBackspace, "Backspace")},
-		applies: func(application *App) bool { return application.sidebar.entered != "" },
-		do: func(application *App, _ *ui.Context, _ int) {
-			application.sidebar.leave(application)
+		applies: func(application *Window) bool { return application.sidebar.Entered != "" },
+		do: func(application *Window, _ *ui.Context, _ int) {
+			application.sidebar.Leave(application)
 			application.focus = sidebarPane
 		}},
 	{description: "Files mode: only the changed files, or every file", keys: []keyPress{key(input.KeyG, "g")},
-		do: func(application *App, _ *ui.Context, _ int) { application.sidebar.toggleChangedFilter() }},
+		do: func(application *Window, _ *ui.Context, _ int) { application.sidebar.ToggleChangedFilter() }},
 	{description: "Enter the project: the sidebar lists only its tree", keys: []keyPress{key(input.KeyE, "e")},
-		do: func(application *App, _ *ui.Context, _ int) { application.enterCurrentProject() }},
+		do: func(application *Window, _ *ui.Context, _ int) { application.enterCurrentProject() }},
 	{description: "Move between the sidebar and the editor", keys: []keyPress{key(input.KeyTab, "Tab")},
-		do: func(application *App, _ *ui.Context, _ int) { application.toggleFocus() }},
+		do: func(application *Window, _ *ui.Context, _ int) { application.toggleFocus() }},
 	{description: "Next / previous changed file, across every project",
 		keys: []keyPress{{key: input.KeyN, label: "n", step: 1}, {key: input.KeyM, label: "m", step: -1}},
-		do:   func(application *App, _ *ui.Context, step int) { application.stepChangedFile(step) }},
+		do:   func(application *Window, _ *ui.Context, step int) { application.stepChangedFile(step) }},
 	{description: "Next / previous change in the file",
 		keys: []keyPress{{key: input.KeyRightBracket, label: "]", step: 1}, {key: input.KeyLeftBracket, label: "[", step: -1}},
-		do:   func(application *App, _ *ui.Context, step int) { application.editor.StepHunk(step) }},
+		do:   func(application *Window, _ *ui.Context, step int) { application.editor.StepHunk(step) }},
 	{description: "Diff or the whole file", keys: []keyPress{key(input.KeyD, "d")},
-		do: func(application *App, _ *ui.Context, _ int) { application.toggleView() }},
+		do: func(application *Window, _ *ui.Context, _ int) { application.toggleView() }},
 	{description: "Fold the unchanged lines, or show them all", keys: []keyPress{key(input.KeyF, "f")},
-		do: func(application *App, _ *ui.Context, _ int) {
+		do: func(application *Window, _ *ui.Context, _ int) {
 			if application.editor.Mode == viewer.DiffView {
 				application.editor.ToggleContext()
 			}
 		}},
 	{description: "Files mode (read any file) / Review mode (the changes, as diffs) / the other one",
 		keys: []keyPress{{key: input.Key1, label: "1", step: 1}, {key: input.Key2, label: "2", step: 2}, key(input.KeyC, "c")},
-		do: func(application *App, _ *ui.Context, step int) {
+		do: func(application *Window, _ *ui.Context, step int) {
 			switch step {
 			case 1:
-				application.setMode(filesMode)
+				application.setMode(sidebar.FilesMode)
 			case 2:
-				application.setMode(reviewMode)
+				application.setMode(sidebar.ReviewMode)
 			default:
-				application.setMode(1 - application.sidebar.mode)
+				application.setMode(1 - application.sidebar.Mode)
 			}
 		}},
 	{description: "Mark the file as viewed and open the next one not viewed", keys: []keyPress{key(input.KeyV, "v")},
-		do: func(application *App, _ *ui.Context, _ int) {
+		do: func(application *Window, _ *ui.Context, _ int) {
 			if reference, ok := application.markTarget(); ok {
 				application.ToggleViewed(reference, application.focus == editorPane || application.editor.Reference == reference)
 			}
 		}},
 	{description: "Only the projects with changes, or every project (sidebar and finder)", keys: []keyPress{key(input.KeyH, "h")},
-		do: func(application *App, _ *ui.Context, _ int) { application.setOnlyChanged(!application.onlyChanged) }},
+		do: func(application *Window, _ *ui.Context, _ int) { application.setOnlyChanged(!application.onlyChanged) }},
 	{description: "Count the changes not committed yet, or only commits", keys: []keyPress{key(input.KeyW, "w")},
-		do: func(application *App, _ *ui.Context, _ int) {
+		do: func(application *Window, _ *ui.Context, _ int) {
 			application.settings.WorkingTree = !application.settings.WorkingTree
 			application.clearDocuments()
 			application.reloadAll()
 			application.toast = workingTreeNote(application.settings.WorkingTree)
 		}},
 	{description: "Light or dark", keys: []keyPress{key(input.KeyT, "t")},
-		do: func(application *App, context *ui.Context, _ int) {
+		do: func(application *Window, context *ui.Context, _ int) {
 			application.dark = !application.dark
 			application.applyTheme(context)
 		}},
 	{description: "Copy the open file's path", keys: []keyPress{key(input.KeyY, "y")},
-		do: func(application *App, context *ui.Context, _ int) { application.copyPath(context) }},
+		do: func(application *Window, context *ui.Context, _ int) { application.copyPath(context) }},
 	{description: "These keys", keys: []keyPress{{text: "?", label: "?"}, key(input.KeyF1, "F1")},
-		do: func(application *App, _ *ui.Context, _ int) { application.helpOpen = true }},
+		do: func(application *Window, _ *ui.Context, _ int) { application.helpOpen = true }},
 
 	{description: "Select the next / previous row, a page, the first / last", place: inSidebar,
 		keys: []keyPress{stepKey(input.KeyDown, "↓", 1), stepKey(input.KeyUp, "↑", -1),
 			stepKey(input.KeyPageDown, "PgDn", pane.PageStep), stepKey(input.KeyPageUp, "PgUp", -pane.PageStep),
 			{key: input.KeyHome, label: "Home", step: -pane.EndStep}, {key: input.KeyEnd, label: "End", step: pane.EndStep}},
-		applies: func(application *App) bool { return len(application.sidebar.rows) > 0 },
-		do:      func(application *App, _ *ui.Context, step int) { application.sidebar.moveSelection(application, step) }},
+		applies: func(application *Window) bool { return len(application.sidebar.Rows) > 0 },
+		do: func(application *Window, _ *ui.Context, step int) {
+			application.sidebar.MoveSelection(application, step)
+		}},
 	{description: "Open / close a folder", place: inSidebar,
 		keys:    []keyPress{stepKey(input.KeyRight, "→", 1), stepKey(input.KeyLeft, "←", -1)},
-		applies: func(application *App) bool { return len(application.sidebar.rows) > 0 },
-		do:      func(application *App, _ *ui.Context, step int) { application.sidebar.openOrClose(application, step) }},
+		applies: func(application *Window) bool { return len(application.sidebar.Rows) > 0 },
+		do:      func(application *Window, _ *ui.Context, step int) { application.sidebar.OpenOrClose(application, step) }},
 	{description: "Open the row: a file (Enter moves to it), a folder, or enter a project", place: inSidebar,
 		keys:    []keyPress{{key: input.KeyEnter, label: "Enter", step: 1}, key(input.KeySpace, "Space")},
-		applies: func(application *App) bool { return len(application.sidebar.rows) > 0 },
-		do: func(application *App, _ *ui.Context, step int) {
-			application.sidebar.openSelected(application, step == 1)
+		applies: func(application *Window) bool { return len(application.sidebar.Rows) > 0 },
+		do: func(application *Window, _ *ui.Context, step int) {
+			application.sidebar.OpenSelected(application, step == 1)
 		}},
 
 	{description: "Scroll a line down / up", place: inEditor,
 		keys: []keyPress{stepKey(input.KeyDown, "↓", 1), stepKey(input.KeyJ, "j", 1), stepKey(input.KeyUp, "↑", -1), stepKey(input.KeyK, "k", -1)},
-		do:   func(application *App, _ *ui.Context, step int) { application.editor.ScrollLines(step) }},
+		do:   func(application *Window, _ *ui.Context, step int) { application.editor.ScrollLines(step) }},
 	{description: "Scroll a page up", place: inEditor,
 		keys: []keyPress{{key: input.KeySpace, shift: true, label: "Shift+Space", step: -pane.PageStep, repeats: true},
 			stepKey(input.KeyPageUp, "PgUp", -pane.PageStep)},
-		do: func(application *App, _ *ui.Context, step int) { application.editor.ScrollLines(step) }},
+		do: func(application *Window, _ *ui.Context, step int) { application.editor.ScrollLines(step) }},
 	{description: "Scroll a page down", place: inEditor,
 		keys: []keyPress{stepKey(input.KeySpace, "Space", pane.PageStep), stepKey(input.KeyPageDown, "PgDn", pane.PageStep)},
-		do:   func(application *App, _ *ui.Context, step int) { application.editor.ScrollLines(step) }},
+		do:   func(application *Window, _ *ui.Context, step int) { application.editor.ScrollLines(step) }},
 	{description: "Go to the top / bottom", place: inEditor,
 		keys: []keyPress{{key: input.KeyHome, label: "Home", step: -pane.EndStep}, {key: input.KeyEnd, label: "End", step: pane.EndStep}},
-		do:   func(application *App, _ *ui.Context, step int) { application.editor.ScrollLines(step) }},
+		do:   func(application *Window, _ *ui.Context, step int) { application.editor.ScrollLines(step) }},
 	{description: "Scroll sideways", place: inEditor,
 		keys: []keyPress{stepKey(input.KeyRight, "→", 1), stepKey(input.KeyLeft, "←", -1)},
-		do:   func(application *App, _ *ui.Context, step int) { application.editor.ScrollSideways(step) }},
+		do:   func(application *Window, _ *ui.Context, step int) { application.editor.ScrollSideways(step) }},
 	{description: "Open a fold in sight", place: inEditor, keys: []keyPress{key(input.KeyEnter, "Enter")},
-		do: func(application *App, _ *ui.Context, _ int) { application.editor.OpenFoldInSight() }},
+		do: func(application *Window, _ *ui.Context, _ int) { application.editor.OpenFoldInSight() }},
 }
 
 // helpRow is a command as the help shows it: its keys and what it does.

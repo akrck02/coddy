@@ -15,11 +15,11 @@ import (
 	"os"
 	"strings"
 
-	"github.com/akrck02/code-review/internal/app"
 	"github.com/akrck02/code-review/internal/review"
+	"github.com/akrck02/code-review/internal/window"
 	"github.com/akrck02/go-renderer/opengl/overlay"
 	ui "github.com/akrck02/go-ui"
-	"github.com/akrck02/go-ui/window"
+	platform "github.com/akrck02/go-ui/window"
 	"golang.org/x/image/font/gofont/gomono"
 )
 
@@ -29,7 +29,7 @@ const (
 )
 
 func main() {
-	options := window.Options{Title: "Code review", MinWidth: 900, MinHeight: 520}
+	options := platform.Options{Title: "Code review", MinWidth: 900, MinHeight: 520}
 	options.RegisterFlags(flag.CommandLine)
 	base := flag.String("base", "", "compare every project against this branch, tag or commit (default: each one's main or master)")
 	committed := flag.Bool("committed", false, "compare the last commit only, leaving out changes not committed yet")
@@ -47,13 +47,13 @@ func main() {
 
 	folders := flag.Args()
 	if len(folders) == 0 {
-		if remembered, found := window.Preference(foldersPreference); found && remembered != "" {
+		if remembered, found := platform.Preference(foldersPreference); found && remembered != "" {
 			folders = existing(strings.Split(remembered, "\n"))
 		}
 	}
 	options.Fonts = overlay.Fonts{Mono: monospaced(*codeFont)}
 
-	reader := app.New(app.Settings{
+	reader := window.New(window.Settings{
 		Folders:     folders,
 		Base:        *base,
 		WorkingTree: !*committed,
@@ -69,10 +69,10 @@ func main() {
 	options.Driver = reader.Driver()
 	options.Hidden = func() {
 		reader.Closed()
-		_ = window.KeepPreference(onlyChangedPreference, fmt.Sprint(reader.OnlyChanged()))
-		_ = window.KeepPreference(foldersPreference, strings.Join(reader.Folders(), "\n"))
+		_ = platform.KeepPreference(onlyChangedPreference, fmt.Sprint(reader.OnlyChanged()))
+		_ = platform.KeepPreference(foldersPreference, strings.Join(reader.Folders(), "\n"))
 	}
-	if err := window.Run(options, func(context *ui.Context) { reader.Build(context) }); err != nil {
+	if err := platform.Run(options, func(context *ui.Context) { reader.Build(context) }); err != nil {
 		log.Fatal(err)
 	}
 }
@@ -83,7 +83,7 @@ func onlyChanged(allProjects bool) bool {
 	if allProjects {
 		return false
 	}
-	remembered, found := window.Preference(onlyChangedPreference)
+	remembered, found := platform.Preference(onlyChangedPreference)
 	return !found || remembered != "false"
 }
 

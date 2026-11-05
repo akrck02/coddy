@@ -1,10 +1,10 @@
-package app
+package window
 
 import (
 	"context"
 	"sync/atomic"
 
-	"github.com/akrck02/go-ui/window"
+	platform "github.com/akrck02/go-ui/window"
 )
 
 // readerLimit is how many repositories are read at once, so a workspace of many projects on a
@@ -124,5 +124,5 @@ func wake() {
 	defer func() {
 		_ = recover() // the window closed between the check and the call: there is nothing to wake
 	}()
-	window.Wake()
+	platform.Wake()
 }

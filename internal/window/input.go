@@ -1,4 +1,4 @@
-package app
+package window
 
 import (
 	"github.com/akrck02/go-renderer/draw2d"

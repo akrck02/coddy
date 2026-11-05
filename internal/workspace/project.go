@@ -106,6 +106,15 @@ func LoadProject(path string, options LoadOptions) *Project {
 	return project
 }
 
+// ChangedPaths are the paths of the files the development changed, sorted.
+func (project *Project) ChangedPaths() []string {
+	paths := make([]string, len(project.Changes))
+	for index, change := range project.Changes {
+		paths[index] = change.Path
+	}
+	return paths
+}
+
 // TotalCounts adds up the lines the development adds and removes in this project.
 func (project *Project) TotalCounts() (added, removed int) {
 	for _, counts := range project.Counts {

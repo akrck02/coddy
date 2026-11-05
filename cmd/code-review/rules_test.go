@@ -76,12 +76,23 @@ func importsAny(test *testing.T, name string, forbidden ...string) string {
 func TestTheWorkspaceImportsNoInterface(test *testing.T) {
 	interfaces := []string{
 		"github.com/akrck02/go-ui",
-		"github.com/akrck02/code-review/internal/app",
+		"github.com/akrck02/code-review/internal/theme",
+		"github.com/akrck02/code-review/internal/pane",
 		"github.com/akrck02/code-review/internal/window",
 		"github.com/akrck02/code-review/internal/files",
 		"github.com/akrck02/code-review/internal/review",
 	}
 	if found := importsAny(test, "workspace", interfaces...); found != "" {
 		test.Errorf("workspace imports %s", found)
+	}
+}
+
+// A pane asks the window for what it needs through an interface of its own, so the arrows only
+// point down: the window knows its panes, and no pane knows the window.
+func TestNoPaneImportsTheWindow(test *testing.T) {
+	for _, pane := range []string{"theme", "pane", "viewer", "sidebar", "finder"} {
+		if found := importsAny(test, pane, "github.com/akrck02/code-review/internal/window"); found != "" {
+			test.Errorf("%s imports %s", pane, found)
+		}
 	}
 }

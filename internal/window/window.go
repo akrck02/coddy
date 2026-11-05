@@ -1,6 +1,6 @@
-// Package app is the reader's window: projects and their files on the left, a file or its diff on
+// Package window is the reader's window: projects and their files on the left, a file or its diff on
 // the right, a finder over every file, all moved through from the keyboard. It only reads.
-package app
+package window
 
 import (
 	"sort"
@@ -11,6 +11,7 @@ import (
 	"github.com/akrck02/code-review/internal/java"
 	"github.com/akrck02/code-review/internal/pane"
 	"github.com/akrck02/code-review/internal/review"
+	"github.com/akrck02/code-review/internal/sidebar"
 	"github.com/akrck02/code-review/internal/theme"
 	"github.com/akrck02/code-review/internal/viewer"
 	"github.com/akrck02/code-review/internal/workspace"
@@ -47,10 +48,10 @@ const (
 	editorPane
 )
 
-// App is the reader. Its fields are only touched from the goroutine that builds the interface;
+// Window is the reader. Its fields are only touched from the goroutine that builds the interface;
 // work done elsewhere (reading repositories and files) runs as jobs of work, whose results come
 // back to that goroutine.
-type App struct {
+type Window struct {
 	settings Settings
 	folders  []string
 
@@ -62,7 +63,7 @@ type App struct {
 	work          *work
 	documentCache map[workspace.FileReference]*workspace.Document
 
-	sidebar sidebarState
+	sidebar sidebar.Sidebar
 	editor  viewer.Viewer
 	finder  finder.Finder
 	base    baseDialog
@@ -88,8 +89,8 @@ type App struct {
 }
 
 // New makes a reader for these settings; Driver must be given to the window it runs in.
-func New(settings Settings) *App {
-	application := &App{
+func New(settings Settings) *Window {
+	application := &Window{
 		settings:      settings,
 		projectBases:  map[string]string{},
 		work:          newWork(settings.Synchronous),
@@ -102,9 +103,9 @@ func New(settings Settings) *App {
 		reviewed:      review.OpenReviewed(settings.ReviewedPath),
 		classKinds:    map[workspace.FileReference]java.ClassKind{},
 	}
-	application.sidebar = newSidebar()
+	application.sidebar = sidebar.New()
 	if settings.Review {
-		application.sidebar.mode = reviewMode
+		application.sidebar.Mode = sidebar.ReviewMode
 	}
 	application.editor = viewer.New()
 	application.setLook()
@@ -120,13 +121,13 @@ func New(settings Settings) *App {
 }
 
 // Driver is what lets the reader see the keys: give it to window.Options.Driver.
-func (application *App) Driver() uidrive.Driver { return application.tap }
+func (application *Window) Driver() uidrive.Driver { return application.tap }
 
 // Folders are the folders opened, to remember them for the next time.
-func (application *App) Folders() []string { return application.folders }
+func (application *Window) Folders() []string { return application.folders }
 
 // setLook picks the light or the dark look.
-func (application *App) setLook() {
+func (application *Window) setLook() {
 	if application.dark {
 		application.look = application.designs.Dark
 	} else {
@@ -135,10 +136,10 @@ func (application *App) setLook() {
 }
 
 // Closed tells the reader its window has closed, so work still running does not wake it.
-func (application *App) Closed() { windowOpen.Store(false) }
+func (application *Window) Closed() { windowOpen.Store(false) }
 
 // openFolders adds repositories, or the repositories inside folders, and reads them.
-func (application *App) openFolders(folders []string) {
+func (application *Window) openFolders(folders []string) {
 	known := map[string]bool{}
 	for _, project := range application.projects {
 		known[project.Path] = true
@@ -163,7 +164,7 @@ func (application *App) openFolders(folders []string) {
 }
 
 // closeAll forgets every project.
-func (application *App) closeAll() {
+func (application *Window) closeAll() {
 	application.projects = nil
 	application.folders = nil
 	application.documentCache = map[workspace.FileReference]*workspace.Document{}
@@ -172,7 +173,7 @@ func (application *App) closeAll() {
 }
 
 // reloadAll reads every project again: after a change of base, or to see new commits.
-func (application *App) reloadAll() {
+func (application *Window) reloadAll() {
 	for index := range application.projects {
 		application.reload(index)
 	}
@@ -180,7 +181,7 @@ func (application *App) reloadAll() {
 }
 
 // reload reads one project again, on another goroutine.
-func (application *App) reload(index int) {
+func (application *Window) reload(index int) {
 	project := application.projects[index]
 	path := project.Path
 	options := workspace.LoadOptions{Base: application.baseFor(path), WorkingTree: application.settings.WorkingTree}
@@ -211,7 +212,7 @@ func (application *App) reload(index int) {
 }
 
 // baseFor is the base a project is compared against: its own, the one for all, or its default.
-func (application *App) baseFor(path string) string {
+func (application *Window) baseFor(path string) string {
 	if base, chosen := application.projectBases[path]; chosen {
 		return base
 	}
@@ -220,7 +221,7 @@ func (application *App) baseFor(path string) string {
 
 // projectsChanged rebuilds what is made from the projects: the finder's files, the order of the
 // changed files and the sidebar's rows.
-func (application *App) projectsChanged() {
+func (application *Window) projectsChanged() {
 	application.candidates = application.candidates[:0]
 	application.changedOrder = application.changedOrder[:0]
 	for index, project := range application.projects {
@@ -233,13 +234,13 @@ func (application *App) projectsChanged() {
 				Project: index, Path: path, Label: project.Name + "/" + path, Changed: changed,
 			})
 		}
-		tree := workspace.BuildTree(changedPaths(project), nil)
+		tree := workspace.BuildTree(project.ChangedPaths(), nil)
 		walkFiles(tree, func(path string) {
 			application.changedOrder = append(application.changedOrder, workspace.FileReference{Project: index, Path: path})
 		})
 	}
 	application.finder.Stale = true
-	application.sidebar.invalidate()
+	application.sidebar.Invalidate()
 }
 
 // walkFiles visits a tree's files in the order the sidebar shows them: folders first.
@@ -252,23 +253,15 @@ func walkFiles(folder *workspace.Folder, visit func(path string)) {
 	}
 }
 
-func changedPaths(project *workspace.Project) []string {
-	paths := make([]string, len(project.Changes))
-	for index, change := range project.Changes {
-		paths[index] = change.Path
-	}
-	return paths
-}
-
 // openFile opens a file of a project in the editor, reading it on another goroutine.
-func (application *App) openFile(reference workspace.FileReference) {
+func (application *Window) openFile(reference workspace.FileReference) {
 	if reference.Project < 0 || reference.Project >= len(application.projects) {
 		return
 	}
 	project := application.projects[reference.Project]
 	application.editor.Start(reference, project)
 	if document, cached := application.documentCache[reference]; cached {
-		application.editor.Show(document, application.sidebar.mode == reviewMode)
+		application.editor.Show(document, application.sidebar.Mode == sidebar.ReviewMode)
 		return
 	}
 	workingTree := application.settings.WorkingTree
@@ -281,14 +274,14 @@ func (application *App) openFile(reference workspace.FileReference) {
 			}
 			application.documentCache[reference] = document
 			if application.editor.Request == request {
-				application.editor.Show(document, application.sidebar.mode == reviewMode)
+				application.editor.Show(document, application.sidebar.Mode == sidebar.ReviewMode)
 			}
 		}
 	})
 }
 
 // openFileAt opens a file and shows one of its lines, marked; 0 shows its top (or first change).
-func (application *App) openFileAt(reference workspace.FileReference, line int) {
+func (application *Window) openFileAt(reference workspace.FileReference, line int) {
 	application.editor.GoTo = line
 	application.openFile(reference)
 	editor := &application.editor
@@ -298,7 +291,7 @@ func (application *App) openFileAt(reference workspace.FileReference, line int) 
 }
 
 // stepChangedFile opens the next (or previous) changed file of the whole development.
-func (application *App) stepChangedFile(step int) {
+func (application *Window) stepChangedFile(step int) {
 	var order []workspace.FileReference
 	for _, reference := range application.changedOrder {
 		if application.inScope(reference) {
@@ -321,7 +314,7 @@ func (application *App) stepChangedFile(step int) {
 	}
 	next = (next + len(order)) % len(order)
 	application.openFile(order[next])
-	application.sidebar.revealFile(application, order[next])
+	application.sidebar.RevealFile(application, order[next])
 }
 
 func contains(list []string, wanted string) bool {
@@ -339,7 +332,7 @@ func baseName(path string) string {
 }
 
 // projectIndex is where a project is in the list, by its path; -1 when it is not open.
-func (application *App) projectIndex(path string) int {
+func (application *Window) projectIndex(path string) int {
 	for index, project := range application.projects {
 		if project.Path == path {
 			return index
@@ -350,13 +343,13 @@ func (application *App) projectIndex(path string) int {
 
 // inScope tells whether a file is among those n, m and v go through: every project's, or only
 // those of the project the sidebar is in.
-func (application *App) inScope(reference workspace.FileReference) bool {
-	entered := application.sidebar.entered
+func (application *Window) inScope(reference workspace.FileReference) bool {
+	entered := application.sidebar.Entered
 	return entered == "" || application.projects[reference.Project].Path == entered
 }
 
 // projectsWithChanges counts the projects the development changed.
-func (application *App) projectsWithChanges() int {
+func (application *Window) projectsWithChanges() int {
 	count := 0
 	for _, project := range application.projects {
 		if len(project.Changes) > 0 {
@@ -367,17 +360,17 @@ func (application *App) projectsWithChanges() int {
 }
 
 // clearDocuments forgets the files read, so they are read again.
-func (application *App) clearDocuments() {
+func (application *Window) clearDocuments() {
 	application.documentCache = map[workspace.FileReference]*workspace.Document{}
 }
 
 // openByLabel opens a file named as "project/path/in/it", once the projects have been read.
-func (application *App) openByLabel(label string) {
+func (application *Window) openByLabel(label string) {
 	for _, candidate := range application.candidates {
 		if candidate.Label == label {
 			reference := workspace.FileReference{Project: candidate.Project, Path: candidate.Path}
 			application.openFile(reference)
-			application.sidebar.revealFile(application, reference)
+			application.sidebar.RevealFile(application, reference)
 			application.focus = editorPane
 			return
 		}
@@ -388,12 +381,12 @@ func (application *App) openByLabel(label string) {
 // hidden tells whether a project is left out of the sidebar and the finder: in the mode that shows
 // only the projects with changes, one that was read and has none. A project still being read, or
 // that could not be read, stays in sight.
-func (application *App) hidden(project *workspace.Project) bool {
+func (application *Window) hidden(project *workspace.Project) bool {
 	return application.onlyChanged && project.Loaded && len(project.Changes) == 0 && project.Error == ""
 }
 
 // setOnlyChanged shows only the projects with changes, or every project.
-func (application *App) setOnlyChanged(only bool) {
+func (application *Window) setOnlyChanged(only bool) {
 	application.onlyChanged = only
 	application.projectsChanged()
 	if only {
@@ -404,4 +397,4 @@ func (application *App) setOnlyChanged(only bool) {
 }
 
 // OnlyChanged tells whether only the projects with changes are shown, to remember it.
-func (application *App) OnlyChanged() bool { return application.onlyChanged }
+func (application *Window) OnlyChanged() bool { return application.onlyChanged }
