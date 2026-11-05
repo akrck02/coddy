@@ -52,6 +52,9 @@ type sidebarState struct {
 	selected int
 	list     scroller
 	width    float32
+	// entered is the project the sidebar was taken into, by its path: then only its tree is
+	// listed, from its top, as if it were the only project open. Empty lists every project.
+	entered string
 }
 
 type treeKey struct {
@@ -108,7 +111,16 @@ func (sidebar *sidebarState) rebuild(application *App) {
 	}
 	sidebar.rows = sidebar.rows[:0]
 	hidden := 0
+	if sidebar.entered != "" && application.projectIndex(sidebar.entered) < 0 {
+		sidebar.entered = "" // the project was closed
+	}
 	for index, project := range application.projects {
+		if sidebar.entered != "" {
+			if project.Path == sidebar.entered {
+				sidebar.addProjectContent(application, index, project, 0)
+			}
+			continue
+		}
 		if application.hidden(project) {
 			hidden++
 			continue
@@ -118,17 +130,9 @@ func (sidebar *sidebarState) rebuild(application *App) {
 			kind: projectRow, project: index, label: project.Name, expanded: expanded, changed: len(project.Changes),
 			quiet: project.Loaded && len(project.Changes) == 0,
 		})
-		if !expanded {
-			continue
+		if expanded {
+			sidebar.addProjectContent(application, index, project, 1)
 		}
-		if !project.Loaded {
-			sidebar.rows = append(sidebar.rows, treeRow{kind: noteRow, project: index, label: "Reading…", depth: 1, quiet: true})
-			continue
-		}
-		if project.Error != "" {
-			sidebar.rows = append(sidebar.rows, treeRow{kind: noteRow, project: index, label: project.Error, depth: 1, quiet: true})
-		}
-		sidebar.addFolder(application, index, sidebar.tree(application, index), 1)
 	}
 	if hidden > 0 {
 		sidebar.rows = append(sidebar.rows, treeRow{kind: noteRow, project: -1, quiet: true,
@@ -145,6 +149,46 @@ func (sidebar *sidebarState) rebuild(application *App) {
 		}
 	}
 	sidebar.selected = min(max(sidebar.selected, 0), max(len(sidebar.rows)-1, 0))
+}
+
+// addProjectContent lists a project's tree at a depth, or why it cannot be listed yet.
+func (sidebar *sidebarState) addProjectContent(application *App, index int, project *review.Project, depth int) {
+	if !project.Loaded {
+		sidebar.rows = append(sidebar.rows, treeRow{kind: noteRow, project: index, label: "Reading…", depth: depth, quiet: true})
+		return
+	}
+	if project.Error != "" {
+		sidebar.rows = append(sidebar.rows, treeRow{kind: noteRow, project: index, label: project.Error, depth: depth, quiet: true})
+	}
+	sidebar.addFolder(application, index, sidebar.tree(application, index), depth)
+}
+
+// enter takes the sidebar into a project, so only its tree is listed.
+func (sidebar *sidebarState) enter(application *App, project int) {
+	if project < 0 || project >= len(application.projects) {
+		return
+	}
+	sidebar.entered = application.projects[project].Path
+	sidebar.selected = 0
+	sidebar.list.offset = 0
+	sidebar.rebuild(application)
+	if application.editor.isOpen() && application.editor.reference.project == project {
+		sidebar.revealFile(application, application.editor.reference)
+	}
+}
+
+// leave goes back to every project, with the one left selected.
+func (sidebar *sidebarState) leave(application *App) {
+	left := application.projectIndex(sidebar.entered)
+	sidebar.entered = ""
+	sidebar.rebuild(application)
+	for index, row := range sidebar.rows {
+		if row.kind == projectRow && row.project == left {
+			sidebar.selected = index
+			sidebar.list.reveal(index)
+			return
+		}
+	}
 }
 
 func (sidebar *sidebarState) addFolder(application *App, project int, folder *review.Folder, depth int) {
@@ -176,6 +220,9 @@ func (sidebar *sidebarState) setExpanded(row treeRow, open bool) {
 // revealFile opens the folders around a file and selects it.
 func (sidebar *sidebarState) revealFile(application *App, reference fileReference) {
 	project := application.projects[reference.project]
+	if sidebar.entered != "" && sidebar.entered != project.Path {
+		sidebar.entered = "" // a file of another project: back to every project to show it
+	}
 	_, changed := project.ChangeOf(reference.path)
 	if sidebar.mode == reviewMode && !changed {
 		sidebar.mode = filesMode
@@ -248,6 +295,9 @@ func (sidebar *sidebarState) handleKeys(application *App, keys keys) {
 		sidebar.expandOrEnter()
 	case keys.typed(input.KeyLeft):
 		sidebar.collapseOrLeave()
+	case keys.pressed(input.KeyEnter) && sidebar.rows[sidebar.selected].kind == projectRow:
+		sidebar.enter(application, sidebar.rows[sidebar.selected].project)
+		return
 	case keys.pressed(input.KeyEnter) || keys.pressed(input.KeySpace):
 		sidebar.activate(application, sidebar.selected)
 		if sidebar.selected < count && sidebar.rows[sidebar.selected].kind == fileRow && keys.pressed(input.KeyEnter) {
@@ -318,6 +368,10 @@ func (sidebar *sidebarState) build(context *ui.Context, application *App) {
 	theme := context.Theme
 	context.Frame(ui.Layout{Direction: ui.Vertical, Width: ui.Grow(), Height: ui.Grow()}, ui.Look{Fill: theme.Surface}, func() {
 		context.Box(ui.Layout{Width: ui.Grow(), Height: ui.Fixed(40), Padding: ui.PadXY(14, 0), Gap: 8, AlignY: ui.Center}, func() {
+			if sidebar.entered != "" {
+				sidebar.buildEnteredHeader(context, application)
+				return
+			}
 			title := "Files"
 			if sidebar.mode == reviewMode {
 				title = "Review"
@@ -342,7 +396,9 @@ func (sidebar *sidebarState) build(context *ui.Context, application *App) {
 			if index := sidebar.list.rowAt(x, y); index >= 0 && !onBar && application.keys.clicked() {
 				sidebar.selected = index
 				application.focus = sidebarPane
-				if sidebar.onCheck(index, x) {
+				if sidebar.onEnter(index, x) {
+					sidebar.enter(application, sidebar.rows[index].project)
+				} else if sidebar.onCheck(index, x) {
 					application.toggleViewed(fileReference{sidebar.rows[index].project, sidebar.rows[index].path}, false)
 				} else {
 					sidebar.activate(application, index)
@@ -356,13 +412,48 @@ func (sidebar *sidebarState) build(context *ui.Context, application *App) {
 	})
 }
 
+// buildEnteredHeader names the project the sidebar is in, with the way back to every project.
+func (sidebar *sidebarState) buildEnteredHeader(context *ui.Context, application *App) {
+	theme := context.Theme
+	index := application.projectIndex(sidebar.entered)
+	if index < 0 {
+		return
+	}
+	project := application.projects[index]
+	if toolButton(context, "Every project (Esc)", "arrow-left", false) {
+		sidebar.leave(application)
+		return
+	}
+	context.Text(project.Name, ui.TextStyle{Weight: draw2d.Medium})
+	if project.Branch != "" {
+		context.Text(project.Branch, ui.TextStyle{Size: theme.SmallTextSize, Color: theme.InkQuiet})
+	}
+	context.Spacer()
+	if sidebar.mode == reviewMode && len(project.Changes) > 0 {
+		viewed, total := application.reviewed.Progress(project)
+		context.Text(fmt.Sprintf("%d/%d", viewed, total), ui.TextStyle{Size: theme.SmallTextSize, Weight: draw2d.Mono, Color: theme.InkQuiet})
+	} else if len(project.Changes) > 0 {
+		context.Text(fmt.Sprint(len(project.Changes)), ui.TextStyle{Size: theme.SmallTextSize, Weight: draw2d.Mono, Color: theme.Warning})
+	}
+}
+
+// enterButtonWidth is the room the button that enters a project takes at the right of its row,
+// shown while the pointer is on the row.
+const enterButtonWidth float32 = 26
+
+// onEnter tells whether a click at x on a row fell on the button that enters its project.
+func (sidebar *sidebarState) onEnter(index int, x float32) bool {
+	right := sidebar.list.area.Right() - 4 - scrollBarWidth/2 - 4
+	return sidebar.rows[index].kind == projectRow && x >= right-enterButtonWidth && x <= right
+}
+
 // onCheck tells whether a click at x on a row fell on its viewed mark, in the review mode.
 func (sidebar *sidebarState) onCheck(index int, x float32) bool {
 	row := sidebar.rows[index]
 	if sidebar.mode != reviewMode || row.kind != fileRow {
 		return false
 	}
-	left := sidebar.rowLeft(row) + treeIconSize + 4
+	left := sidebar.rowLeft(row)
 	return x >= left-4 && x <= left+treeIconSize+4
 }
 
@@ -432,13 +523,18 @@ func (sidebar *sidebarState) paint(context *ui.Context, application *App, drawin
 			drawing.Icon(icon, x, iconTop, treeIconSize, theme.InkQuiet)
 			x += treeIconSize + 7
 		case fileRow:
-			x += treeIconSize + 4
-			icon, iconInk := "file", theme.InkQuiet
+			// in the review mode the room a folder gives its chevron holds the viewed mark
 			if sidebar.mode == reviewMode {
-				icon = "circle"
+				check, checkInk := "circle", theme.InkQuiet
 				if application.isViewed(reference) {
-					icon, iconInk, ink = "circle-check", theme.InkSoft, theme.InkQuiet
+					check, checkInk, ink = "circle-check", theme.InkSoft, theme.InkQuiet
 				}
+				drawing.Icon(check, x, iconTop, treeIconSize, checkInk)
+			}
+			x += treeIconSize + 4
+			icon, iconInk := fileIcon(row.label, look)
+			if ink == theme.InkQuiet {
+				iconInk = iconInk.WithAlpha(0.5)
 			}
 			drawing.Icon(icon, x, iconTop, treeIconSize, iconInk)
 			x += treeIconSize + 7
@@ -451,6 +547,14 @@ func (sidebar *sidebarState) paint(context *ui.Context, application *App, drawin
 			ink = theme.InkQuiet
 		}
 		right := rowArea.Right() - 8
+		if row.kind == projectRow && index == hovered {
+			button := draw2d.Rectangle{X: rowArea.Right() - 4 - enterButtonWidth, Y: top + 3, Width: enterButtonWidth, Height: sidebarRowHeight - 6}
+			if sidebar.onEnter(index, pointerX) {
+				drawing.Rectangle(button, 4, look.chosen, draw2d.Color{}, 0)
+			}
+			drawing.Icon("arrow-right-to-line", button.X+(enterButtonWidth-14)/2, top+(sidebarRowHeight-14)/2, 14, theme.InkSoft)
+			right = button.X - 6
+		}
 		right = sidebar.paintRight(context, application, drawing, row, right, baseline, top)
 		drawing.PushClip(draw2d.Rectangle{X: area.X, Y: top, Width: max(right-area.X-8, 0), Height: sidebarRowHeight})
 		drawing.Text(row.label, x, baseline, size, weight, ink)

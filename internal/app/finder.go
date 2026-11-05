@@ -141,6 +141,9 @@ func (finder *finderState) paint(context *ui.Context, application *App, drawing 
 		}
 		drawing.Text(status, x, baseline, size, draw2d.Mono, statusInk)
 		x += 20
+		icon, iconInk := fileIcon(candidate.Path, application.look)
+		drawing.Icon(icon, x, top+(finderRowHeight-15)/2, 15, iconInk)
+		x += 22
 		paintMatched(drawing, measurer, candidate.Label, match.Positions, x, baseline, size, theme, changed, change.Status)
 	}
 	finder.list.paintBar(drawing, theme.InkQuiet.WithAlpha(0.4))

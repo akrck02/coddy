@@ -261,3 +261,39 @@ func TestMarkingAFileViewedOpensTheNextOneNotViewed(test *testing.T) {
 		test.Errorf("the progress is %d of %d, want 1 of 3", viewed, total)
 	}
 }
+
+func TestEnteringAProjectListsOnlyItsTree(test *testing.T) {
+	folder := makeRepository(test)
+	addUntouchedRepository(test, folder)
+	application := New(Settings{Folders: []string{folder}, WorkingTree: true, Synchronous: true})
+	window := newWindow(test, application)
+	sidebar := &application.sidebar
+	sidebar.rebuild(application)
+	for index, row := range sidebar.rows {
+		if row.kind == projectRow && row.label == "lighthouse" {
+			sidebar.selected = index
+		}
+	}
+	window.PressKey(input.KeyEnter)
+	window.Frames(2)
+	if sidebar.entered == "" {
+		test.Fatal("Enter on a project did not enter it")
+	}
+	inside := application.projectIndex(sidebar.entered)
+	if application.projects[inside].Name != "lighthouse" {
+		test.Fatalf("entered %s, want lighthouse", sidebar.entered)
+	}
+	for _, row := range sidebar.rows {
+		if row.kind == projectRow || row.project != inside {
+			test.Fatalf("inside lighthouse the sidebar still lists %q of project %d", row.label, row.project)
+		}
+	}
+	if !sidebarShows(application, "src") || !sidebarShows(application, "notes.txt") {
+		test.Error("the project's own tree is not listed from its top")
+	}
+	window.PressKey(input.KeyEscape)
+	window.Frames(2)
+	if sidebar.entered != "" || !sidebarShows(application, "harbour") {
+		test.Error("Esc did not go back to every project")
+	}
+}

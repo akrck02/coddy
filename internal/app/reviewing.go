@@ -83,7 +83,7 @@ func (application *App) openNextUnviewed(after fileReference) bool {
 	}
 	for step := range order {
 		reference := order[(start+step)%len(order)]
-		if !application.isViewed(reference) {
+		if application.inScope(reference) && !application.isViewed(reference) {
 			application.openFile(reference)
 			application.sidebar.revealFile(application, reference)
 			return true

@@ -322,7 +322,12 @@ func (application *App) openFile(reference fileReference) {
 
 // stepChangedFile opens the next (or previous) changed file of the whole development.
 func (application *App) stepChangedFile(step int) {
-	order := application.changedOrder
+	var order []fileReference
+	for _, reference := range application.changedOrder {
+		if application.inScope(reference) {
+			order = append(order, reference)
+		}
+	}
 	if len(order) == 0 {
 		return
 	}
@@ -354,6 +359,23 @@ func contains(list []string, wanted string) bool {
 func baseName(path string) string {
 	path = strings.TrimRight(path, "/")
 	return path[strings.LastIndexByte(path, '/')+1:]
+}
+
+// projectIndex is where a project is in the list, by its path; -1 when it is not open.
+func (application *App) projectIndex(path string) int {
+	for index, project := range application.projects {
+		if project.Path == path {
+			return index
+		}
+	}
+	return -1
+}
+
+// inScope tells whether a file is among those n, m and v go through: every project's, or only
+// those of the project the sidebar is in.
+func (application *App) inScope(reference fileReference) bool {
+	entered := application.sidebar.entered
+	return entered == "" || application.projects[reference.project].Path == entered
 }
 
 // projectsWithChanges counts the projects the development changed.

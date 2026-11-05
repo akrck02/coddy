@@ -116,3 +116,11 @@ func RoleOf(kind chroma.TokenType) Role {
 	}
 	return Plain
 }
+
+// RoleColour is the colour of a role, or of plain text when the role has none of its own.
+func (palette *Palette) RoleColour(role Role) draw2d.Color {
+	if colour, found := palette.colours[role]; found {
+		return colour
+	}
+	return palette.colours[Plain]
+}

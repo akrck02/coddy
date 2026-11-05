@@ -53,6 +53,9 @@ It has two modes, chosen on the rail at the far left (or with `1`, `2`, `c`):
   out of the sidebar (both modes) and the finder. `h`, the *Only changed projects* button or
   `-all` show every project; the choice is remembered.
 - **Every other file stays readable**: the *Files* mode lists them all, and the finder finds them.
+- **Enter a project** to see only its tree, from its top (Enter on its row, `e`, or the → that
+  shows on its row under the pointer); `Esc` goes back to every project.
+- **Icons by file type** in the tree and the finder, tinted with the code's own colours.
 - **Syntax colouring** for Java, Kotlin, Vue, SQL, Gradle, Groovy, XML, YAML, Markdown and the
   rest of chroma's languages; text that is not UTF-8 is read as Latin-1.
 - **Never writes to a repository.** It only runs `git cat-file`, `diff`, `ls-files`, `merge-base`,
@@ -94,6 +97,8 @@ go vet ./... && go test ./...     # the interface tests drive the window with no
 | `n` / `m` | Next / previous changed file, across every project |
 | `]` / `[` | Next / previous change in the file (the diff, or the marked lines) |
 | `1` / `2` (`c` switches) | Files mode / Review mode |
+| `Enter` on a project, `e`, or its → button | Enter the project: the sidebar lists only its tree, and `n`/`m`/`v` stay in it |
+| `Esc` / `Backspace` | Back to every project |
 | `v` | Mark the file as viewed (or not); marking it opens the next file not viewed |
 | `d` | Diff, or the whole file |
 | `f` | Fold the unchanged lines, or show them all |

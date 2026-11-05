@@ -86,6 +86,11 @@ func (application *App) handleKeys(context *ui.Context) {
 		application.toast = "Reading the projects again"
 	case keys.plain(input.KeyB):
 		application.openBaseDialog()
+	case application.sidebar.entered != "" && (keys.pressed(input.KeyEscape) || keys.pressed(input.KeyBackspace)):
+		application.sidebar.leave(application)
+		application.focus = sidebarPane
+	case keys.plain(input.KeyE):
+		application.enterCurrentProject()
 	case keys.pressed(input.KeyTab):
 		application.toggleFocus()
 	case keys.plain(input.KeyN):
@@ -130,6 +135,17 @@ func (application *App) handleKeys(context *ui.Context) {
 		application.sidebar.handleKeys(application, keys)
 	default:
 		application.editor.handleKeys(keys)
+	}
+}
+
+// enterCurrentProject takes the sidebar into the project of the selected row, or of the file open.
+func (application *App) enterCurrentProject() {
+	if row, ok := application.sidebar.selectedRow(); ok && row.project >= 0 && application.focus == sidebarPane {
+		application.sidebar.enter(application, row.project)
+		return
+	}
+	if application.editor.isOpen() {
+		application.sidebar.enter(application, application.editor.reference.project)
 	}
 }
 
@@ -398,6 +414,8 @@ var helpKeys = [][2]string{
 	{"n  /  m", "Next / previous changed file, across every project"},
 	{"]  /  [", "Next / previous change in the file"},
 	{"1  /  2  ·  c", "Files mode (read any file) / Review mode (the changes, as diffs)"},
+	{"Enter (on a project)  ·  e", "Enter the project: the sidebar lists only its tree"},
+	{"Esc  ·  Backspace", "Back to every project"},
 	{"v", "Mark the file as viewed and open the next one not viewed"},
 	{"d", "Diff or the whole file"},
 	{"f", "Fold the unchanged lines, or show them all"},
