@@ -138,9 +138,8 @@ type palette struct {
 	lineWash, wordWash                         float32
 }
 
-// look takes Bubble's shapes, spacing and type for a mode and paints them in these colours: every
-// colour of the theme is set here, so none of Bubble's paper (its warm beige) is left.
-func (colours palette) look(mode bubble.Mode, syntax map[highlight.Role]draw2d.Color) Look {
+// bubbleTheme is Bubble's theme for a mode, compact: its shapes, spacing and type.
+func bubbleTheme(mode bubble.Mode) ui.Theme {
 	options := bubble.DefaultOptions()
 	options.Mode = mode
 	options.Density = bubble.DensityCompact
@@ -148,8 +147,11 @@ func (colours palette) look(mode bubble.Mode, syntax map[highlight.Role]draw2d.C
 	if err != nil {
 		panic(err) // Bubble's own options are always valid
 	}
-	theme := goui.Theme(design)
+	return goui.Theme(design)
+}
 
+// paint sets every colour of a theme, and the reader's text sizes.
+func (colours palette) paint(theme ui.Theme) ui.Theme {
 	theme.Background, theme.Surface, theme.Sunken = colours.background, colours.surface, colours.hover
 	theme.Ink, theme.InkSoft, theme.InkQuiet = colours.ink, colours.inkSoft, colours.inkQuiet
 	theme.Placeholder = colours.inkQuiet.WithAlpha(0.8)
@@ -168,7 +170,13 @@ func (colours palette) look(mode bubble.Mode, syntax map[highlight.Role]draw2d.C
 
 	theme.TextSize, theme.SmallTextSize = BodySize, SmallSize
 	theme.LineHeight, theme.HeadingLineHeight = LineHeight, LineHeight
+	return theme
+}
 
+// look takes Bubble's shapes, spacing and type for a mode and paints them in these colours: every
+// colour of the theme is set here, so none of Bubble's paper (its warm beige) is left.
+func (colours palette) look(mode bubble.Mode, syntax map[highlight.Role]draw2d.Color) Look {
+	theme := colours.paint(bubbleTheme(mode))
 	return Look{
 		Theme:            theme,
 		Editor:           colours.editor,

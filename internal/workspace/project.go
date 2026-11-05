@@ -86,18 +86,7 @@ func LoadProject(path string, options LoadOptions) *Project {
 		project.Files = sortedUnique(files)
 		return project
 	}
-	project.Ahead = git.CommitsAhead(path, project.MergeBase)
-	changes, err := git.Changes(path, project.Comparison(options.WorkingTree))
-	if err != nil {
-		project.Error = err.Error()
-	}
-	project.setChanges(changes)
-	// counts that cannot be read leave the files without their +/− numbers; the changes still show
-	project.Counts, _ = git.CountLines(path, project.Comparison(options.WorkingTree))
-	if project.Counts == nil {
-		project.Counts = map[string]git.LineCounts{}
-	}
-	project.Fingerprints = fingerprints(path, project.MergeBase, changes, options.WorkingTree, project.Counts)
+	changes := project.readChanges(options.WorkingTree)
 	// a file deleted by the development is no longer in the working tree, but it is still worth
 	// finding in the tree to read what was removed
 	for _, change := range changes {
@@ -105,6 +94,25 @@ func LoadProject(path string, options LoadOptions) *Project {
 	}
 	project.Files = sortedUnique(files)
 	return project
+}
+
+// readChanges reads what the development changed against its merge base: the commits ahead, the
+// files changed, their counts of lines and their fingerprints. It returns the changes.
+func (project *Project) readChanges(workingTree bool) []git.Change {
+	path := project.Path
+	project.Ahead = git.CommitsAhead(path, project.MergeBase)
+	changes, err := git.Changes(path, project.Comparison(workingTree))
+	if err != nil {
+		project.Error = err.Error()
+	}
+	project.setChanges(changes)
+	// counts that cannot be read leave the files without their +/− numbers; the changes still show
+	project.Counts, _ = git.CountLines(path, project.Comparison(workingTree))
+	if project.Counts == nil {
+		project.Counts = map[string]git.LineCounts{}
+	}
+	project.Fingerprints = fingerprints(path, project.MergeBase, changes, workingTree, project.Counts)
+	return changes
 }
 
 // ChangedPaths are the paths of the files the development changed, sorted.

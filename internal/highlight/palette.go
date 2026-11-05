@@ -61,58 +61,62 @@ func (palette *Palette) Colour(kind chroma.TokenType) draw2d.Color {
 	return colour
 }
 
+// exactRoles are the roles of the chroma tokens known by their exact type.
+var exactRoles = map[chroma.TokenType]Role{
+	chroma.KeywordConstant:       Boolean,
+	chroma.KeywordType:           TypeName,
+	chroma.KeywordNamespace:      Keyword,
+	chroma.NameFunction:          Function,
+	chroma.NameFunctionMagic:     Function,
+	chroma.NameClass:             TypeName,
+	chroma.NameException:         TypeName,
+	chroma.NameBuiltin:           TypeName,
+	chroma.NameBuiltinPseudo:     TypeName,
+	chroma.NameDecorator:         Attribute,
+	chroma.NameAttribute:         Attribute,
+	chroma.NameTag:               Tag,
+	chroma.NameConstant:          Constant,
+	chroma.NameEntity:            Constant,
+	chroma.NameNamespace:         Namespace,
+	chroma.NameProperty:          Property,
+	chroma.NameLabel:             Label,
+	chroma.NameVariable:          Variable,
+	chroma.NameVariableClass:     Variable,
+	chroma.NameVariableGlobal:    Variable,
+	chroma.NameVariableInstance:  Variable,
+	chroma.LiteralStringEscape:   Escape,
+	chroma.LiteralStringInterpol: Escape,
+	chroma.LiteralStringDoc:      DocComment,
+	chroma.CommentSpecial:        DocComment,
+	chroma.CommentPreproc:        Preprocess,
+	chroma.CommentPreprocFile:    Preprocess,
+	chroma.GenericHeading:        Title,
+	chroma.GenericSubheading:     Title,
+	chroma.Punctuation:           Punctuation,
+}
+
+// kindRoles are the roles of the chroma tokens known only by their kind: strings and numbers are
+// kinds of literal, keywords, comments and operators are kinds of their own. A kind of literal is
+// a subcategory, and the others are categories, so no token finds two of them.
+var kindRoles = map[chroma.TokenType]Role{
+	chroma.LiteralString: String,
+	chroma.LiteralNumber: Number,
+	chroma.Keyword:       Keyword,
+	chroma.Comment:       Comment,
+	chroma.Operator:      Operator,
+}
+
 // RoleOf finds the role of a chroma token: by its exact type first, then by its kind (any keyword,
 // any string…).
 func RoleOf(kind chroma.TokenType) Role {
-	switch kind {
-	case chroma.KeywordConstant:
-		return Boolean
-	case chroma.KeywordType:
-		return TypeName
-	case chroma.KeywordNamespace:
-		return Keyword
-	case chroma.NameFunction, chroma.NameFunctionMagic:
-		return Function
-	case chroma.NameClass, chroma.NameException, chroma.NameBuiltin, chroma.NameBuiltinPseudo:
-		return TypeName
-	case chroma.NameDecorator, chroma.NameAttribute:
-		return Attribute
-	case chroma.NameTag:
-		return Tag
-	case chroma.NameConstant, chroma.NameEntity:
-		return Constant
-	case chroma.NameNamespace:
-		return Namespace
-	case chroma.NameProperty:
-		return Property
-	case chroma.NameLabel:
-		return Label
-	case chroma.NameVariable, chroma.NameVariableClass, chroma.NameVariableGlobal, chroma.NameVariableInstance:
-		return Variable
-	case chroma.LiteralStringEscape, chroma.LiteralStringInterpol:
-		return Escape
-	case chroma.LiteralStringDoc, chroma.CommentSpecial:
-		return DocComment
-	case chroma.CommentPreproc, chroma.CommentPreprocFile:
-		return Preprocess
-	case chroma.GenericHeading, chroma.GenericSubheading:
-		return Title
-	case chroma.Punctuation:
-		return Punctuation
+	if role, found := exactRoles[kind]; found {
+		return role
 	}
-	switch kind.SubCategory() { // strings and numbers are kinds of literal
-	case chroma.LiteralString:
-		return String
-	case chroma.LiteralNumber:
-		return Number
+	if role, found := kindRoles[kind.SubCategory()]; found {
+		return role
 	}
-	switch kind.Category() {
-	case chroma.Keyword:
-		return Keyword
-	case chroma.Comment:
-		return Comment
-	case chroma.Operator:
-		return Operator
+	if role, found := kindRoles[kind.Category()]; found {
+		return role
 	}
 	return Plain
 }

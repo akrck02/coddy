@@ -169,47 +169,59 @@ func Diff(repository string, comparison Comparison, change Change) (FileDiff, er
 	return parseUnifiedDiff(output)
 }
 
+// hunkReader numbers the lines of a diff's hunks as it reads them.
+type hunkReader struct {
+	diff                 FileDiff
+	inHunk               bool
+	oldNumber, newNumber int
+}
+
 // parseUnifiedDiff reads git's unified diff of one file into numbered lines.
 func parseUnifiedDiff(output []byte) (FileDiff, error) {
-	var diff FileDiff
+	var reader hunkReader
 	scanner := bufio.NewScanner(bytes.NewReader(output))
 	scanner.Buffer(make([]byte, 0, 64*1024), 64*1024*1024)
-	inHunk := false
-	oldNumber, newNumber := 0, 0
 	for scanner.Scan() {
 		line := scanner.Text()
-		if !inHunk {
-			if strings.HasPrefix(line, "Binary files ") || strings.HasPrefix(line, "GIT binary patch") {
-				diff.Binary = true
-				return diff, nil
-			}
+		if !reader.inHunk && (strings.HasPrefix(line, "Binary files ") || strings.HasPrefix(line, "GIT binary patch")) {
+			reader.diff.Binary = true
+			return reader.diff, nil
 		}
-		if strings.HasPrefix(line, "@@") {
-			oldStart, newStart, err := parseHunkHeader(line)
-			if err != nil {
-				return diff, err
-			}
-			oldNumber, newNumber = oldStart, newStart
-			inHunk = true
-			continue
-		}
-		if !inHunk || line == "" {
-			continue
-		}
-		switch line[0] {
-		case ' ':
-			diff.Lines = append(diff.Lines, DiffLine{Kind: Context, OldNumber: oldNumber, NewNumber: newNumber})
-			oldNumber++
-			newNumber++
-		case '+':
-			diff.Lines = append(diff.Lines, DiffLine{Kind: Insertion, NewNumber: newNumber})
-			newNumber++
-		case '-':
-			diff.Lines = append(diff.Lines, DiffLine{Kind: Removal, OldNumber: oldNumber})
-			oldNumber++
+		if err := reader.read(line); err != nil {
+			return reader.diff, err
 		}
 	}
-	return diff, scanner.Err()
+	return reader.diff, scanner.Err()
+}
+
+// read takes one line of the diff: a hunk's header starts counting again, and a line inside a hunk
+// is numbered on the sides it is on.
+func (reader *hunkReader) read(line string) error {
+	if strings.HasPrefix(line, "@@") {
+		oldStart, newStart, err := parseHunkHeader(line)
+		if err != nil {
+			return err
+		}
+		reader.oldNumber, reader.newNumber = oldStart, newStart
+		reader.inHunk = true
+		return nil
+	}
+	if !reader.inHunk || line == "" {
+		return nil
+	}
+	switch line[0] {
+	case ' ':
+		reader.diff.Lines = append(reader.diff.Lines, DiffLine{Kind: Context, OldNumber: reader.oldNumber, NewNumber: reader.newNumber})
+		reader.oldNumber++
+		reader.newNumber++
+	case '+':
+		reader.diff.Lines = append(reader.diff.Lines, DiffLine{Kind: Insertion, NewNumber: reader.newNumber})
+		reader.newNumber++
+	case '-':
+		reader.diff.Lines = append(reader.diff.Lines, DiffLine{Kind: Removal, OldNumber: reader.oldNumber})
+		reader.oldNumber++
+	}
+	return nil
 }
 
 // parseHunkHeader reads where a hunk starts on each side from "@@ -12,7 +12,9 @@".

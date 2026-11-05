@@ -234,7 +234,6 @@ func (review *Mode) buildOverviewRow(context *ui.Context, index int, project *wo
 	palette := context.Theme
 	look := review.window.Look()
 	viewed, total := review.reviewed.Progress(project)
-	added, removed := project.TotalCounts()
 	normal := ui.Look{Fill: palette.Surface, Radius: 8, Border: look.Hover, BorderWidth: 1}
 	hovered := normal
 	hovered.Fill = look.Hover
@@ -249,29 +248,44 @@ func (review *Mode) buildOverviewRow(context *ui.Context, index int, project *wo
 			}
 			context.Text(where, ui.TextStyle{Size: palette.SmallTextSize, Color: palette.InkQuiet})
 		})
-		context.Text(fmt.Sprintf("%d files", len(project.Changes)), ui.TextStyle{Size: palette.SmallTextSize, Color: palette.InkSoft})
-		if added > 0 {
-			context.Text(fmt.Sprintf("+%d", added), ui.TextStyle{Size: palette.SmallTextSize, Weight: draw2d.Mono, Color: palette.Positive})
-		}
-		if removed > 0 {
-			context.Text(fmt.Sprintf("−%d", removed), ui.TextStyle{Size: palette.SmallTextSize, Weight: draw2d.Mono, Color: palette.Danger})
-		}
-		colour := palette.InkQuiet
-		if viewed == total {
-			colour = palette.Positive
-		}
-		context.Paint(ui.Layout{Width: ui.Fixed(64), Height: ui.Fixed(4)}, func(area draw2d.Rectangle, drawing *draw2d.List) {
-			drawing.Rectangle(area, 2, look.Hover.Mix(palette.Ink, 0.12), draw2d.Color{}, 0)
-			if viewed > 0 {
-				done := area
-				done.Width = area.Width * float32(viewed) / float32(max(total, 1))
-				drawing.Rectangle(done, 2, colour, draw2d.Color{}, 0)
-			}
-		})
-		context.Text(fmt.Sprintf("%d/%d", viewed, total), ui.TextStyle{Size: palette.SmallTextSize, Weight: draw2d.Mono, Color: colour})
+		buildCounts(context, project)
+		review.buildProjectProgress(context, viewed, total)
 	}) {
 		review.openFirstUnviewedOf(index)
 	}
+}
+
+// buildCounts says how many files a project changed, and the lines added and removed.
+func buildCounts(context *ui.Context, project *workspace.Project) {
+	palette := context.Theme
+	added, removed := project.TotalCounts()
+	context.Text(fmt.Sprintf("%d files", len(project.Changes)), ui.TextStyle{Size: palette.SmallTextSize, Color: palette.InkSoft})
+	if added > 0 {
+		context.Text(fmt.Sprintf("+%d", added), ui.TextStyle{Size: palette.SmallTextSize, Weight: draw2d.Mono, Color: palette.Positive})
+	}
+	if removed > 0 {
+		context.Text(fmt.Sprintf("−%d", removed), ui.TextStyle{Size: palette.SmallTextSize, Weight: draw2d.Mono, Color: palette.Danger})
+	}
+}
+
+// buildProjectProgress is a bar of the files viewed in a project and their count, green once every
+// one is.
+func (review *Mode) buildProjectProgress(context *ui.Context, viewed, total int) {
+	palette := context.Theme
+	look := review.window.Look()
+	colour := palette.InkQuiet
+	if viewed == total {
+		colour = palette.Positive
+	}
+	context.Paint(ui.Layout{Width: ui.Fixed(64), Height: ui.Fixed(4)}, func(area draw2d.Rectangle, drawing *draw2d.List) {
+		drawing.Rectangle(area, 2, look.Hover.Mix(palette.Ink, 0.12), draw2d.Color{}, 0)
+		if viewed > 0 {
+			done := area
+			done.Width = area.Width * float32(viewed) / float32(max(total, 1))
+			drawing.Rectangle(done, 2, colour, draw2d.Color{}, 0)
+		}
+	})
+	context.Text(fmt.Sprintf("%d/%d", viewed, total), ui.TextStyle{Size: palette.SmallTextSize, Weight: draw2d.Mono, Color: colour})
 }
 
 // openFirstUnviewedOf opens a project's first changed file not viewed yet, or its first one.
