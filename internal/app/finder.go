@@ -5,7 +5,6 @@ import (
 	"sort"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 	"unicode/utf8"
 
@@ -40,7 +39,6 @@ type finderState struct {
 
 	// the content search runs on other goroutines; search counts the searches asked for, so the
 	// answer to one overtaken by more typing is dropped
-	search    *atomic.Int64
 	hits      []contentHit
 	searching bool
 	truncated bool
@@ -64,13 +62,11 @@ const (
 	contentHitLimit   = 400 // lines kept from a search across every project
 	contentPerFile    = 6   // lines kept from each file
 	contentPause      = 180 * time.Millisecond
+	contentSearch     = "content search" // the key of the search running, which a newer one replaces
 	finderPanelRadius = 14
 )
 
 func (finder *finderState) show(scope finderScope) {
-	if finder.search == nil {
-		finder.search = &atomic.Int64{}
-	}
 	finder.open = true
 	finder.focusNext = true
 	finder.scope = scope
@@ -119,9 +115,8 @@ func (finder *finderState) refresh(application *App) {
 // searchContent looks for a text in every project shown, a few at a time, after a short pause
 // so that typing a word does not start a search for each of its letters.
 func (finder *finderState) searchContent(application *App, text string) {
-	search := finder.search
-	number := search.Add(1)
 	if utf8.RuneCountInString(text) < contentMinLength {
+		application.work.cancel(contentSearch)
 		finder.hits, finder.searching, finder.truncated = nil, false, false
 		return
 	}
@@ -138,12 +133,13 @@ func (finder *finderState) searchContent(application *App, text string) {
 	options := git.GrepOptions{WorkingTree: application.settings.WorkingTree, PerFile: contentPerFile}
 	synchronous := application.settings.Synchronous
 	finder.searching = true
-	application.later(func() func() {
+	application.work.run(contentSearch, func(stop cancellation) func() {
 		if !synchronous {
-			time.Sleep(contentPause)
-		}
-		if search.Load() != number {
-			return func() {}
+			select {
+			case <-time.After(contentPause):
+			case <-stop.Done():
+				return nil // a newer search, typed during the pause
+			}
 		}
 		found := make([][]git.Hit, len(projects))
 		var group sync.WaitGroup
@@ -151,18 +147,13 @@ func (finder *finderState) searchContent(application *App, text string) {
 			group.Add(1)
 			go func() {
 				defer group.Done()
-				readers <- struct{}{}
-				defer func() { <-readers }()
-				if search.Load() == number {
-					found[position], _ = git.Grep(project.path, text, options)
-				}
+				application.work.read(stop, func() {
+					found[position], _ = git.Grep(project.path, text, options) // a project git cannot search shows no lines
+				})
 			}()
 		}
 		group.Wait()
 		return func() {
-			if search.Load() != number {
-				return
-			}
 			finder.hits, finder.truncated = nil, false
 			for position, hits := range found {
 				index := projects[position].project

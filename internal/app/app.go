@@ -5,14 +5,12 @@ package app
 import (
 	"sort"
 	"strings"
-	"sync/atomic"
 
 	"github.com/akrck02/code-review/internal/git"
 	"github.com/akrck02/code-review/internal/java"
 	"github.com/akrck02/code-review/internal/review"
 	"github.com/akrck02/code-review/internal/workspace"
 	"github.com/akrck02/go-ui/uidrive"
-	"github.com/akrck02/go-ui/window"
 )
 
 // Settings are what the reader starts with.
@@ -46,7 +44,8 @@ const (
 )
 
 // App is the reader. Its fields are only touched from the goroutine that builds the interface;
-// work done elsewhere (reading repositories and files) comes back through results.
+// work done elsewhere (reading repositories and files) runs as jobs of work, whose results come
+// back to that goroutine.
 type App struct {
 	settings Settings
 	folders  []string
@@ -56,7 +55,7 @@ type App struct {
 	loading       int
 	candidates    []review.Candidate
 	changedOrder  []fileReference
-	results       chan func()
+	work          *work
 	documentCache map[fileReference]*workspace.Document
 
 	sidebar sidebarState
@@ -95,7 +94,7 @@ func New(settings Settings) *App {
 	application := &App{
 		settings:      settings,
 		projectBases:  map[string]string{},
-		results:       make(chan func(), 256),
+		work:          newWork(settings.Synchronous),
 		documentCache: map[fileReference]*workspace.Document{},
 		tap:           &inputTap{},
 		dark:          settings.Dark,
@@ -137,49 +136,8 @@ func (application *App) setLook() {
 	}
 }
 
-// later runs work on another goroutine and its result back on the interface's, waking the window.
-func (application *App) later(work func() func()) {
-	if application.settings.Synchronous {
-		work()()
-		return
-	}
-	go func() {
-		apply := work()
-		application.results <- apply
-		application.wake()
-	}()
-}
-
-// windowOpen is set once the window has drawn its first frame and cleared when it closes: the
-// window can only be woken in between. Work that finishes before the first frame needs no waking,
-// as that frame takes its result.
-var windowOpen atomic.Bool
-
-// wake asks the window for a frame, when there is a window to ask.
-func (application *App) wake() {
-	if !windowOpen.Load() {
-		return
-	}
-	defer func() {
-		_ = recover() // the window closed between the check and the call: there is nothing to wake
-	}()
-	window.Wake()
-}
-
 // Closed tells the reader its window has closed, so work still running does not wake it.
 func (application *App) Closed() { windowOpen.Store(false) }
-
-// takeResults applies what finished since the last frame.
-func (application *App) takeResults() {
-	for {
-		select {
-		case apply := <-application.results:
-			apply()
-		default:
-			return
-		}
-	}
-}
 
 // openFolders adds repositories, or the repositories inside folders, and reads them.
 func (application *App) openFolders(folders []string) {
@@ -223,10 +181,6 @@ func (application *App) reloadAll() {
 	application.projectsChanged()
 }
 
-// readers limits how many repositories are read at once, so a workspace of many projects on a slow
-// disk does not start dozens of git processes together.
-var readers = make(chan struct{}, 6)
-
 // reload reads one project again, on another goroutine.
 func (application *App) reload(index int) {
 	project := application.projects[index]
@@ -234,10 +188,11 @@ func (application *App) reload(index int) {
 	options := workspace.LoadOptions{Base: application.baseFor(path), WorkingTree: application.settings.WorkingTree}
 	application.projects[index] = &workspace.Project{Name: project.Name, Path: path}
 	application.loading++
-	application.later(func() func() {
-		readers <- struct{}{}
-		loaded := workspace.LoadProject(path, options)
-		<-readers
+	application.work.run("project "+path, func(stop cancellation) func() {
+		var loaded *workspace.Project
+		if !application.work.read(stop, func() { loaded = workspace.LoadProject(path, options) }) {
+			return nil
+		}
 		return func() {
 			application.loading--
 			application.forgetClassKinds(path)
@@ -320,7 +275,7 @@ func (application *App) openFile(reference fileReference) {
 	}
 	workingTree := application.settings.WorkingTree
 	request := application.editor.request
-	application.later(func() func() {
+	application.work.run("", func(cancellation) func() {
 		document := workspace.OpenDocument(project, reference.path, workingTree)
 		return func() {
 			if len(application.documentCache) > 64 {

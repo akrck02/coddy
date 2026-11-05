@@ -117,7 +117,7 @@ Each task leaves the reader working and every test passing.
 - [x] T3 — Give `git` and `review` error codes from Go Renderer's `failure` · `errors.go` per package · serves R5 · test: `errors_test.go`
 - [x] T4 — Turn `review`'s domain files into `workspace` · serves R4 · test: `TestTheWorkspaceImportsNoInterface`
 - [x] T5 — Move the Java tree and class kinds into `java` · serves R1 · test: `TestAJavaTreeMarksRootsAndJoinsPackages`
-- [ ] T6 — Background work with keys and cancelling · `window/work.go` · serves R8 · test: `TestANewerSearchCancelsTheOlderOne`
+- [x] T6 — Background work with keys and cancelling · `app/work.go`, which becomes `window` · serves R8 · test: `TestANewerSearchCancelsTheOlderOne`
 - [ ] T7 — Commands, keys and the help built from them · `window/commands.go` · serves R7 · tests: `TestNoTwoCommandsShareAKeyInOneMode`, `TestTheHelpListsEveryCommand`
 - [ ] T8 — `viewer`, `sidebar` and `finder` as packages · serves R1 · test: the tests of T1
 - [ ] T9 — The `Mode` interface; `files` and `review` as packages · serves R3, R6 · tests: `TestTheWindowImportsNoMode`, `TestMarksSavedBeforeTheSplitAreRead`

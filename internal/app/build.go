@@ -27,7 +27,7 @@ func (application *App) Build(context *ui.Context) {
 	}
 	application.keys = keys{state: application.tap.state}
 	windowOpen.Store(true)
-	application.takeResults()
+	application.work.take()
 	application.readClassKinds()
 	application.handleKeys(context)
 

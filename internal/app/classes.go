@@ -42,7 +42,7 @@ func (application *App) readClassKinds() {
 	for index, reference := range wanted {
 		paths[index] = application.projects[reference.project].Path
 	}
-	application.later(func() func() {
+	application.work.run("", func(cancellation) func() {
 		kinds := make([]java.ClassKind, len(wanted))
 		for index, reference := range wanted {
 			kinds[index] = java.ReadKind(paths[index], reference.path)
