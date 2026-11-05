@@ -96,8 +96,9 @@ var exactRoles = map[chroma.TokenType]Role{
 }
 
 // kindRoles are the roles of the chroma tokens known only by their kind: strings and numbers are
-// kinds of literal, keywords, comments and operators are kinds of their own. A kind of literal is
-// a subcategory, and the others are categories, so no token finds two of them.
+// kinds of literal, keywords, comments and operators are kinds of their own. A token is looked up
+// by its subcategory, then by its category; a keyword, a comment or an operator may be found by
+// both, with the same role.
 var kindRoles = map[chroma.TokenType]Role{
 	chroma.LiteralString: String,
 	chroma.LiteralNumber: Number,

@@ -1,6 +1,6 @@
 # 2. Keep every function short
 
-> Status: building · Author's approval: proposal ☑ plan ☑
+> Status: done · Author's approval: proposal ☑ plan ☑
 
 ## Why
 
@@ -66,8 +66,24 @@ and after, on a small repository it makes, and compares the pictures.
 - [x] T5 — `window` and `main`: the title bar, the base dialog, the status bar, `Build`, `main` · serves R2, R3 · test: the same
 - [x] T6 — The rest: `RoleOf`, `look`, `LoadProject`, `buildOverviewRow`, `parseUnifiedDiff` · serves R2, R3 · test: the same
 - [x] T7 — The shortcut tests' tables as functions · serves R2 · test: they still pass
-- [ ] T8 — `TestNoFunctionIsLongerThanFortyLines`, and the captures compared with T1 · serves R1, R2
+- [x] T8 — `TestNoFunctionIsLongerThanFortyLines`, and the captures compared with T1 · serves R1, R2
 
 ## Result
 
-Not built yet.
+| Id | Met | How it was checked |
+|---|---|---|
+| R1 | Yes | Every test passes after each task. The ten captures (files, review, overview, finder and a narrow window, each light and dark) are the same bytes before and after. The 38 shortcut cases are the same cases with the same checks. `RoleOf` gave the same role as the old `switch` for every one of chroma's token types. |
+| R2 | Yes | `TestNoFunctionIsLongerThanFortyLines` passes, and fails on a function of 41 lines. |
+| R3 | Yes | The reviewer found no change in behaviour. Four names that said less than the function does were renamed, and a parameter that carried an unused colour was removed. |
+
+What changed from the plan:
+
+- The shortcut tables could not each be one function, since a table alone is longer than forty
+  lines. Each is now a few functions, each holding the cases of one kind (opening, the window's
+  state, moving, the file's changes, …), and small helpers (`pressing`, `typing`) keep a case to one
+  or two lines.
+- `RoleOf` reads two tables: exact token types, then kinds of token.
+
+What was left as it is: the sidebar's `paintEnterButton` and `paintRight` still take the row's
+`top` along with its area, since working it out again from the area could round differently and
+move a pixel.

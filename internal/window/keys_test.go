@@ -173,7 +173,7 @@ func runShortcuts(test *testing.T, shortcuts []shortcut) {
 }
 
 func TestEveryWindowShortcutDoesItsJob(test *testing.T) {
-	runShortcuts(test, append(append(openingShortcuts(), settingShortcuts()...), movingShortcuts()...))
+	runShortcuts(test, append(append(openingShortcuts(), stateShortcuts()...), movingShortcuts()...))
 }
 
 // openingShortcuts open the window's dialogs and panels.
@@ -198,8 +198,9 @@ func openingShortcuts() []shortcut {
 	}
 }
 
-// settingShortcuts read the projects again and change what the window compares and shows.
-func settingShortcuts() []shortcut {
+// stateShortcuts change the window's state: they read the projects again, switch the mode, the
+// comparison and the theme, and copy a path.
+func stateShortcuts() []shortcut {
 	readAgain := func(application *Window) string {
 		return unless(len(application.projects[0].Changes) == 4, "the file added since the start is not among the changes")
 	}
@@ -396,8 +397,8 @@ func scrollDownFirst(test *testing.T, application *Window, window *uitest.Window
 
 // scrollingShortcuts scroll the file open by lines, by pages and to its ends.
 func scrollingShortcuts() []shortcut {
-	long := func(name string, prepare func(*testing.T, *Window, *uitest.Window), press func(*uitest.Window), holds func(*Window) string) shortcut {
-		return shortcut{name: name, open: "tides/coast.txt", long: true, prepare: prepare, press: press, holds: holds}
+	long := func(name string, prepare func(*testing.T, *Window, *uitest.Window), keys func(*uitest.Window), holds func(*Window) string) shortcut {
+		return shortcut{name: name, open: "tides/coast.txt", long: true, prepare: prepare, press: keys, holds: holds}
 	}
 	return []shortcut{
 		long("j scrolls down a line", focusEditor, pressing(input.KeyJ), scrolledDown),

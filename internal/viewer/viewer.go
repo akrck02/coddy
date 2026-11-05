@@ -644,7 +644,7 @@ type lineStyle struct {
 }
 
 // styleOf picks a diff line's code from the side it is on, and its colours from how it changed.
-func (view *Viewer) styleOf(line git.DiffLine, quiet draw2d.Color, look theme.Look) lineStyle {
+func (view *Viewer) styleOf(line git.DiffLine, look theme.Look) lineStyle {
 	document := view.Document
 	switch line.Kind {
 	case git.Insertion:
@@ -654,14 +654,14 @@ func (view *Viewer) styleOf(line git.DiffLine, quiet draw2d.Color, look theme.Lo
 		return lineStyle{code: lineAt(document.OldLines, line.OldNumber), sign: "−", signColour: look.Deleted,
 			lineWash: look.DeletedLine, wordWash: look.DeletedWord, edge: look.Deleted}
 	}
-	return lineStyle{code: lineAt(document.NewLines, line.NewNumber), signColour: quiet}
+	return lineStyle{code: lineAt(document.NewLines, line.NewNumber)} // an unchanged line has no sign
 }
 
 // paintDiffLine paints a line of the diff: its wash, its two numbers, its sign and its code.
 func (view *Viewer) paintDiffLine(painter painting, index int, top, baseline float32) {
 	look, area, drawing := painter.look, painter.area, painter.drawing
 	line := view.rows[index].Line
-	style := view.styleOf(line, painter.context.Theme.InkQuiet, look)
+	style := view.styleOf(line, look)
 	rowArea := draw2d.Rectangle{X: area.X, Y: top, Width: area.Width, Height: view.rowHeight}
 	if style.lineWash.IsVisible() {
 		view.paintWash(painter, index, style, rowArea)

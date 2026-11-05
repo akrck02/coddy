@@ -168,7 +168,7 @@ func (application *Window) buildTitleBar(context *ui.Context) {
 		application.buildSearchField(context)
 		context.Box(ui.Layout{Width: ui.Grow(), Gap: 4, AlignY: ui.Center}, func() {
 			context.Spacer()
-			application.buildComparisonButtons(context)
+			application.buildSettingButtons(context)
 			application.buildMenu(context)
 		})
 	})
@@ -196,9 +196,9 @@ func (application *Window) buildSearchField(context *ui.Context) {
 	}
 }
 
-// buildComparisonButtons are the comparison's settings: the projects listed, the changes counted,
-// the base, and reading again.
-func (application *Window) buildComparisonButtons(context *ui.Context) {
+// buildSettingButtons are the window's settings: the projects listed, the changes counted, the
+// base, and reading again.
+func (application *Window) buildSettingButtons(context *ui.Context) {
 	if theme.ToolButton(context, "Only the projects with changes (h)", "list-filter", application.onlyChanged) {
 		application.setOnlyChanged(!application.onlyChanged)
 	}

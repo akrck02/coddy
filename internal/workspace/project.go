@@ -86,7 +86,7 @@ func LoadProject(path string, options LoadOptions) *Project {
 		project.Files = sortedUnique(files)
 		return project
 	}
-	changes := project.readChanges(options.WorkingTree)
+	changes := project.loadChanges(options.WorkingTree)
 	// a file deleted by the development is no longer in the working tree, but it is still worth
 	// finding in the tree to read what was removed
 	for _, change := range changes {
@@ -96,9 +96,10 @@ func LoadProject(path string, options LoadOptions) *Project {
 	return project
 }
 
-// readChanges reads what the development changed against its merge base: the commits ahead, the
-// files changed, their counts of lines and their fingerprints. It returns the changes.
-func (project *Project) readChanges(workingTree bool) []git.Change {
+// loadChanges reads what the development changed against its merge base and keeps it in the
+// project: the commits ahead, the files changed, their counts of lines and their fingerprints. It
+// returns the changes.
+func (project *Project) loadChanges(workingTree bool) []git.Change {
 	path := project.Path
 	project.Ahead = git.CommitsAhead(path, project.MergeBase)
 	changes, err := git.Changes(path, project.Comparison(workingTree))
