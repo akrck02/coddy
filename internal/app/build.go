@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/akrck02/code-review/internal/finder"
 	"github.com/akrck02/code-review/internal/pane"
 	"github.com/akrck02/code-review/internal/theme"
 	"github.com/akrck02/code-review/internal/viewer"
@@ -54,7 +55,7 @@ func (application *App) Build(context *ui.Context) {
 		application.buildStatusBar(context)
 	})
 
-	application.finder.build(context, application)
+	application.finder.Build(context, application)
 	application.buildBaseDialog(context)
 	application.buildHelp(context)
 	application.buildPicker(context)
@@ -70,7 +71,7 @@ func (application *App) applyTheme(context *ui.Context) {
 }
 
 func (application *App) ModalOpen() bool {
-	return application.finder.open || application.base.open || application.helpOpen || application.pickerOpen
+	return application.finder.Open || application.base.open || application.helpOpen || application.pickerOpen
 }
 
 // enterCurrentProject takes the sidebar into the project of the selected row, or of the file open.
@@ -181,7 +182,7 @@ func (application *App) buildTitleBar(context *ui.Context) {
 				context.Text("⌘P", ui.TextStyle{Size: palette.SmallTextSize, Color: palette.InkSoft, Weight: draw2d.Medium})
 			})
 		}) {
-			application.finder.show(namesScope)
+			application.finder.Show(finder.NamesScope)
 		}
 		context.Box(ui.Layout{Width: ui.Grow(), Gap: 4, AlignY: ui.Center}, func() {
 			context.Spacer()

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/akrck02/code-review/internal/finder"
 	"github.com/akrck02/code-review/internal/viewer"
 	"github.com/akrck02/go-renderer/input"
 	"github.com/akrck02/go-ui/uitest"
@@ -174,11 +175,11 @@ func TestEveryWindowShortcutDoesItsJob(test *testing.T) {
 			holds: func(application *App) string { return unless(application.base.open, "the base dialog is closed") }},
 		{name: "Shift+P finds a file by name", press: func(window *uitest.Window) { press(window, input.KeyP, input.KeyShift) },
 			holds: func(application *App) string {
-				return unless(application.finder.open && application.finder.scope == namesScope, "the finder is not open on names")
+				return unless(application.finder.Open && application.finder.Scope == finder.NamesScope, "the finder is not open on names")
 			}},
 		{name: "/ finds a text in the files", press: func(window *uitest.Window) { typeText(window, "/") },
 			holds: func(application *App) string {
-				return unless(application.finder.open && application.finder.scope == contentScope, "the finder is not open on content")
+				return unless(application.finder.Open && application.finder.Scope == finder.ContentScope, "the finder is not open on content")
 			}},
 		{name: "? opens the help", press: func(window *uitest.Window) { typeText(window, "?") },
 			holds: func(application *App) string { return unless(application.helpOpen, "the help is closed") }},

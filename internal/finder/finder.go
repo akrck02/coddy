@@ -1,6 +1,9 @@
-package app
+// Package finder finds a file by its name or by a text it holds, in any project, and opens it
+// at the line found.
+package finder
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"strings"
@@ -11,7 +14,6 @@ import (
 	"github.com/akrck02/code-review/internal/git"
 	"github.com/akrck02/code-review/internal/highlight"
 	"github.com/akrck02/code-review/internal/pane"
-	"github.com/akrck02/code-review/internal/review"
 	"github.com/akrck02/code-review/internal/theme"
 	"github.com/akrck02/code-review/internal/workspace"
 	"github.com/akrck02/go-renderer/draw2d"
@@ -19,36 +21,59 @@ import (
 	ui "github.com/akrck02/go-ui"
 )
 
-// finderScope is what the finder searches: the names of the files, or what they hold.
-type finderScope int
+// Scope is what the finder searches: the names of the files, or what they hold.
+type Scope int
 
 const (
-	namesScope   finderScope = iota // fuzzy, over every file's project and path
-	contentScope                    // the lines that hold the text typed, in every file
+	NamesScope   Scope = iota // fuzzy, over every file's project and path
+	ContentScope              // the lines that hold the text typed, in every file
 )
 
-// finderState is the finder: type part of a file's name, or a text it holds, from any project,
+// Window is what the finder needs from the window it opens over.
+type Window interface {
+	Look() theme.Look
+	Keys() pane.Keys
+	Projects() []*workspace.Project
+	// Candidates are every file the names search can find.
+	Candidates() []Candidate
+	// Searchable tells whether the content search looks in a project: one read, shown and in
+	// the project entered, if any.
+	Searchable(project int) bool
+	// WorkingTree tells whether the changes not committed yet count.
+	WorkingTree() bool
+	// Synchronous tells whether work runs at once, for a capture or a test: the search does not
+	// wait for the typing to pause.
+	Synchronous() bool
+	// Run, Cancel and Read are the window's background work: see its work.
+	Run(key string, do func(stop context.Context) func())
+	Cancel(key string)
+	Read(stop context.Context, reading func()) bool
+	// OpenAt opens a file at a line, shows it in the sidebar and gives it the keyboard.
+	OpenAt(file workspace.FileReference, line int)
+}
+
+// Finder is the finder: type part of a file's name, or a text it holds, from any project,
 // and open it with Enter, at the line found.
-type finderState struct {
-	open      bool
+type Finder struct {
+	Open      bool
 	focusNext bool
-	scope     finderScope
-	query     string
+	Scope     Scope
+	Query     string
 	asked     string // the query the matches are for
-	stale     bool   // the projects changed since the matches were found
-	matches   []review.Match
+	Stale     bool   // the projects changed since the matches were found
+	matches   []Match
 	selected  int
 	list      pane.Scroller
 
-	// the content search runs on other goroutines; search counts the searches asked for, so the
-	// answer to one overtaken by more typing is dropped
-	hits      []contentHit
+	// the content search runs as a job of the window, under a key: a newer search, typed while one
+	// runs, replaces it
+	Hits      []ContentHit
 	searching bool
 	truncated bool
 }
 
-// contentHit is a line found by the content search.
-type contentHit struct {
+// ContentHit is a line found by the content search.
+type ContentHit struct {
 	project int
 	changed bool
 	status  git.Status
@@ -69,58 +94,58 @@ const (
 	finderPanelRadius = 14
 )
 
-func (finder *finderState) show(scope finderScope) {
-	finder.open = true
+func (finder *Finder) Show(scope Scope) {
+	finder.Open = true
 	finder.focusNext = true
-	finder.scope = scope
-	finder.query = ""
-	finder.stale = true
+	finder.Scope = scope
+	finder.Query = ""
+	finder.Stale = true
 	finder.selected = 0
 	finder.list.Offset = 0
-	finder.hits, finder.searching = nil, false
+	finder.Hits, finder.searching = nil, false
 }
 
-func (finder *finderState) setScope(scope finderScope) {
-	finder.scope = scope
-	finder.stale = true
+func (finder *Finder) setScope(scope Scope) {
+	finder.Scope = scope
+	finder.Stale = true
 	finder.focusNext = true
 }
 
-func (finder *finderState) count() int {
-	if finder.scope == contentScope {
-		return len(finder.hits)
+func (finder *Finder) count() int {
+	if finder.Scope == ContentScope {
+		return len(finder.Hits)
 	}
 	return len(finder.matches)
 }
 
-func (finder *finderState) rowHeight() float32 {
-	if finder.scope == contentScope {
+func (finder *Finder) rowHeight() float32 {
+	if finder.Scope == ContentScope {
 		return contentRowHeight
 	}
 	return finderRowHeight
 }
 
-func (finder *finderState) refresh(application *App) {
-	if !finder.stale && finder.asked == finder.query {
+func (finder *Finder) refresh(window Window) {
+	if !finder.Stale && finder.asked == finder.Query {
 		return
 	}
-	finder.asked = finder.query
-	finder.stale = false
+	finder.asked = finder.Query
+	finder.Stale = false
 	finder.selected = 0
 	finder.list.Offset = 0
-	if finder.scope == namesScope {
-		finder.matches = review.FuzzyFind(application.candidates, finder.query, finderLimit)
+	if finder.Scope == NamesScope {
+		finder.matches = FuzzyFind(window.Candidates(), finder.Query, finderLimit)
 		return
 	}
-	finder.searchContent(application, strings.TrimSpace(finder.query))
+	finder.searchContent(window, strings.TrimSpace(finder.Query))
 }
 
 // searchContent looks for a text in every project shown, a few at a time, after a short pause
 // so that typing a word does not start a search for each of its letters.
-func (finder *finderState) searchContent(application *App, text string) {
+func (finder *Finder) searchContent(window Window, text string) {
 	if utf8.RuneCountInString(text) < contentMinLength {
-		application.work.cancel(contentSearch)
-		finder.hits, finder.searching, finder.truncated = nil, false, false
+		window.Cancel(contentSearch)
+		finder.Hits, finder.searching, finder.truncated = nil, false, false
 		return
 	}
 	type searched struct {
@@ -128,15 +153,15 @@ func (finder *finderState) searchContent(application *App, text string) {
 		path    string
 	}
 	var projects []searched
-	for index, project := range application.projects {
-		if project.Loaded && !application.hidden(project) && application.inScope(workspace.FileReference{Project: index, Path: ""}) {
+	for index, project := range window.Projects() {
+		if window.Searchable(index) {
 			projects = append(projects, searched{index, project.Path})
 		}
 	}
-	options := git.GrepOptions{WorkingTree: application.settings.WorkingTree, PerFile: contentPerFile}
-	synchronous := application.settings.Synchronous
+	options := git.GrepOptions{WorkingTree: window.WorkingTree(), PerFile: contentPerFile}
+	synchronous := window.Synchronous()
 	finder.searching = true
-	application.work.run(contentSearch, func(stop cancellation) func() {
+	window.Run(contentSearch, func(stop context.Context) func() {
 		if !synchronous {
 			select {
 			case <-time.After(contentPause):
@@ -150,31 +175,31 @@ func (finder *finderState) searchContent(application *App, text string) {
 			group.Add(1)
 			go func() {
 				defer group.Done()
-				application.work.read(stop, func() {
+				window.Read(stop, func() {
 					found[position], _ = git.Grep(project.path, text, options) // a project git cannot search shows no lines
 				})
 			}()
 		}
 		group.Wait()
 		return func() {
-			finder.hits, finder.truncated = nil, false
+			finder.Hits, finder.truncated = nil, false
 			for position, hits := range found {
 				index := projects[position].project
-				if index >= len(application.projects) {
+				if index >= len(window.Projects()) {
 					continue
 				}
-				project := application.projects[index]
+				project := window.Projects()[index]
 				for _, hit := range hits {
 					change, changed := project.ChangeOf(hit.Path)
-					finder.hits = append(finder.hits, contentHit{index, changed, change.Status, hit})
+					finder.Hits = append(finder.Hits, ContentHit{index, changed, change.Status, hit})
 				}
 			}
 			// the development's own files first: they are what is being reviewed
-			sort.SliceStable(finder.hits, func(first, second int) bool {
-				return finder.hits[first].changed && !finder.hits[second].changed
+			sort.SliceStable(finder.Hits, func(first, second int) bool {
+				return finder.Hits[first].changed && !finder.Hits[second].changed
 			})
-			if len(finder.hits) > contentHitLimit {
-				finder.hits, finder.truncated = finder.hits[:contentHitLimit], true
+			if len(finder.Hits) > contentHitLimit {
+				finder.Hits, finder.truncated = finder.Hits[:contentHitLimit], true
 			}
 			finder.searching = false
 			finder.selected = 0
@@ -183,30 +208,28 @@ func (finder *finderState) searchContent(application *App, text string) {
 	})
 }
 
-func (finder *finderState) choose(application *App) {
+func (finder *Finder) choose(window Window) {
 	if finder.selected < 0 || finder.selected >= finder.count() {
 		return
 	}
 	var reference workspace.FileReference
 	line := 0
-	if finder.scope == contentScope {
-		hit := finder.hits[finder.selected]
+	if finder.Scope == ContentScope {
+		hit := finder.Hits[finder.selected]
 		reference, line = workspace.FileReference{Project: hit.project, Path: hit.Path}, hit.Line
 	} else {
 		candidate := finder.matches[finder.selected].Candidate
 		reference = workspace.FileReference{Project: candidate.Project, Path: candidate.Path}
 	}
-	finder.open = false
-	application.openFileAt(reference, line)
-	application.sidebar.revealFile(application, reference)
-	application.focus = editorPane
+	finder.Open = false
+	window.OpenAt(reference, line)
 }
 
-func (finder *finderState) build(context *ui.Context, application *App) {
-	if !finder.open {
+func (finder *Finder) Build(context *ui.Context, window Window) {
+	if !finder.Open {
 		return
 	}
-	keys := application.keys
+	keys := window.Keys()
 	switch {
 	case keys.Typed(input.KeyDown):
 		finder.selected++
@@ -217,16 +240,16 @@ func (finder *finderState) build(context *ui.Context, application *App) {
 	case keys.Typed(input.KeyPageUp):
 		finder.selected -= finderRows
 	case keys.Pressed(input.KeyTab):
-		finder.setScope(1 - finder.scope)
+		finder.setScope(1 - finder.Scope)
 	}
 	palette := context.Theme
-	look := application.look
+	look := window.Look()
 	options := ui.LayerOptions{AlignX: ui.Center, AlignY: ui.Start, Padding: ui.Padding{Top: 64}, Width: ui.Fixed(760)}
 	dismissed := context.Modal("finder", options, func() {
 		panel := ui.Look{Fill: palette.Surface, Border: look.Chosen, BorderWidth: 1, Radius: finderPanelRadius, Shadow: true}
 		context.Frame(ui.Layout{Direction: ui.Vertical, Width: ui.Grow(), Padding: ui.Pad(8), Gap: 6}, panel, func() {
-			submitted := finder.buildQuery(context, application)
-			finder.refresh(application)
+			submitted := finder.buildQuery(context, window)
+			finder.refresh(window)
 			count := finder.count()
 			finder.selected = min(max(finder.selected, 0), max(count-1, 0))
 			finder.list.RowHeight = finder.rowHeight()
@@ -239,35 +262,35 @@ func (finder *finderState) build(context *ui.Context, application *App) {
 				submitted = true
 			}
 			rows := min(max(count, 1), finderRows)
-			if finder.scope == contentScope {
+			if finder.Scope == ContentScope {
 				rows = min(max(count, 1), contentRows)
 			}
 			height := float32(rows) * finder.rowHeight()
 			context.Paint(ui.Layout{Width: ui.Grow(), Height: ui.Fixed(height)}, func(area draw2d.Rectangle, drawing *draw2d.List) {
 				finder.list.Place(area)
-				finder.paint(context, application, drawing)
+				finder.paint(context, window, drawing)
 			})
 			finder.buildFooter(context)
 			if submitted {
-				finder.choose(application)
+				finder.choose(window)
 			}
 		})
 	})
 	if dismissed {
-		finder.open = false
+		finder.Open = false
 	}
 }
 
 // buildQuery is the field typed in, as a pill like the window's search field, with the switch
 // between names and content on its right. It tells whether Enter was pressed in it.
-func (finder *finderState) buildQuery(context *ui.Context, application *App) bool {
+func (finder *Finder) buildQuery(context *ui.Context, window Window) bool {
 	palette := context.Theme
-	look := application.look
+	look := window.Look()
 	submitted := false
 	pill := ui.Look{Fill: look.Hover.WithAlpha(0.7), Radius: 20, Border: palette.Primary.WithAlpha(0.5), BorderWidth: 1}
 	context.Frame(ui.Layout{Width: ui.Grow(), Height: ui.Fixed(40), Padding: ui.Padding{Left: 14, Right: 5}, Gap: 10, AlignY: ui.Center}, pill, func() {
 		icon, placeholder := "search", "Find a file by its name, in any project"
-		if finder.scope == contentScope {
+		if finder.Scope == ContentScope {
 			icon, placeholder = "text-search", "Find a text in the files of every project"
 		}
 		context.IconSized(icon, 16, palette.InkSoft)
@@ -275,29 +298,29 @@ func (finder *finderState) buildQuery(context *ui.Context, application *App) boo
 			context.FocusField("query")
 			finder.focusNext = false
 		}
-		submitted = context.EntryField("query", &finder.query, ui.TextFieldOptions{Placeholder: placeholder, Plain: true, Width: ui.Grow()})
-		scope := int(finder.scope)
+		submitted = context.EntryField("query", &finder.Query, ui.TextFieldOptions{Placeholder: placeholder, Plain: true, Width: ui.Grow()})
+		scope := int(finder.Scope)
 		if theme.IconSwitch(context, "finder scope", &scope, []theme.IconChoice{
 			{Icon: "file-search", Name: "File names (Tab)"}, {Icon: "text-search", Name: "File content (Tab)"},
 		}) {
-			finder.setScope(finderScope(scope))
+			finder.setScope(Scope(scope))
 		}
 	})
 	return submitted
 }
 
 // buildFooter says what was found and the keys, each in a key cap.
-func (finder *finderState) buildFooter(context *ui.Context) {
+func (finder *Finder) buildFooter(context *ui.Context) {
 	palette := context.Theme
 	quiet := ui.TextStyle{Size: palette.SmallTextSize, Color: palette.InkQuiet}
 	context.Box(ui.Layout{Width: ui.Grow(), Height: ui.Fixed(30), Padding: ui.PadXY(8, 0), Gap: 6, AlignY: ui.Center}, func() {
 		switch {
-		case finder.scope == contentScope && finder.searching:
+		case finder.Scope == ContentScope && finder.searching:
 			context.Text("Searching…", quiet)
-		case finder.scope == contentScope && utf8.RuneCountInString(strings.TrimSpace(finder.query)) < contentMinLength:
+		case finder.Scope == ContentScope && utf8.RuneCountInString(strings.TrimSpace(finder.Query)) < contentMinLength:
 			context.Text("Type two letters or more; a capital makes it match case", quiet)
-		case finder.scope == contentScope:
-			words := fmt.Sprintf("%d lines", len(finder.hits))
+		case finder.Scope == ContentScope:
+			words := fmt.Sprintf("%d lines", len(finder.Hits))
 			if finder.truncated {
 				words = fmt.Sprintf("the first %d lines", contentHitLimit)
 			}
@@ -323,15 +346,15 @@ func keyCap(context *ui.Context, key string) {
 		})
 }
 
-func (finder *finderState) paint(context *ui.Context, application *App, drawing *draw2d.List) {
+func (finder *Finder) paint(context *ui.Context, window Window, drawing *draw2d.List) {
 	palette := context.Theme
 	area := finder.list.Area
 	drawing.PushClip(area)
 	if finder.count() == 0 {
 		message := "No file matches"
-		if finder.scope == contentScope {
+		if finder.Scope == ContentScope {
 			message = "No line holds it"
-			if finder.searching || utf8.RuneCountInString(strings.TrimSpace(finder.query)) < contentMinLength {
+			if finder.searching || utf8.RuneCountInString(strings.TrimSpace(finder.Query)) < contentMinLength {
 				message = ""
 			}
 		}
@@ -345,32 +368,32 @@ func (finder *finderState) paint(context *ui.Context, application *App, drawing 
 		rowArea := draw2d.Rectangle{X: area.X, Y: top + 1, Width: area.Width - pane.ScrollBarWidth - 2, Height: finder.rowHeight() - 2}
 		switch index {
 		case finder.selected:
-			drawing.Rectangle(rowArea, 8, application.look.Chosen, draw2d.Color{}, 0)
+			drawing.Rectangle(rowArea, 8, window.Look().Chosen, draw2d.Color{}, 0)
 		case hovered:
-			drawing.Rectangle(rowArea, 8, application.look.Hover, draw2d.Color{}, 0)
+			drawing.Rectangle(rowArea, 8, window.Look().Hover, draw2d.Color{}, 0)
 		}
-		if finder.scope == contentScope {
-			finder.paintHit(context, application, drawing, finder.hits[index], rowArea)
+		if finder.Scope == ContentScope {
+			finder.paintHit(context, window, drawing, finder.Hits[index], rowArea)
 		} else {
-			finder.paintName(context, application, drawing, finder.matches[index], rowArea)
+			finder.paintName(context, window, drawing, finder.matches[index], rowArea)
 		}
 	}
-	finder.list.PaintBar(drawing, application.look.ScrollThumb)
+	finder.list.PaintBar(drawing, window.Look().ScrollThumb)
 	drawing.PopClip()
 }
 
 // paintName paints a file found by its name: its icon, its name and, quieter, its project and
 // folder, with the letters that matched in the accent; its status on the right.
-func (finder *finderState) paintName(context *ui.Context, application *App, drawing *draw2d.List, match review.Match, row draw2d.Rectangle) {
+func (finder *Finder) paintName(context *ui.Context, window Window, drawing *draw2d.List, match Match, row draw2d.Rectangle) {
 	palette := context.Theme
 	measurer := context.Measurer()
 	size := palette.TextSize
 	metrics := measurer.MeasureText("Ag", size, draw2d.Regular, 1)
 	baseline := row.Y + (row.Height+metrics.Ascent-metrics.Descent)/2
 	candidate := match.Candidate
-	project := application.projects[candidate.Project]
+	project := window.Projects()[candidate.Project]
 	change, changed := project.ChangeOf(candidate.Path)
-	icon, iconInk := theme.FileIcon(candidate.Path, application.look)
+	icon, iconInk := theme.FileIcon(candidate.Path, window.Look())
 	drawing.Icon(icon, row.X+12, row.Y+(row.Height-16)/2, 16, iconInk)
 	nameInk := palette.Ink
 	if changed {
@@ -391,13 +414,13 @@ func (finder *finderState) paintName(context *ui.Context, application *App, draw
 
 // paintHit paints a line found by its content: the line itself in the code's face, the text found
 // washed in the accent, and under it the file and the line's number.
-func (finder *finderState) paintHit(context *ui.Context, application *App, drawing *draw2d.List, hit contentHit, row draw2d.Rectangle) {
+func (finder *Finder) paintHit(context *ui.Context, window Window, drawing *draw2d.List, hit ContentHit, row draw2d.Rectangle) {
 	palette := context.Theme
 	measurer := context.Measurer()
 	const codeSize = 13
 	code := measurer.MeasureText("M", codeSize, draw2d.Mono, 1)
 	small := measurer.MeasureText("Ag", palette.SmallTextSize, draw2d.Regular, 1)
-	icon, iconInk := theme.FileIcon(hit.Path, application.look)
+	icon, iconInk := theme.FileIcon(hit.Path, window.Look())
 	drawing.Icon(icon, row.X+12, row.Y+9, 16, iconInk)
 	left := row.X + 40
 	drawing.PushClip(draw2d.Rectangle{X: row.X, Y: row.Y, Width: row.Width - 8, Height: row.Height})
@@ -416,8 +439,8 @@ func (finder *finderState) paintHit(context *ui.Context, application *App, drawi
 	matchX := left + float32(utf8.RuneCountInString(text[start:min(column, len(text))]))*code.Width
 	wash := draw2d.Rectangle{X: matchX - 1, Y: row.Y + 6, Width: float32(found)*code.Width + 2, Height: code.Ascent + code.Descent + 4}
 	drawing.Rectangle(wash, 3, palette.Primary.WithAlpha(0.3), draw2d.Color{}, 0)
-	drawing.Text(shown, left, codeBaseline, codeSize, draw2d.Mono, application.look.Syntax.RoleColour(highlight.Plain))
-	where := fmt.Sprintf("%s/%s:%d", application.projects[hit.project].Name, hit.Path, hit.Line)
+	drawing.Text(shown, left, codeBaseline, codeSize, draw2d.Mono, window.Look().Syntax.RoleColour(highlight.Plain))
+	where := fmt.Sprintf("%s/%s:%d", window.Projects()[hit.project].Name, hit.Path, hit.Line)
 	whereInk := palette.InkQuiet
 	if hit.changed {
 		whereInk = theme.StatusColour(palette, hit.status).WithAlpha(0.85)

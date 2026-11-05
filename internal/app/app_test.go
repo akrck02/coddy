@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/akrck02/code-review/internal/finder"
 	"github.com/akrck02/code-review/internal/viewer"
 	"github.com/akrck02/code-review/internal/workspace"
 	"github.com/akrck02/go-renderer/input"
@@ -135,14 +136,14 @@ func TestTheFinderOpensAnUnchangedFileByPartOfItsName(test *testing.T) {
 	window.PressKey(input.KeyP)
 	window.ReleaseKey(input.KeySuper)
 	window.Frames(2)
-	if !application.finder.open {
+	if !application.finder.Open {
 		test.Fatal("⌘P did not open the finder")
 	}
 	window.Type("kpr")
 	window.Frames(2)
 	window.PressKey(input.KeyEnter)
 	window.Frames(2)
-	if application.finder.open {
+	if application.finder.Open {
 		test.Fatal("Enter left the finder open")
 	}
 	document := application.editor.Document
@@ -327,13 +328,13 @@ func TestTheFinderFindsATextAndOpensItsLine(test *testing.T) {
 	window.ReleaseKey(input.KeyShift)
 	window.ReleaseKey(input.KeySuper)
 	window.Frames(2)
-	if !application.finder.open || application.finder.scope != contentScope {
+	if !application.finder.Open || application.finder.Scope != finder.ContentScope {
 		test.Fatal("⌘⇧F did not open the finder on the files' content")
 	}
 	window.Type("Beam")
 	window.Frames(2)
-	if len(application.finder.hits) != 1 {
-		test.Fatalf("found %d lines holding Beam, want 1: %+v", len(application.finder.hits), application.finder.hits)
+	if len(application.finder.Hits) != 1 {
+		test.Fatalf("found %d lines holding Beam, want 1: %+v", len(application.finder.Hits), application.finder.Hits)
 	}
 	window.PressKey(input.KeyEnter)
 	window.Frames(2)

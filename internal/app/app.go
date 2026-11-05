@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/akrck02/code-review/internal/finder"
 	"github.com/akrck02/code-review/internal/git"
 	"github.com/akrck02/code-review/internal/java"
 	"github.com/akrck02/code-review/internal/pane"
@@ -56,14 +57,14 @@ type App struct {
 	projects      []*workspace.Project
 	projectBases  map[string]string // a base chosen for one project, by its path
 	loading       int
-	candidates    []review.Candidate
+	candidates    []finder.Candidate
 	changedOrder  []workspace.FileReference
 	work          *work
 	documentCache map[workspace.FileReference]*workspace.Document
 
 	sidebar sidebarState
 	editor  viewer.Viewer
-	finder  finderState
+	finder  finder.Finder
 	base    baseDialog
 	focus   focusedPane
 
@@ -112,8 +113,8 @@ func New(settings Settings) *App {
 		application.openByLabel(settings.Open)
 	}
 	if settings.Find != "" {
-		application.finder.show(contentScope)
-		application.finder.query = settings.Find
+		application.finder.Show(finder.ContentScope)
+		application.finder.Query = settings.Find
 	}
 	return application
 }
@@ -228,7 +229,7 @@ func (application *App) projectsChanged() {
 		}
 		for _, path := range project.Files {
 			_, changed := project.ChangeOf(path)
-			application.candidates = append(application.candidates, review.Candidate{
+			application.candidates = append(application.candidates, finder.Candidate{
 				Project: index, Path: path, Label: project.Name + "/" + path, Changed: changed,
 			})
 		}
@@ -237,7 +238,7 @@ func (application *App) projectsChanged() {
 			application.changedOrder = append(application.changedOrder, workspace.FileReference{Project: index, Path: path})
 		})
 	}
-	application.finder.stale = true
+	application.finder.Stale = true
 	application.sidebar.invalidate()
 }
 

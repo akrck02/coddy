@@ -3,6 +3,7 @@ package app
 import (
 	"strings"
 
+	"github.com/akrck02/code-review/internal/finder"
 	"github.com/akrck02/code-review/internal/pane"
 	"github.com/akrck02/code-review/internal/viewer"
 	"github.com/akrck02/go-renderer/input"
@@ -113,10 +114,10 @@ var commands = []command{
 		do: func(*App, *ui.Context, int) { window.Quit() }},
 	{description: "Find a text in the files of every project (Tab switches in the finder)",
 		keys: []keyPress{{key: input.KeyF, command: true, shift: true, label: "⌘⇧F"}, {text: "/", label: "/"}},
-		do:   func(application *App, _ *ui.Context, _ int) { application.finder.show(contentScope) }},
+		do:   func(application *App, _ *ui.Context, _ int) { application.finder.Show(finder.ContentScope) }},
 	{description: "Find a file by its name, in any project",
 		keys: []keyPress{commandKey(input.KeyP, "⌘P"), {key: input.KeyP, shift: true, label: "Shift+P"}},
-		do:   func(application *App, _ *ui.Context, _ int) { application.finder.show(namesScope) }},
+		do:   func(application *App, _ *ui.Context, _ int) { application.finder.Show(finder.NamesScope) }},
 	{description: "Open a repository or a folder of repositories",
 		keys: []keyPress{key(input.KeyO, "o"), commandKey(input.KeyO, "⌘O")},
 		do:   func(application *App, _ *ui.Context, _ int) { application.pickerOpen = true }},

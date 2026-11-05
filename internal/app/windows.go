@@ -1,8 +1,12 @@
 package app
 
 import (
+	"context"
+
+	"github.com/akrck02/code-review/internal/finder"
 	"github.com/akrck02/code-review/internal/pane"
 	"github.com/akrck02/code-review/internal/theme"
+	"github.com/akrck02/code-review/internal/workspace"
 	ui "github.com/akrck02/go-ui"
 )
 
@@ -31,4 +35,42 @@ func (application *App) BuildInsteadOfAFile(context *ui.Context) bool {
 	}
 	application.buildOverview(context)
 	return true
+}
+
+// Projects are the repositories open, in the order the sidebar lists them.
+func (application *App) Projects() []*workspace.Project { return application.projects }
+
+// Candidates are every file the finder can find by name.
+func (application *App) Candidates() []finder.Candidate { return application.candidates }
+
+// Searchable tells whether the finder's content search looks in a project.
+func (application *App) Searchable(index int) bool {
+	project := application.projects[index]
+	return project.Loaded && !application.hidden(project) && application.inScope(workspace.FileReference{Project: index})
+}
+
+// WorkingTree tells whether the changes not committed yet count.
+func (application *App) WorkingTree() bool { return application.settings.WorkingTree }
+
+// Synchronous tells whether work runs at once, for a capture or a test.
+func (application *App) Synchronous() bool { return application.settings.Synchronous }
+
+// Run starts background work under a key, replacing the work under that key still running.
+func (application *App) Run(key string, do func(stop context.Context) func()) {
+	application.work.run(key, do)
+}
+
+// Cancel stops the work under a key, if any.
+func (application *App) Cancel(key string) { application.work.cancel(key) }
+
+// Read reads a repository once one of the few readers is free.
+func (application *App) Read(stop context.Context, reading func()) bool {
+	return application.work.read(stop, reading)
+}
+
+// OpenAt opens a file at a line, shows it in the sidebar and gives it the keyboard.
+func (application *App) OpenAt(file workspace.FileReference, line int) {
+	application.openFileAt(file, line)
+	application.sidebar.revealFile(application, file)
+	application.focus = editorPane
 }

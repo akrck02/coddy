@@ -8,11 +8,14 @@ import (
 // waitTo gives a job time to run on its goroutine; the jobs here finish at once, or never.
 const waitTo = 2 * time.Second
 
+// search is the key both searches run under.
+const search = "search"
+
 func TestANewerSearchCancelsTheOlderOne(test *testing.T) {
 	jobs := newWork(false)
 	var shown []string
 	olderStopped := make(chan bool, 1)
-	jobs.run(contentSearch, func(stop cancellation) func() {
+	jobs.run(search, func(stop cancellation) func() {
 		select {
 		case <-stop.Done():
 			olderStopped <- true
@@ -23,7 +26,7 @@ func TestANewerSearchCancelsTheOlderOne(test *testing.T) {
 		}
 	})
 	newerDone := make(chan struct{})
-	jobs.run(contentSearch, func(stop cancellation) func() {
+	jobs.run(search, func(stop cancellation) func() {
 		defer close(newerDone)
 		return func() { shown = append(shown, "newer") }
 	})

@@ -146,7 +146,7 @@ Each task leaves the reader working and every test passing.
 - [x] T8a — `theme` as a package: looks, file icons, the reader's controls · serves R1 · test: the tests of T1
 - [x] T8b — `pane` as a package, and `workspace.FileReference` · serves R1 · test: the tests of T1
 - [x] T8c — `viewer` as a package, with the interface it needs from the window · serves R1 · test: the tests of T1
-- [ ] T8d — `finder` as a package, with the fuzzy search · serves R1 · test: the tests of T1
+- [x] T8d — `finder` as a package, with the fuzzy search · serves R1 · test: the tests of T1
 - [ ] T8e — `sidebar` as a package; `app` becomes `window` · serves R1 · test: the tests of T1
 - [ ] T9 — The `Mode` interface; `files` and `review` as packages · serves R3, R6 · tests: `TestTheWindowImportsNoMode`, `TestMarksSavedBeforeTheSplitAreRead`
 - [ ] T10 — Describe the packages in `docs/8-contributing.md` · serves R3
