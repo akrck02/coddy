@@ -147,17 +147,41 @@ func (sidebar *Sidebar) Rebuild(window Window) {
 		previous = sidebar.Rows[sidebar.Selected]
 	}
 	sidebar.Rows = sidebar.Rows[:0]
-	hidden := 0
 	if sidebar.Entered != "" && window.ProjectIndex(sidebar.Entered) < 0 {
 		sidebar.Entered = "" // the project was closed
 	}
-	for index, project := range window.Projects() {
-		if sidebar.Entered != "" {
-			if project.Path == sidebar.Entered {
-				sidebar.addProjectContent(window, index, project, 0)
+	if sidebar.Entered != "" {
+		sidebar.addEnteredProject(window)
+	} else {
+		sidebar.addEveryProject(window)
+	}
+	sidebar.Stale = false
+	sidebar.list.Count = len(sidebar.Rows)
+	if hadSelection {
+		for index, row := range sidebar.Rows {
+			if row.Kind == previous.Kind && row.Project == previous.Project && row.Path == previous.Path {
+				sidebar.Selected = index
+				return
 			}
-			continue
 		}
+	}
+	sidebar.Selected = min(max(sidebar.Selected, 0), max(len(sidebar.Rows)-1, 0))
+}
+
+// addEnteredProject lists the content of the project entered, with no row for the project itself.
+func (sidebar *Sidebar) addEnteredProject(window Window) {
+	for index, project := range window.Projects() {
+		if project.Path == sidebar.Entered {
+			sidebar.addProjectContent(window, index, project, 0)
+		}
+	}
+}
+
+// addEveryProject lists each project not hidden, with its content when expanded, and says how many
+// are hidden.
+func (sidebar *Sidebar) addEveryProject(window Window) {
+	hidden := 0
+	for index, project := range window.Projects() {
 		if window.Hidden(project) {
 			hidden++
 			continue
@@ -175,17 +199,6 @@ func (sidebar *Sidebar) Rebuild(window Window) {
 		sidebar.Rows = append(sidebar.Rows, Row{Kind: NoteRow, Project: -1, Quiet: true,
 			Label: fmt.Sprintf("%d projects without changes hidden (h shows them)", hidden)})
 	}
-	sidebar.Stale = false
-	sidebar.list.Count = len(sidebar.Rows)
-	if hadSelection {
-		for index, row := range sidebar.Rows {
-			if row.Kind == previous.Kind && row.Project == previous.Project && row.Path == previous.Path {
-				sidebar.Selected = index
-				return
-			}
-		}
-	}
-	sidebar.Selected = min(max(sidebar.Selected, 0), max(len(sidebar.Rows)-1, 0))
 }
 
 // addProjectContent lists a project's tree at a depth, or why it cannot be listed yet.
@@ -419,44 +432,60 @@ func (sidebar *Sidebar) Build(context *ui.Context, window Window) {
 				sidebar.buildEnteredHeader(context, window)
 				return
 			}
-			title := sidebar.Listing.Name()
-			titleStyle := ui.TextStyle{Weight: draw2d.Medium, Color: palette.InkSoft}
-			context.Text(title, titleStyle)
-			room := sidebar.headerRoom() - theme.TextWidth(context, title, titleStyle) - toolButtonWidth*2 - headerGap*3
-			if header := sidebar.Listing.Header(); header != "" {
-				progressStyle := ui.TextStyle{Size: palette.SmallTextSize, Color: palette.InkQuiet}
-				if progress := theme.FitText(context, header, progressStyle, room); progress != "" {
-					context.Text(progress, progressStyle)
-				}
-			}
-			context.Spacer()
-			sidebar.buildChangedFilter(context)
-			if theme.ToolButton(context, "Collapse all", "chevrons-down-up", false) {
-				sidebar.collapseAll(window)
-			}
+			sidebar.buildHeader(context, window)
 		})
 		sidebar.list.RowHeight = RowHeight
 		sidebar.list.Count = len(sidebar.Rows)
 		if !window.ModalOpen() {
-			onBar := sidebar.list.Follow(context, window.Keys(), palette.ScrollStep)
-			x, y := context.Pointer()
-			if index := sidebar.list.RowAt(x, y); index >= 0 && !onBar && window.Keys().Clicked() {
-				sidebar.Selected = index
-				window.FocusSidebar()
-				if sidebar.onEnter(index, x) {
-					sidebar.Enter(window, sidebar.Rows[index].Project)
-				} else if sidebar.onCheck(index, x) {
-					sidebar.Listing.Press(workspace.FileReference{Project: sidebar.Rows[index].Project, Path: sidebar.Rows[index].Path}, false)
-				} else {
-					sidebar.activate(window, index)
-				}
-			}
+			sidebar.followPointer(context, window)
 		}
 		context.Paint(ui.Layout{Width: ui.Grow(), Height: ui.Grow()}, func(area draw2d.Rectangle, drawing *draw2d.List) {
 			sidebar.list.Place(area)
 			sidebar.paint(context, window, drawing)
 		})
 	})
+}
+
+// buildHeader names the mode, says how far it has gone if it can, and offers its buttons.
+func (sidebar *Sidebar) buildHeader(context *ui.Context, window Window) {
+	palette := context.Theme
+	title := sidebar.Listing.Name()
+	titleStyle := ui.TextStyle{Weight: draw2d.Medium, Color: palette.InkSoft}
+	context.Text(title, titleStyle)
+	room := sidebar.headerRoom() - theme.TextWidth(context, title, titleStyle) - toolButtonWidth*2 - headerGap*3
+	if header := sidebar.Listing.Header(); header != "" {
+		progressStyle := ui.TextStyle{Size: palette.SmallTextSize, Color: palette.InkQuiet}
+		if progress := theme.FitText(context, header, progressStyle, room); progress != "" {
+			context.Text(progress, progressStyle)
+		}
+	}
+	context.Spacer()
+	sidebar.buildChangedFilter(context)
+	if theme.ToolButton(context, "Collapse all", "chevrons-down-up", false) {
+		sidebar.collapseAll(window)
+	}
+}
+
+// followPointer scrolls the rows with the wheel and the bar, and answers a click on a row: on its
+// enter button, on its check, or anywhere else on it.
+func (sidebar *Sidebar) followPointer(context *ui.Context, window Window) {
+	onBar := sidebar.list.Follow(context, window.Keys(), context.Theme.ScrollStep)
+	x, y := context.Pointer()
+	index := sidebar.list.RowAt(x, y)
+	if index < 0 || onBar || !window.Keys().Clicked() {
+		return
+	}
+	sidebar.Selected = index
+	window.FocusSidebar()
+	row := sidebar.Rows[index]
+	switch {
+	case sidebar.onEnter(index, x):
+		sidebar.Enter(window, row.Project)
+	case sidebar.onCheck(index, x):
+		sidebar.Listing.Press(workspace.FileReference{Project: row.Project, Path: row.Path}, false)
+	default:
+		sidebar.activate(window, index)
+	}
 }
 
 // buildEnteredHeader names the project the sidebar is in, with the way back to every project.
@@ -471,16 +500,7 @@ func (sidebar *Sidebar) buildEnteredHeader(context *ui.Context, window Window) {
 		sidebar.Leave(window)
 		return
 	}
-	count, countStyle := "", ui.TextStyle{Size: palette.SmallTextSize, Weight: draw2d.Mono, Color: palette.Warning}
-	if len(project.Changes) > 0 {
-		decoration := sidebar.Listing.Decorate(Row{Kind: ProjectRow, Project: index, Changed: len(project.Changes)})
-		if len(decoration.Words) > 0 {
-			count, countStyle.Color = decoration.Words[0].Text, decoration.Words[0].Ink.colour(palette)
-		}
-		if decoration.Progress != nil {
-			countStyle.Color = palette.InkQuiet // the header keeps the bar's colour for the rows
-		}
-	}
+	count, countStyle := sidebar.enteredCount(context, index, project)
 	// what is left for the name and the branch once the buttons and the count have their room
 	room := sidebar.headerRoom() - toolButtonWidth - headerGap
 	if count != "" {
@@ -502,6 +522,23 @@ func (sidebar *Sidebar) buildEnteredHeader(context *ui.Context, window Window) {
 		context.Text(count, countStyle)
 	}
 	sidebar.buildChangedFilter(context)
+}
+
+// enteredCount is what the mode counts in the project entered, and the style it is written in.
+func (sidebar *Sidebar) enteredCount(context *ui.Context, index int, project *workspace.Project) (string, ui.TextStyle) {
+	palette := context.Theme
+	count, countStyle := "", ui.TextStyle{Size: palette.SmallTextSize, Weight: draw2d.Mono, Color: palette.Warning}
+	if len(project.Changes) == 0 {
+		return count, countStyle
+	}
+	decoration := sidebar.Listing.Decorate(Row{Kind: ProjectRow, Project: index, Changed: len(project.Changes)})
+	if len(decoration.Words) > 0 {
+		count, countStyle.Color = decoration.Words[0].Text, decoration.Words[0].Ink.colour(palette)
+	}
+	if decoration.Progress != nil {
+		countStyle.Color = palette.InkQuiet // the header keeps the bar's colour for the rows
+	}
+	return count, countStyle
 }
 
 // The sidebar's header: its padding, the gap between its parts and an icon button's width.
@@ -574,181 +611,6 @@ func (sidebar *Sidebar) collapseAll(window Window) {
 		sidebar.expanded[sidebar.expandedKey(index, "")] = false
 	}
 	sidebar.Stale = true
-}
-
-func (sidebar *Sidebar) paint(context *ui.Context, window Window, drawing *draw2d.List) {
-	palette := context.Theme
-	look := window.Look()
-	area := sidebar.list.Area
-	measurer := context.Measurer()
-	size := palette.TextSize
-	small := palette.SmallTextSize
-	metrics := measurer.MeasureText("Ag", size, draw2d.Regular, 1)
-	pointerX, pointerY := context.Pointer()
-	hovered := -1
-	if !window.ModalOpen() {
-		hovered = sidebar.list.RowAt(pointerX, pointerY)
-	}
-	drawing.PushClip(area)
-	first, last := sidebar.list.Visible()
-	for index := first; index < last; index++ {
-		row := sidebar.Rows[index]
-		top := sidebar.list.RowTop(index)
-		rowArea := draw2d.Rectangle{X: area.X + 4, Y: top + 1, Width: area.Width - 8 - pane.ScrollBarWidth/2, Height: RowHeight - 2}
-		reference := workspace.FileReference{Project: row.Project, Path: row.Path}
-		isOpen := row.Kind == FileRow && window.IsOpened(reference)
-		switch {
-		case index == sidebar.Selected && window.SidebarFocused():
-			drawing.Rectangle(rowArea, 5, look.Chosen, look.FocusEdge, 1)
-		case index == sidebar.Selected, isOpen:
-			// the selection of a pane without the keyboard, quieter than the one with it
-			drawing.Rectangle(rowArea, 5, look.Hover.Mix(look.Chosen, 0.5), draw2d.Color{}, 0)
-		case index == hovered:
-			drawing.Rectangle(rowArea, 5, look.Hover, draw2d.Color{}, 0)
-		}
-		baseline := top + (RowHeight+metrics.Ascent-metrics.Descent)/2
-		x := sidebar.rowLeft(row)
-		iconTop := top + (RowHeight-treeIconSize)/2
-		ink := palette.Ink
-		if row.Quiet {
-			ink = palette.InkQuiet
-		}
-		weight := draw2d.Regular
-		label := row.Label
-		switch row.Kind {
-		case ProjectRow, FolderRow:
-			chevron := "chevron-right"
-			if row.Expanded {
-				chevron = "chevron-down"
-			}
-			drawing.Icon(chevron, x, iconTop, treeIconSize, palette.InkQuiet)
-			x += treeIconSize + 4
-			icon, iconInk := folderIcon(row, look)
-			if row.Kind == ProjectRow {
-				icon, iconInk, weight = "git-branch", palette.InkQuiet, draw2d.Medium
-			}
-			if row.Role == workspace.ModuleFolder {
-				weight = draw2d.Medium
-			}
-			drawing.Icon(icon, x, iconTop, treeIconSize, iconInk)
-			x += treeIconSize + 7
-		case FileRow:
-			// when the mode marks files, the room a folder gives its chevron holds the mark
-			decoration := sidebar.Listing.Decorate(row)
-			switch decoration.Mark {
-			case OpenMark:
-				drawing.Icon("circle", x, iconTop, treeIconSize, palette.InkQuiet)
-			case DoneMark:
-				ink = palette.InkQuiet
-				drawing.Icon("circle-check", x, iconTop, treeIconSize, palette.InkSoft)
-			}
-			x += treeIconSize + 4
-			// a Java or Kotlin class is named without its extension and drawn by its kind, as
-			// IntelliJ draws it, once the file has been read
-			if kind := window.ClassKind(reference); kind != java.UnknownKind && kind != java.NoClass {
-				paintClassBadge(drawing, look, kind, x, iconTop, treeIconSize, ink == palette.InkQuiet)
-				label = strings.TrimSuffix(strings.TrimSuffix(row.Label, ".java"), ".kt")
-			} else {
-				icon, iconInk := theme.FileIcon(row.Label, look)
-				if ink == palette.InkQuiet {
-					iconInk = iconInk.WithAlpha(0.5)
-				}
-				drawing.Icon(icon, x, iconTop, treeIconSize, iconInk)
-			}
-			x += treeIconSize + 7
-			// the name may say how the file changed, as Zed's project panel does; where every file
-			// listed changed, the colour is kept for its counts
-			if row.Status != git.Unchanged && decoration.Tinted {
-				ink = theme.StatusColour(palette, row.Status)
-			}
-		case NoteRow:
-			ink = palette.InkQuiet
-		}
-		right := rowArea.Right() - 8
-		if row.Kind == ProjectRow && index == hovered {
-			button := draw2d.Rectangle{X: rowArea.Right() - 4 - enterButtonWidth, Y: top + 3, Width: enterButtonWidth, Height: RowHeight - 6}
-			if sidebar.onEnter(index, pointerX) {
-				drawing.Rectangle(button, 4, look.Chosen, draw2d.Color{}, 0)
-			}
-			drawing.Icon("arrow-right-to-line", button.X+(enterButtonWidth-14)/2, top+(RowHeight-14)/2, 14, palette.InkSoft)
-			right = button.X - 6
-		}
-		right = sidebar.paintRight(context, window, drawing, row, right, baseline, top)
-		drawing.PushClip(draw2d.Rectangle{X: area.X, Y: top, Width: max(right-area.X-8, 0), Height: RowHeight})
-		drawing.Text(label, x, baseline, size, weight, ink)
-		if row.Kind == ProjectRow {
-			labelWidth := measurer.MeasureText(row.Label, size, weight, 1).Width
-			project := window.Projects()[row.Project]
-			if project.Branch != "" {
-				drawing.Text(project.Branch, x+labelWidth+8, baseline, small, draw2d.Regular, palette.InkQuiet)
-			}
-		}
-		drawing.PopClip()
-	}
-	if len(sidebar.Rows) == 0 {
-		message := "No projects open: press o to open a folder"
-		if window.Loading() {
-			message = "Reading the projects…"
-		}
-		drawing.Text(message, area.X+16, area.Y+24, size, draw2d.Regular, palette.InkQuiet)
-	}
-	sidebar.list.PaintBar(drawing, look.ScrollThumb)
-	drawing.PopClip()
-	if window.ReadingKinds() {
-		context.RequestFrame(0) // the next frame starts reading the classes that came into sight
-	}
-}
-
-// paintRight paints what a row shows on its right, from right to left, and returns where it ends:
-// a file's status letter, a project still being read, and what the mode adds.
-func (sidebar *Sidebar) paintRight(context *ui.Context, window Window, drawing *draw2d.List, row Row, right, baseline, top float32) float32 {
-	palette := context.Theme
-	measurer := context.Measurer()
-	small := palette.SmallTextSize
-	text := func(words string, colour draw2d.Color) {
-		width := measurer.MeasureText(words, small, draw2d.Mono, 1).Width
-		right -= width
-		drawing.Text(words, right, baseline, small, draw2d.Mono, colour)
-		right -= 8
-	}
-	switch row.Kind {
-	case FileRow:
-		if row.Status == git.Unchanged {
-			return right
-		}
-		text(row.Status.Letter(), theme.StatusColour(palette, row.Status))
-	case ProjectRow:
-		if !window.Projects()[row.Project].Loaded {
-			text("…", palette.InkQuiet)
-			return right
-		}
-		if row.Changed == 0 {
-			return right
-		}
-	case FolderRow:
-	default:
-		return right
-	}
-	decoration := sidebar.Listing.Decorate(row)
-	for _, word := range decoration.Words {
-		text(word.Text, word.Ink.colour(palette))
-	}
-	if progress := decoration.Progress; progress != nil {
-		bar := draw2d.Rectangle{X: right - 28, Y: top + RowHeight/2 - 1.5, Width: 28, Height: 3}
-		drawing.Rectangle(bar, 1.5, window.Look().Hover.Mix(palette.Ink, 0.12), draw2d.Color{}, 0)
-		if progress.Total > 0 && progress.Done > 0 {
-			done := bar
-			done.Width = bar.Width * float32(progress.Done) / float32(progress.Total)
-			drawing.Rectangle(done, 1.5, progress.Ink.colour(palette), draw2d.Color{}, 0)
-		}
-		right -= 36
-	}
-	if decoration.Dot {
-		dot := draw2d.Rectangle{X: right - 6, Y: top + RowHeight/2 - 3, Width: 6, Height: 6}
-		drawing.Rectangle(dot, 3, palette.Warning.WithAlpha(0.8), draw2d.Color{}, 0)
-		right -= 14
-	}
-	return right
 }
 
 // SelectedRow is the row selected, if any.
