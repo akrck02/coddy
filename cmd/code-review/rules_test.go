@@ -3,6 +3,7 @@ package main
 import (
 	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -43,5 +44,44 @@ func TestNoErrorIsMadeWithoutACode(test *testing.T) {
 				test.Errorf("%s makes an error with %s; declare a code in its errors.go", path, maker)
 			}
 		}
+	}
+}
+
+// dependencies lists every package a package of this module imports, directly or not.
+func dependencies(test *testing.T, name string) []string {
+	test.Helper()
+	command := exec.Command("go", "list", "-deps", "github.com/akrck02/code-review/internal/"+name)
+	command.Dir = moduleRoot
+	output, err := command.Output()
+	if err != nil {
+		test.Fatalf("go list %s: %v", name, err)
+	}
+	return strings.Fields(string(output))
+}
+
+// importsAny gives the first of the packages that a package imports, directly or not.
+func importsAny(test *testing.T, name string, forbidden ...string) string {
+	test.Helper()
+	for _, dependency := range dependencies(test, name) {
+		for _, path := range forbidden {
+			if dependency == path || strings.HasPrefix(dependency, path+"/") {
+				return dependency
+			}
+		}
+	}
+	return ""
+}
+
+// The domain knows nothing of the window: what the reader opens can be read without one.
+func TestTheWorkspaceImportsNoInterface(test *testing.T) {
+	interfaces := []string{
+		"github.com/akrck02/go-ui",
+		"github.com/akrck02/code-review/internal/app",
+		"github.com/akrck02/code-review/internal/window",
+		"github.com/akrck02/code-review/internal/files",
+		"github.com/akrck02/code-review/internal/review",
+	}
+	if found := importsAny(test, "workspace", interfaces...); found != "" {
+		test.Errorf("workspace imports %s", found)
 	}
 }

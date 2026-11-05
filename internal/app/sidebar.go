@@ -6,6 +6,7 @@ import (
 
 	"github.com/akrck02/code-review/internal/git"
 	"github.com/akrck02/code-review/internal/review"
+	"github.com/akrck02/code-review/internal/workspace"
 	"github.com/akrck02/go-renderer/draw2d"
 	"github.com/akrck02/go-renderer/input"
 	ui "github.com/akrck02/go-ui"
@@ -39,7 +40,7 @@ type treeRow struct {
 	status   git.Status
 	changed  int // changed files inside a project or a folder
 	quiet    bool
-	role     review.FolderRole
+	role     workspace.FolderRole
 }
 
 type sidebarState struct {
@@ -47,7 +48,7 @@ type sidebarState struct {
 	// expanded keeps the folders and projects opened or closed by hand, by key; the others follow
 	// the mode's default (everything open in the review mode, closed in the files mode).
 	expanded map[string]bool
-	trees    map[treeKey]*review.Folder
+	trees    map[treeKey]*workspace.Folder
 	rows     []treeRow
 	stale    bool
 	selected int
@@ -68,11 +69,11 @@ type treeKey struct {
 }
 
 func newSidebar() sidebarState {
-	return sidebarState{expanded: map[string]bool{}, trees: map[treeKey]*review.Folder{}, stale: true, width: 380, list: scroller{rowHeight: sidebarRowHeight}}
+	return sidebarState{expanded: map[string]bool{}, trees: map[treeKey]*workspace.Folder{}, stale: true, width: 380, list: scroller{rowHeight: sidebarRowHeight}}
 }
 
 func (sidebar *sidebarState) invalidate() {
-	sidebar.trees = map[treeKey]*review.Folder{}
+	sidebar.trees = map[treeKey]*workspace.Folder{}
 	sidebar.stale = true
 }
 
@@ -90,7 +91,7 @@ func (sidebar *sidebarState) isExpanded(application *App, project int, path stri
 	return isProject && len(application.projects) == 1
 }
 
-func (sidebar *sidebarState) tree(application *App, project int) *review.Folder {
+func (sidebar *sidebarState) tree(application *App, project int) *workspace.Folder {
 	key := treeKey{project, sidebar.mode, sidebar.listsChangesOnly()}
 	if tree, built := sidebar.trees[key]; built {
 		return tree
@@ -102,7 +103,7 @@ func (sidebar *sidebarState) tree(application *App, project int) *review.Folder 
 		paths = changedPaths(model)
 	}
 	// a Gradle or Maven project is shown as IntelliJ shows it: modules, source roots, packages
-	build := review.BuildTree
+	build := workspace.BuildTree
 	if review.IsJavaProject(model.Files) {
 		build = review.BuildJavaTree
 	}
@@ -161,7 +162,7 @@ func (sidebar *sidebarState) rebuild(application *App) {
 }
 
 // addProjectContent lists a project's tree at a depth, or why it cannot be listed yet.
-func (sidebar *sidebarState) addProjectContent(application *App, index int, project *review.Project, depth int) {
+func (sidebar *sidebarState) addProjectContent(application *App, index int, project *workspace.Project, depth int) {
 	if !project.Loaded {
 		sidebar.rows = append(sidebar.rows, treeRow{kind: noteRow, project: index, label: "Reading…", depth: depth, quiet: true})
 		return
@@ -200,7 +201,7 @@ func (sidebar *sidebarState) leave(application *App) {
 	}
 }
 
-func (sidebar *sidebarState) addFolder(application *App, project int, folder *review.Folder, depth int) {
+func (sidebar *sidebarState) addFolder(application *App, project int, folder *workspace.Folder, depth int) {
 	model := application.projects[project]
 	for _, child := range folder.Folders {
 		expanded := sidebar.isExpanded(application, project, child.Path, false)
@@ -215,7 +216,7 @@ func (sidebar *sidebarState) addFolder(application *App, project int, folder *re
 	for _, path := range folder.Files {
 		change, _ := model.ChangeOf(path)
 		sidebar.rows = append(sidebar.rows, treeRow{
-			kind: fileRow, project: project, path: path, label: review.BaseName(path), depth: depth, status: change.Status,
+			kind: fileRow, project: project, path: path, label: workspace.BaseName(path), depth: depth, status: change.Status,
 		})
 	}
 }
@@ -242,7 +243,7 @@ func (sidebar *sidebarState) revealFile(application *App, reference fileReferenc
 	sidebar.expanded[sidebar.expandedKey(reference.project, "")] = true
 	folder := sidebar.tree(application, reference.project)
 	for {
-		var inside *review.Folder
+		var inside *workspace.Folder
 		for _, child := range folder.Folders {
 			if strings.HasPrefix(reference.path, child.Path+"/") {
 				inside = child
@@ -593,7 +594,7 @@ func (sidebar *sidebarState) paint(context *ui.Context, application *App, drawin
 			if row.kind == projectRow {
 				icon, iconInk, weight = "git-branch", theme.InkQuiet, draw2d.Medium
 			}
-			if row.role == review.ModuleFolder {
+			if row.role == workspace.ModuleFolder {
 				weight = draw2d.Medium
 			}
 			drawing.Icon(icon, x, iconTop, treeIconSize, iconInk)

@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/akrck02/code-review/internal/workspace"
 )
 
 func TestMarksThatCannotBeWrittenSayWhy(test *testing.T) {
@@ -13,7 +15,7 @@ func TestMarksThatCannotBeWrittenSayWhy(test *testing.T) {
 		test.Fatal(err)
 	}
 	reviewed := OpenReviewed(filepath.Join(blocker, "reviewed.json"))
-	project := &Project{Path: "lighthouse", Fingerprints: map[string]string{"lamp.go": "one"}}
+	project := &workspace.Project{Path: "lighthouse", Fingerprints: map[string]string{"lamp.go": "one"}}
 	err := reviewed.SetViewed(project, "lamp.go", true)
 	if !errors.Is(err, MarksNotKept) {
 		test.Errorf("keeping the marks under a file gave %v, want the code %v", err, MarksNotKept)

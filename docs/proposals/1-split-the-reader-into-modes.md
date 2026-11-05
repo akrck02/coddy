@@ -115,7 +115,7 @@ Each task leaves the reader working and every test passing.
 - [x] T1 — Pin today's behaviour: a test for each shortcut of each mode · `internal/app/keys_test.go` · serves R1
 - [x] T2 — Move `main.go` to `cmd/code-review/` · serves R1 · test: `go build ./...`
 - [x] T3 — Give `git` and `review` error codes from Go Renderer's `failure` · `errors.go` per package · serves R5 · test: `errors_test.go`
-- [ ] T4 — Turn `review`'s domain files into `workspace` · serves R4 · test: `TestTheWorkspaceImportsNoInterface`
+- [x] T4 — Turn `review`'s domain files into `workspace` · serves R4 · test: `TestTheWorkspaceImportsNoInterface`
 - [ ] T5 — Move the Java tree and class kinds into `java` · serves R1 · test: `TestAJavaTreeMarksRootsAndJoinsPackages`
 - [ ] T6 — Background work with keys and cancelling · `window/work.go` · serves R8 · test: `TestANewerSearchCancelsTheOlderOne`
 - [ ] T7 — Commands, keys and the help built from them · `window/commands.go` · serves R7 · tests: `TestNoTwoCommandsShareAKeyInOneMode`, `TestTheHelpListsEveryCommand`

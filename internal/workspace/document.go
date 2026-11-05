@@ -1,4 +1,4 @@
-package review
+package workspace
 
 import (
 	"bytes"

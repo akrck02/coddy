@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/akrck02/code-review/internal/review"
+	"github.com/akrck02/code-review/internal/workspace"
 	"github.com/akrck02/go-renderer/input"
 	"github.com/akrck02/go-ui/uitest"
 )
@@ -227,7 +227,7 @@ func TestTheFilesModeShowsAChangedFileWholeWithItsChangesMarked(test *testing.T)
 	if editor.mode != fileView || editor.rowCount() != 5 {
 		test.Fatalf("lamp.go opened in mode %d with %d rows, want the whole file of 5 lines", editor.mode, editor.rowCount())
 	}
-	if editor.marks[4] != review.ModifiedMark {
+	if editor.marks[4] != workspace.ModifiedMark {
 		test.Errorf("the changed line 4 is marked %d, want modified", editor.marks[4])
 	}
 	if len(editor.hunks) != 1 || editor.hunks[0] != 3 {

@@ -4,6 +4,7 @@ import (
 	"github.com/akrck02/code-review/internal/git"
 	"github.com/akrck02/code-review/internal/highlight"
 	"github.com/akrck02/code-review/internal/review"
+	"github.com/akrck02/code-review/internal/workspace"
 	"github.com/akrck02/go-renderer/draw2d"
 )
 
@@ -110,17 +111,17 @@ func folderIcon(row treeRow, look look) (string, draw2d.Color) {
 	quiet := look.theme.InkQuiet
 	open := row.expanded
 	switch row.role {
-	case review.ModuleFolder:
+	case workspace.ModuleFolder:
 		return "package", look.syntax.RoleColour(highlight.Function)
-	case review.SourceRoot:
+	case workspace.SourceRoot:
 		return "folder-code", look.syntax.RoleColour(highlight.Function)
-	case review.TestRoot:
+	case workspace.TestRoot:
 		return "folder-code", look.syntax.RoleColour(highlight.String)
-	case review.ResourceRoot:
+	case workspace.ResourceRoot:
 		return "folder-cog", look.syntax.RoleColour(highlight.Number)
-	case review.TestResourceRoot:
+	case workspace.TestResourceRoot:
 		return "folder-cog", look.syntax.RoleColour(highlight.String)
-	case review.PackageFolder:
+	case workspace.PackageFolder:
 		return "folder-dot", quiet
 	}
 	if open {

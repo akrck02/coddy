@@ -1,3 +1,4 @@
+// Package review is the review mode's own state: which changed files a reviewer has viewed.
 package review
 
 import (
@@ -6,6 +7,7 @@ import (
 	"path/filepath"
 	"sync"
 
+	"github.com/akrck02/code-review/internal/workspace"
 	"github.com/akrck02/go-renderer/failure"
 )
 
@@ -44,7 +46,7 @@ func DefaultReviewedPath() string {
 }
 
 // IsViewed tells whether a changed file was viewed as its text is now.
-func (reviewed *Reviewed) IsViewed(project *Project, path string) bool {
+func (reviewed *Reviewed) IsViewed(project *workspace.Project, path string) bool {
 	fingerprint, known := project.Fingerprints[path]
 	if !known {
 		return false
@@ -55,7 +57,7 @@ func (reviewed *Reviewed) IsViewed(project *Project, path string) bool {
 }
 
 // SetViewed marks a changed file as viewed, or not, and keeps it.
-func (reviewed *Reviewed) SetViewed(project *Project, path string, viewed bool) error {
+func (reviewed *Reviewed) SetViewed(project *workspace.Project, path string, viewed bool) error {
 	fingerprint, known := project.Fingerprints[path]
 	if !known {
 		return nil
@@ -89,7 +91,7 @@ func (reviewed *Reviewed) SetViewed(project *Project, path string, viewed bool) 
 }
 
 // Progress counts a project's changed files viewed so far.
-func (reviewed *Reviewed) Progress(project *Project) (viewed, total int) {
+func (reviewed *Reviewed) Progress(project *workspace.Project) (viewed, total int) {
 	for _, change := range project.Changes {
 		if reviewed.IsViewed(project, change.Path) {
 			viewed++

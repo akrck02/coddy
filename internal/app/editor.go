@@ -7,7 +7,7 @@ import (
 
 	"github.com/akrck02/code-review/internal/git"
 	"github.com/akrck02/code-review/internal/highlight"
-	"github.com/akrck02/code-review/internal/review"
+	"github.com/akrck02/code-review/internal/workspace"
 	"github.com/akrck02/go-renderer/draw2d"
 	"github.com/akrck02/go-renderer/input"
 	ui "github.com/akrck02/go-ui"
@@ -30,8 +30,8 @@ const codeRowHeight float32 = 22
 
 type editorState struct {
 	reference fileReference
-	project   *review.Project
-	document  *review.Document
+	project   *workspace.Project
+	document  *workspace.Document
 	request   int // counts the files asked for, so a slow read that was overtaken is dropped
 	showing   bool
 
@@ -39,19 +39,19 @@ type editorState struct {
 	fullContext bool         // show every unchanged line instead of folding them
 	openedFolds map[int]bool // folds opened by hand, by where they start in the diff
 
-	rows  []review.Row // the diff's rows as shown
+	rows  []workspace.Row // the diff's rows as shown
 	hunks []int
 	added int
 	gone  int
 	// inline are the words that changed inside a replaced line, by row of the diff
-	inline map[int]review.Span
+	inline map[int]workspace.Span
 	// goTo is a line to show once the file is read, from the finder; markedLine is the line shown
 	// that way, painted as the line the reader is on
 	goTo       int
 	markedLine int
 	// marks say, in the file view, which lines the development added or changed and where it
 	// removed some, as Zed marks them in its gutter
-	marks map[int]review.Mark
+	marks map[int]workspace.Mark
 
 	list scroller
 
@@ -75,7 +75,7 @@ func (editor *editorState) close() {
 }
 
 // start begins showing a file, before its text has been read.
-func (editor *editorState) start(reference fileReference, project *review.Project) {
+func (editor *editorState) start(reference fileReference, project *workspace.Project) {
 	if editor.showing && editor.reference == reference && editor.document != nil {
 		return
 	}
@@ -91,7 +91,7 @@ func (editor *editorState) start(reference fileReference, project *review.Projec
 
 // show puts a file's text in the editor once it has been read: as its diff when reviewing a
 // changed file, whole otherwise.
-func (editor *editorState) show(document *review.Document, reviewing bool) {
+func (editor *editorState) show(document *workspace.Document, reviewing bool) {
 	keepPlace := editor.document != nil && editor.document.Path == document.Path
 	editor.document = document
 	if !keepPlace {
@@ -160,17 +160,17 @@ func (editor *editorState) layOut() {
 		return
 	}
 	if document.Changed {
-		editor.added, editor.gone = review.Counts(document.Diff)
-		editor.marks = review.LineMarks(document.Diff)
+		editor.added, editor.gone = workspace.Counts(document.Diff)
+		editor.marks = workspace.LineMarks(document.Diff)
 	}
 	if editor.mode == diffView && document.Changed {
 		context := foldContext
 		if editor.fullContext {
 			context = -1
 		}
-		editor.rows = review.DiffRows(document.Diff, context, editor.openedFolds)
-		editor.hunks = review.HunkStarts(editor.rows)
-		editor.inline = review.InlineChanges(editor.rows, func(line git.DiffLine) []rune {
+		editor.rows = workspace.DiffRows(document.Diff, context, editor.openedFolds)
+		editor.hunks = workspace.HunkStarts(editor.rows)
+		editor.inline = workspace.InlineChanges(editor.rows, func(line git.DiffLine) []rune {
 			if line.Kind == git.Removal {
 				return []rune(lineAt(document.OldLines, line.OldNumber).Text())
 			}
@@ -180,7 +180,7 @@ func (editor *editorState) layOut() {
 	}
 	// in the file view, ] and [ go from one run of marked lines to the next
 	for number := 1; number <= len(editor.lines()); number++ {
-		if editor.marks[number] != review.NoMark && editor.marks[number-1] == review.NoMark {
+		if editor.marks[number] != workspace.NoMark && editor.marks[number-1] == workspace.NoMark {
 			editor.hunks = append(editor.hunks, number-1)
 		}
 	}
@@ -586,15 +586,15 @@ func (editor *editorState) paint(context *ui.Context, application *App, drawing 
 
 // paintMark paints a line's mark in the file view's gutter: a bar for a line added (green) or
 // changed (amber), a small wedge where lines were removed (red).
-func (editor *editorState) paintMark(drawing *draw2d.List, look look, mark review.Mark, x, top float32) {
+func (editor *editorState) paintMark(drawing *draw2d.List, look look, mark workspace.Mark, x, top float32) {
 	switch mark {
-	case review.AddedMark:
+	case workspace.AddedMark:
 		drawing.Rectangle(draw2d.Rectangle{X: x, Y: top, Width: gutterMarkWidth, Height: editor.rowHeight}, 0, look.created, draw2d.Color{}, 0)
-	case review.ModifiedMark:
+	case workspace.ModifiedMark:
 		drawing.Rectangle(draw2d.Rectangle{X: x, Y: top, Width: gutterMarkWidth, Height: editor.rowHeight}, 0, look.modified, draw2d.Color{}, 0)
-	case review.RemovedAbove:
+	case workspace.RemovedAbove:
 		drawing.Rectangle(draw2d.Rectangle{X: x - 1, Y: top - 2, Width: 8, Height: 4}, 2, look.deleted, draw2d.Color{}, 0)
-	case review.RemovedBelow:
+	case workspace.RemovedBelow:
 		drawing.Rectangle(draw2d.Rectangle{X: x - 1, Y: top + editor.rowHeight - 2, Width: 8, Height: 4}, 2, look.deleted, draw2d.Color{}, 0)
 	}
 }
@@ -621,9 +621,9 @@ func (editor *editorState) paintChangeMarks(drawing *draw2d.List, look look) {
 	count := len(editor.lines())
 	for number, kind := range editor.marks {
 		switch kind {
-		case review.AddedMark:
+		case workspace.AddedMark:
 			mark(number-1, count, look.created)
-		case review.ModifiedMark:
+		case workspace.ModifiedMark:
 			mark(number-1, count, look.modified)
 		default:
 			mark(number-1, count, look.deleted)

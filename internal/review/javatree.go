@@ -1,21 +1,9 @@
 package review
 
 import (
+	"github.com/akrck02/code-review/internal/workspace"
 	"regexp"
 	"strings"
-)
-
-// FolderRole is what a folder is to a build tool, as IntelliJ marks it in its project tree.
-type FolderRole int
-
-const (
-	PlainFolder      FolderRole = iota
-	ModuleFolder                // holds a build file: a Gradle or Maven module
-	SourceRoot                  // src/main/java, src/main/kotlin…: its folders are packages
-	TestRoot                    // the same for tests
-	ResourceRoot                // src/main/resources, an Android res folder
-	TestResourceRoot            // src/test/resources
-	PackageFolder               // a package inside a source root
 )
 
 // buildFiles mark a folder as a module.
@@ -30,7 +18,7 @@ var sourceRoot = regexp.MustCompile(`(^|/)src/([A-Za-z0-9_-]+)/(java|kotlin|groo
 // IsJavaProject tells whether a project's files are laid out as Gradle or Maven lay them out.
 func IsJavaProject(paths []string) bool {
 	for _, path := range paths {
-		if buildFiles[baseName(path)] || strings.Contains(path, "src/main/java/") || strings.Contains(path, "src/main/kotlin/") {
+		if buildFiles[workspace.BaseName(path)] || strings.Contains(path, "src/main/java/") || strings.Contains(path, "src/main/kotlin/") {
 			return true
 		}
 	}
@@ -40,53 +28,39 @@ func IsJavaProject(paths []string) bool {
 // BuildJavaTree makes a project's tree as IntelliJ shows a Java or Kotlin project: modules and
 // source roots marked, folders outside the roots one by one, and inside a source root the
 // packages that hold only one package joined with dots ("app.coast.platform.dal").
-func BuildJavaTree(paths []string, isChanged func(path string) bool) *Folder {
-	root := &Folder{}
-	byPath := map[string]*Folder{"": root}
-	for _, path := range paths {
-		parent := folderOf(byPath, parentPath(path))
-		parent.Files = append(parent.Files, path)
-		if isChanged != nil && isChanged(path) {
-			for folderPath := parentPath(path); ; folderPath = parentPath(folderPath) {
-				byPath[folderPath].Changed++
-				if folderPath == "" {
-					break
-				}
-			}
-		}
-	}
-	sortFolder(root)
-	markRoles(root, PlainFolder)
+func BuildJavaTree(paths []string, isChanged func(path string) bool) *workspace.Folder {
+	root := workspace.BuildFolders(paths, isChanged)
+	markRoles(root, workspace.PlainFolder)
 	return root
 }
 
 // markRoles marks each folder's role from where it is, and joins the packages of source roots.
-func markRoles(folder *Folder, inside FolderRole) {
+func markRoles(folder *workspace.Folder, inside workspace.FolderRole) {
 	for _, path := range folder.Files {
-		if buildFiles[baseName(path)] && folder.Path != "" {
-			folder.Role = ModuleFolder
+		if buildFiles[workspace.BaseName(path)] && folder.Path != "" {
+			folder.Role = workspace.ModuleFolder
 		}
 	}
 	for _, child := range folder.Folders {
 		switch {
-		case inside == SourceRoot || inside == TestRoot:
-			child.Role = PackageFolder
+		case inside == workspace.SourceRoot || inside == workspace.TestRoot:
+			child.Role = workspace.PackageFolder
 			compactPackages(child)
 			markRoles(child, inside)
 			continue
-		case inside == PlainFolder:
+		case inside == workspace.PlainFolder:
 			if match := sourceRoot.FindStringSubmatch(child.Path); match != nil {
 				test := strings.Contains(strings.ToLower(match[2]), "test")
 				resources := match[3] == "resources" || match[3] == "res" || match[3] == "assets"
 				switch {
 				case resources && test:
-					child.Role = TestResourceRoot
+					child.Role = workspace.TestResourceRoot
 				case resources:
-					child.Role = ResourceRoot
+					child.Role = workspace.ResourceRoot
 				case test:
-					child.Role = TestRoot
+					child.Role = workspace.TestRoot
 				default:
-					child.Role = SourceRoot
+					child.Role = workspace.SourceRoot
 				}
 				markRoles(child, child.Role)
 				continue
@@ -97,7 +71,7 @@ func markRoles(folder *Folder, inside FolderRole) {
 }
 
 // compactPackages joins a package with its only package while it holds no files, with a dot.
-func compactPackages(folder *Folder) {
+func compactPackages(folder *workspace.Folder) {
 	for len(folder.Files) == 0 && len(folder.Folders) == 1 {
 		only := folder.Folders[0]
 		folder.Name += "." + only.Name
@@ -125,7 +99,7 @@ var declaration = regexp.MustCompile(`(?m)^[ \t]*(?:(?:public|private|protected|
 
 // KindOf reads what a source file declares under its own name (Lamp for Lamp.java).
 func KindOf(path string, content []byte) ClassKind {
-	name := baseName(path)
+	name := workspace.BaseName(path)
 	if dot := strings.LastIndexByte(name, '.'); dot > 0 {
 		name = name[:dot]
 	}

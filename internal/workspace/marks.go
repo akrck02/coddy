@@ -1,4 +1,4 @@
-package review
+package workspace
 
 import "github.com/akrck02/code-review/internal/git"
 

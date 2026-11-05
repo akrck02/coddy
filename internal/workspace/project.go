@@ -1,6 +1,6 @@
-// Package review is what a reviewer looks at: the projects of a development, what changed in each
-// since its base, the files of each and a changed file's diff. It knows nothing about the screen.
-package review
+// Package workspace is what the reader opens: the projects of a development, what changed in each
+// since its base, the files of each, a file's diff and its tree. It knows nothing about the screen.
+package workspace
 
 import (
 	"bytes"

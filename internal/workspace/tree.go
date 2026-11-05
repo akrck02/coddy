@@ -1,4 +1,4 @@
-package review
+package workspace
 
 import (
 	"sort"
@@ -19,6 +19,16 @@ type Folder struct {
 // BuildTree makes a tree of folders from file paths. isChanged tells which files to count as
 // changed in each folder.
 func BuildTree(paths []string, isChanged func(path string) bool) *Folder {
+	root := BuildFolders(paths, isChanged)
+	for _, child := range root.Folders {
+		compress(child)
+	}
+	return root
+}
+
+// BuildFolders lays the paths out as nested folders, sorted, one folder per level: the tree before
+// any chain of lone folders is joined into one.
+func BuildFolders(paths []string, isChanged func(path string) bool) *Folder {
 	root := &Folder{}
 	byPath := map[string]*Folder{"": root}
 	for _, path := range paths {
@@ -34,9 +44,6 @@ func BuildTree(paths []string, isChanged func(path string) bool) *Folder {
 		}
 	}
 	sortFolder(root)
-	for _, child := range root.Folders {
-		compress(child)
-	}
 	return root
 }
 
@@ -92,3 +99,16 @@ func baseName(path string) string {
 
 // BaseName is the last part of a path.
 func BaseName(path string) string { return baseName(path) }
+
+// FolderRole is what a folder is to a build tool, as IntelliJ marks it in its project tree.
+type FolderRole int
+
+const (
+	PlainFolder      FolderRole = iota
+	ModuleFolder                // holds a build file: a Gradle or Maven module
+	SourceRoot                  // src/main/java, src/main/kotlin…: its folders are packages
+	TestRoot                    // the same for tests
+	ResourceRoot                // src/main/resources, an Android res folder
+	TestResourceRoot            // src/test/resources
+	PackageFolder               // a package inside a source root
+)

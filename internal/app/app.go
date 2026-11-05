@@ -9,6 +9,7 @@ import (
 
 	"github.com/akrck02/code-review/internal/git"
 	"github.com/akrck02/code-review/internal/review"
+	"github.com/akrck02/code-review/internal/workspace"
 	"github.com/akrck02/go-ui/uidrive"
 	"github.com/akrck02/go-ui/window"
 )
@@ -49,13 +50,13 @@ type App struct {
 	settings Settings
 	folders  []string
 
-	projects      []*review.Project
+	projects      []*workspace.Project
 	projectBases  map[string]string // a base chosen for one project, by its path
 	loading       int
 	candidates    []review.Candidate
 	changedOrder  []fileReference
 	results       chan func()
-	documentCache map[fileReference]*review.Document
+	documentCache map[fileReference]*workspace.Document
 
 	sidebar sidebarState
 	editor  editorState
@@ -94,7 +95,7 @@ func New(settings Settings) *App {
 		settings:      settings,
 		projectBases:  map[string]string{},
 		results:       make(chan func(), 256),
-		documentCache: map[fileReference]*review.Document{},
+		documentCache: map[fileReference]*workspace.Document{},
 		tap:           &inputTap{},
 		dark:          settings.Dark,
 		onlyChanged:   settings.OnlyChanged,
@@ -194,12 +195,12 @@ func (application *App) openFolders(folders []string) {
 		if known[path] {
 			continue
 		}
-		application.projects = append(application.projects, &review.Project{Name: baseName(path), Path: path})
+		application.projects = append(application.projects, &workspace.Project{Name: baseName(path), Path: path})
 	}
 	sort.SliceStable(application.projects, func(first, second int) bool {
 		return strings.ToLower(application.projects[first].Name) < strings.ToLower(application.projects[second].Name)
 	})
-	application.documentCache = map[fileReference]*review.Document{}
+	application.documentCache = map[fileReference]*workspace.Document{}
 	application.editor.close()
 	application.reloadAll()
 }
@@ -208,7 +209,7 @@ func (application *App) openFolders(folders []string) {
 func (application *App) closeAll() {
 	application.projects = nil
 	application.folders = nil
-	application.documentCache = map[fileReference]*review.Document{}
+	application.documentCache = map[fileReference]*workspace.Document{}
 	application.editor.close()
 	application.projectsChanged()
 }
@@ -229,12 +230,12 @@ var readers = make(chan struct{}, 6)
 func (application *App) reload(index int) {
 	project := application.projects[index]
 	path := project.Path
-	options := review.LoadOptions{Base: application.baseFor(path), WorkingTree: application.settings.WorkingTree}
-	application.projects[index] = &review.Project{Name: project.Name, Path: path}
+	options := workspace.LoadOptions{Base: application.baseFor(path), WorkingTree: application.settings.WorkingTree}
+	application.projects[index] = &workspace.Project{Name: project.Name, Path: path}
 	application.loading++
 	application.later(func() func() {
 		readers <- struct{}{}
-		loaded := review.LoadProject(path, options)
+		loaded := workspace.LoadProject(path, options)
 		<-readers
 		return func() {
 			application.loading--
@@ -278,7 +279,7 @@ func (application *App) projectsChanged() {
 				Project: index, Path: path, Label: project.Name + "/" + path, Changed: changed,
 			})
 		}
-		tree := review.BuildTree(changedPaths(project), nil)
+		tree := workspace.BuildTree(changedPaths(project), nil)
 		walkFiles(tree, func(path string) {
 			application.changedOrder = append(application.changedOrder, fileReference{index, path})
 		})
@@ -288,7 +289,7 @@ func (application *App) projectsChanged() {
 }
 
 // walkFiles visits a tree's files in the order the sidebar shows them: folders first.
-func walkFiles(folder *review.Folder, visit func(path string)) {
+func walkFiles(folder *workspace.Folder, visit func(path string)) {
 	for _, child := range folder.Folders {
 		walkFiles(child, visit)
 	}
@@ -297,7 +298,7 @@ func walkFiles(folder *review.Folder, visit func(path string)) {
 	}
 }
 
-func changedPaths(project *review.Project) []string {
+func changedPaths(project *workspace.Project) []string {
 	paths := make([]string, len(project.Changes))
 	for index, change := range project.Changes {
 		paths[index] = change.Path
@@ -319,10 +320,10 @@ func (application *App) openFile(reference fileReference) {
 	workingTree := application.settings.WorkingTree
 	request := application.editor.request
 	application.later(func() func() {
-		document := review.OpenDocument(project, reference.path, workingTree)
+		document := workspace.OpenDocument(project, reference.path, workingTree)
 		return func() {
 			if len(application.documentCache) > 64 {
-				application.documentCache = map[fileReference]*review.Document{}
+				application.documentCache = map[fileReference]*workspace.Document{}
 			}
 			application.documentCache[reference] = document
 			if application.editor.request == request {
@@ -413,7 +414,7 @@ func (application *App) projectsWithChanges() int {
 
 // clearDocuments forgets the files read, so they are read again.
 func (application *App) clearDocuments() {
-	application.documentCache = map[fileReference]*review.Document{}
+	application.documentCache = map[fileReference]*workspace.Document{}
 }
 
 // openByLabel opens a file named as "project/path/in/it", once the projects have been read.
@@ -433,7 +434,7 @@ func (application *App) openByLabel(label string) {
 // hidden tells whether a project is left out of the sidebar and the finder: in the mode that shows
 // only the projects with changes, one that was read and has none. A project still being read, or
 // that could not be read, stays in sight.
-func (application *App) hidden(project *review.Project) bool {
+func (application *App) hidden(project *workspace.Project) bool {
 	return application.onlyChanged && project.Loaded && len(project.Changes) == 0 && project.Error == ""
 }
 

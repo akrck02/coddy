@@ -3,7 +3,7 @@ package app
 import (
 	"fmt"
 
-	"github.com/akrck02/code-review/internal/review"
+	"github.com/akrck02/code-review/internal/workspace"
 	"github.com/akrck02/go-renderer/draw2d"
 	ui "github.com/akrck02/go-ui"
 )
@@ -132,7 +132,7 @@ func (application *App) buildOverview(context *ui.Context) {
 	})
 }
 
-func (application *App) buildOverviewRow(context *ui.Context, index int, project *review.Project) {
+func (application *App) buildOverviewRow(context *ui.Context, index int, project *workspace.Project) {
 	theme := context.Theme
 	look := application.look
 	viewed, total := application.reviewed.Progress(project)
