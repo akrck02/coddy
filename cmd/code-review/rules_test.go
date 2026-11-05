@@ -1,6 +1,9 @@
 package main
 
 import (
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"io/fs"
 	"os"
 	"os/exec"
@@ -104,5 +107,36 @@ func TestTheWindowImportsNoMode(test *testing.T) {
 	modes := []string{"github.com/akrck02/code-review/internal/files", "github.com/akrck02/code-review/internal/review"}
 	if found := importsAny(test, "window", modes...); found != "" {
 		test.Errorf("window imports %s", found)
+	}
+}
+
+// longestFunction is how many lines a function may take, from func to its closing brace.
+const longestFunction = 40
+
+// A long function usually does two jobs, so none is longer than forty lines, tests included.
+func TestNoFunctionIsLongerThanFortyLines(test *testing.T) {
+	files := token.NewFileSet()
+	err := filepath.WalkDir(moduleRoot, func(path string, entry fs.DirEntry, err error) error {
+		if err != nil || !strings.HasSuffix(path, ".go") {
+			return err
+		}
+		file, err := parser.ParseFile(files, path, nil, 0)
+		if err != nil {
+			return err
+		}
+		for _, declaration := range file.Decls {
+			function, isFunction := declaration.(*ast.FuncDecl)
+			if !isFunction || function.Body == nil {
+				continue
+			}
+			start, end := files.Position(function.Pos()), files.Position(function.End())
+			if lines := end.Line - start.Line + 1; lines > longestFunction {
+				test.Errorf("%s:%d: %s is %d lines long; split it into functions of %d at most", path, start.Line, function.Name.Name, lines, longestFunction)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		test.Fatal(err)
 	}
 }
