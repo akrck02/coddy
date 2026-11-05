@@ -29,6 +29,9 @@ Commits made with AI carry a `Co-Authored-By: Claude` line. **Status: pending th
 - **Reads a changed file as a diff**, both sides interleaved with their line numbers, the unchanged
   lines folded away (`f` shows them all, Enter or a click opens one fold), and a map of the changes
   along the scroll bar. `d` switches to the whole file.
+- **Only the projects with changes**, by default: the projects a development did not touch are left
+  out of the sidebar (both modes) and the finder. `h`, the *Only changed projects* button or
+  `-all` show every project; the choice is remembered.
 - **Every other file stays readable**: the sidebar's *Files* mode lists them all, and the finder
   finds them.
 - **Syntax colouring** for Java, Kotlin, Vue, SQL, Gradle, Groovy, XML, YAML, Markdown and the
@@ -55,6 +58,7 @@ go build -o bin/code-review .
 | `-base ref` | Compare every project against this branch, tag or commit |
 | `-committed` | Compare the last commit only, leaving out changes not committed yet |
 | `-open project/path` | Open a file at the start |
+| `-all` | Show every project, not only those with changes |
 | `-light` | Start in the light theme (dark by default) |
 | `-width`, `-height`, `-capture shot.png` | go-ui's window flags; `-capture` draws one frame to a picture |
 
@@ -76,7 +80,7 @@ go vet ./... && go test ./...     # the interface tests drive the window with no
 | `j` / `k`, `Space` | Scroll a line, a page |
 | `Enter` | Open a file or a folder (sidebar), open a fold (editor) |
 | `c` | Sidebar: the changes only, or every file |
-| `h` | Show or hide the projects without changes |
+| `h` | Only the projects with changes, or every project (sidebar and finder) |
 | `b` | Compare against another branch, tag or commit |
 | `w` | Count the changes not committed yet, or the commits only |
 | `r` (`⌘R`) | Read every project again |

@@ -22,7 +22,10 @@ import (
 	"golang.org/x/image/font/gofont/gomono"
 )
 
-const foldersPreference = "folders"
+const (
+	foldersPreference     = "folders"
+	onlyChangedPreference = "only-changed"
+)
 
 func main() {
 	options := window.Options{Title: "Code review", MinWidth: 900, MinHeight: 520}
@@ -31,6 +34,7 @@ func main() {
 	committed := flag.Bool("committed", false, "compare the last commit only, leaving out changes not committed yet")
 	light := flag.Bool("light", false, "start in the light theme")
 	open := flag.String("open", "", "open this file at the start, as project/path/in/it")
+	allProjects := flag.Bool("all", false, "show every project, not only those with changes (the choice is remembered otherwise)")
 	flag.Usage = func() {
 		fmt.Fprintln(flag.CommandLine.Output(), "usage: code-review [flags] [repository or folder of repositories …]")
 		flag.PrintDefaults()
@@ -51,17 +55,29 @@ func main() {
 		Base:        *base,
 		WorkingTree: !*committed,
 		Dark:        options.Dark || !*light,
+		OnlyChanged: onlyChanged(*allProjects),
 		Open:        *open,
 		Synchronous: options.CapturePath != "",
 	})
 	options.Driver = reader.Driver()
 	options.Hidden = func() {
 		reader.Closed()
+		_ = window.KeepPreference(onlyChangedPreference, fmt.Sprint(reader.OnlyChanged()))
 		_ = window.KeepPreference(foldersPreference, strings.Join(reader.Folders(), "\n"))
 	}
 	if err := window.Run(options, func(context *ui.Context) { reader.Build(context) }); err != nil {
 		log.Fatal(err)
 	}
+}
+
+// onlyChanged tells whether to start showing only the projects with changes: yes, unless -all asks
+// for every project or the person chose that last time.
+func onlyChanged(allProjects bool) bool {
+	if allProjects {
+		return false
+	}
+	remembered, found := window.Preference(onlyChangedPreference)
+	return !found || remembered != "false"
 }
 
 // existing keeps the folders that are still there.

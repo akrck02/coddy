@@ -42,8 +42,7 @@ type treeRow struct {
 }
 
 type sidebarState struct {
-	mode          sidebarMode
-	showUnchanged bool // list the projects with no changes in the changes mode too
+	mode sidebarMode
 	// expanded keeps the folders and projects opened or closed by hand, by key; the others follow
 	// the mode's default (everything open in the changes mode, closed in the files mode).
 	expanded map[string]bool
@@ -110,7 +109,7 @@ func (sidebar *sidebarState) rebuild(application *App) {
 	sidebar.rows = sidebar.rows[:0]
 	hidden := 0
 	for index, project := range application.projects {
-		if sidebar.mode == changesMode && !sidebar.showUnchanged && project.Loaded && len(project.Changes) == 0 && project.Error == "" {
+		if application.hidden(project) {
 			hidden++
 			continue
 		}
@@ -133,7 +132,7 @@ func (sidebar *sidebarState) rebuild(application *App) {
 	}
 	if hidden > 0 {
 		sidebar.rows = append(sidebar.rows, treeRow{kind: noteRow, project: -1, quiet: true,
-			label: fmt.Sprintf("%d projects without changes (h shows them)", hidden)})
+			label: fmt.Sprintf("%d projects without changes hidden (h shows them)", hidden)})
 	}
 	sidebar.stale = false
 	sidebar.list.count = len(sidebar.rows)
@@ -220,8 +219,7 @@ func (sidebar *sidebarState) activate(application *App, index int) {
 		sidebar.setExpanded(row, !row.expanded)
 	case noteRow:
 		if row.project < 0 {
-			sidebar.showUnchanged = true
-			sidebar.stale = true
+			application.setOnlyChanged(false)
 		}
 	}
 }

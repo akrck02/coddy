@@ -151,3 +151,66 @@ func TestTheFinderOpensAnUnchangedFileByPartOfItsName(test *testing.T) {
 		test.Errorf("the sidebar did not switch to every file to show an unchanged one")
 	}
 }
+
+// addUntouchedRepository puts a repository with no development beside the others.
+func addUntouchedRepository(test *testing.T, folder string) {
+	test.Helper()
+	repository := filepath.Join(folder, "harbour")
+	if err := os.MkdirAll(repository, 0o755); err != nil {
+		test.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(repository, "quay.go"), []byte("package harbour\n"), 0o644); err != nil {
+		test.Fatal(err)
+	}
+	for _, arguments := range [][]string{{"init", "-q", "-b", "main"}, {"add", "."}, {"commit", "-q", "-m", "start"}} {
+		command := exec.Command("git", arguments...)
+		command.Dir = repository
+		command.Env = append(os.Environ(), "GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@t", "GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@t")
+		if output, err := command.CombinedOutput(); err != nil {
+			test.Fatalf("git %v: %v\n%s", arguments, err, output)
+		}
+	}
+}
+
+func sidebarShows(application *App, label string) bool {
+	application.sidebar.rebuild(application)
+	for _, row := range application.sidebar.rows {
+		if row.label == label {
+			return true
+		}
+	}
+	return false
+}
+
+func finderFinds(application *App, label string) bool {
+	for _, candidate := range application.candidates {
+		if strings.HasPrefix(candidate.Label, label+"/") {
+			return true
+		}
+	}
+	return false
+}
+
+func TestOnlyTheProjectsWithChangesAreShownInBothModesAndTheFinder(test *testing.T) {
+	folder := makeRepository(test)
+	addUntouchedRepository(test, folder)
+	application := New(Settings{Folders: []string{folder}, WorkingTree: true, Synchronous: true, OnlyChanged: true})
+	window := newWindow(test, application)
+	if len(application.projects) != 2 {
+		test.Fatalf("found %d projects, want 2", len(application.projects))
+	}
+	for _, mode := range []sidebarMode{changesMode, filesMode} {
+		application.sidebar.mode = mode
+		if sidebarShows(application, "harbour") || !sidebarShows(application, "lighthouse") {
+			test.Errorf("in mode %d the sidebar does not show only the changed project", mode)
+		}
+	}
+	if finderFinds(application, "harbour") || !finderFinds(application, "lighthouse") {
+		test.Error("the finder does not find only the changed project's files")
+	}
+	window.PressKey(input.KeyH)
+	window.Frames(2)
+	if application.onlyChanged || !sidebarShows(application, "harbour") || !finderFinds(application, "harbour") {
+		test.Error("h did not show every project")
+	}
+}

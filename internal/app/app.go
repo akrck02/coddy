@@ -20,6 +20,8 @@ type Settings struct {
 	Base        string   // the ref every project is compared against; empty = each one's default branch
 	WorkingTree bool     // count the changes not committed yet
 	Dark        bool
+	// OnlyChanged hides the projects the development did not change, in the sidebar and the finder.
+	OnlyChanged bool
 	// Open names a file to open at the start, as "project/path/in/it".
 	Open string
 	// Synchronous reads everything before the first frame instead of in the background: for
@@ -58,11 +60,13 @@ type App struct {
 	helpOpen   bool
 	pickerOpen bool
 	dark       bool
-	palette    *highlight.Palette
-	tap        *inputTap
-	keys       keys
-	toast      string
-	themeSet   bool
+	// onlyChanged hides the projects with no changes, in the sidebar and the finder
+	onlyChanged bool
+	palette     *highlight.Palette
+	tap         *inputTap
+	keys        keys
+	toast       string
+	themeSet    bool
 }
 
 // fileReference names a file of a project.
@@ -80,6 +84,7 @@ func New(settings Settings) *App {
 		documentCache: map[fileReference]*review.Document{},
 		tap:           &inputTap{},
 		dark:          settings.Dark,
+		onlyChanged:   settings.OnlyChanged,
 		focus:         sidebarPane,
 	}
 	application.sidebar = newSidebar()
@@ -239,6 +244,9 @@ func (application *App) projectsChanged() {
 	application.candidates = application.candidates[:0]
 	application.changedOrder = application.changedOrder[:0]
 	for index, project := range application.projects {
+		if application.hidden(project) {
+			continue
+		}
 		for _, path := range project.Files {
 			_, changed := project.ChangeOf(path)
 			application.candidates = append(application.candidates, review.Candidate{
@@ -364,3 +372,24 @@ func (application *App) openByLabel(label string) {
 	}
 	application.toast = "No file " + label + " in the projects open"
 }
+
+// hidden tells whether a project is left out of the sidebar and the finder: in the mode that shows
+// only the projects with changes, one that was read and has none. A project still being read, or
+// that could not be read, stays in sight.
+func (application *App) hidden(project *review.Project) bool {
+	return application.onlyChanged && project.Loaded && len(project.Changes) == 0 && project.Error == ""
+}
+
+// setOnlyChanged shows only the projects with changes, or every project.
+func (application *App) setOnlyChanged(only bool) {
+	application.onlyChanged = only
+	application.projectsChanged()
+	if only {
+		application.toast = "Only the projects with changes"
+	} else {
+		application.toast = "Every project"
+	}
+}
+
+// OnlyChanged tells whether only the projects with changes are shown, to remember it.
+func (application *App) OnlyChanged() bool { return application.onlyChanged }

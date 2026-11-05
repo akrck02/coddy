@@ -109,8 +109,7 @@ func (application *App) handleKeys(context *ui.Context) {
 		application.sidebar.mode = 1 - application.sidebar.mode
 		application.sidebar.stale = true
 	case keys.plain(input.KeyH):
-		application.sidebar.showUnchanged = !application.sidebar.showUnchanged
-		application.sidebar.stale = true
+		application.setOnlyChanged(!application.onlyChanged)
 	case keys.plain(input.KeyW):
 		application.settings.WorkingTree = !application.settings.WorkingTree
 		application.clearDocuments()
@@ -169,6 +168,14 @@ func (application *App) buildToolbar(context *ui.Context) {
 		context.IconSized("git-compare", 18, context.Theme.Primary)
 		context.Text(application.title(), ui.TextStyle{Weight: draw2d.Bold})
 		context.Spacer()
+		onlyIcon := "square"
+		if application.onlyChanged {
+			onlyIcon = "square-check"
+		}
+		if context.FlatIconButton(onlyIcon, "Only changed projects") {
+			application.setOnlyChanged(!application.onlyChanged)
+		}
+		context.Tooltip("h: hide the projects the development did not change, in the sidebar and the finder")
 		if context.FlatIconButton("search", "Find file") {
 			application.finder.show()
 		}
@@ -328,7 +335,7 @@ var helpKeys = [][2]string{
 	{"↑ ↓ ← →  PgUp PgDn  Home End", "Move in the sidebar or scroll the file"},
 	{"j  /  k  ·  Space", "Scroll a line · a page"},
 	{"c", "Sidebar: changes only, or every file"},
-	{"h", "Show or hide the projects without changes"},
+	{"h", "Only the projects with changes, or every project (sidebar and finder)"},
 	{"b", "Compare against another branch, tag or commit"},
 	{"w", "Count the changes not committed yet, or only commits"},
 	{"r  or  ⌘R", "Read every project again"},
