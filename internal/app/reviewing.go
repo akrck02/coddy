@@ -109,14 +109,14 @@ func (application *App) markTarget() (fileReference, bool) {
 // changed, where its branch stands against its base, how much it changed and how much of it has
 // been viewed, to choose where to start.
 func (application *App) buildOverview(context *ui.Context) {
-	theme := context.Theme
+	palette := context.Theme
 	look := application.look
-	context.Frame(ui.Layout{Direction: ui.Vertical, Width: ui.Grow(), Height: ui.Grow()}, ui.Look{Fill: look.editor}, func() {
+	context.Frame(ui.Layout{Direction: ui.Vertical, Width: ui.Grow(), Height: ui.Grow()}, ui.Look{Fill: look.Editor}, func() {
 		context.ScrollArea("overview", ui.Layout{Direction: ui.Vertical, Width: ui.Grow(), Height: ui.Grow(), Padding: ui.PadXY(40, 32), Gap: 6}, func() {
 			viewed, total := application.reviewProgress()
-			context.Text("Review", ui.TextStyle{Size: theme.HeadingSize, Weight: draw2d.Bold})
+			context.Text("Review", ui.TextStyle{Size: palette.HeadingSize, Weight: draw2d.Bold})
 			context.Text(fmt.Sprintf("%d changed files in %d projects · %d viewed", total, application.projectsWithChanges(), viewed),
-				ui.TextStyle{Color: theme.InkSoft})
+				ui.TextStyle{Color: palette.InkSoft})
 			context.Caption("v marks the file open as viewed and opens the next one · n / m go through every change · ⌘P finds any file")
 			context.Box(ui.Layout{Height: ui.Fixed(16)}, nil)
 			for index, project := range application.projects {
@@ -133,44 +133,44 @@ func (application *App) buildOverview(context *ui.Context) {
 }
 
 func (application *App) buildOverviewRow(context *ui.Context, index int, project *workspace.Project) {
-	theme := context.Theme
+	palette := context.Theme
 	look := application.look
 	viewed, total := application.reviewed.Progress(project)
 	added, removed := project.TotalCounts()
-	normal := ui.Look{Fill: theme.Surface, Radius: 8, Border: look.hover, BorderWidth: 1}
+	normal := ui.Look{Fill: palette.Surface, Radius: 8, Border: look.Hover, BorderWidth: 1}
 	hovered := normal
-	hovered.Fill = look.hover
+	hovered.Fill = look.Hover
 	layout := ui.Layout{Width: ui.Grow(), Padding: ui.PadXY(16, 12), Gap: 16, AlignY: ui.Center}
 	if context.Clickable("project "+project.Path, layout, ui.Looks{Normal: normal, Hovered: hovered, Pressed: hovered}, func() {
-		context.IconSized("git-branch", 16, theme.InkQuiet)
+		context.IconSized("git-branch", 16, palette.InkQuiet)
 		context.Box(ui.Layout{Direction: ui.Vertical, Width: ui.Grow(), Gap: 2}, func() {
 			context.Text(project.Name, ui.TextStyle{Weight: draw2d.Medium})
 			where := project.Branch
 			if project.Base != "" {
 				where = fmt.Sprintf("%s ← %s · %d commits", project.Branch, project.Base, project.Ahead)
 			}
-			context.Text(where, ui.TextStyle{Size: theme.SmallTextSize, Color: theme.InkQuiet})
+			context.Text(where, ui.TextStyle{Size: palette.SmallTextSize, Color: palette.InkQuiet})
 		})
-		context.Text(fmt.Sprintf("%d files", len(project.Changes)), ui.TextStyle{Size: theme.SmallTextSize, Color: theme.InkSoft})
+		context.Text(fmt.Sprintf("%d files", len(project.Changes)), ui.TextStyle{Size: palette.SmallTextSize, Color: palette.InkSoft})
 		if added > 0 {
-			context.Text(fmt.Sprintf("+%d", added), ui.TextStyle{Size: theme.SmallTextSize, Weight: draw2d.Mono, Color: theme.Positive})
+			context.Text(fmt.Sprintf("+%d", added), ui.TextStyle{Size: palette.SmallTextSize, Weight: draw2d.Mono, Color: palette.Positive})
 		}
 		if removed > 0 {
-			context.Text(fmt.Sprintf("−%d", removed), ui.TextStyle{Size: theme.SmallTextSize, Weight: draw2d.Mono, Color: theme.Danger})
+			context.Text(fmt.Sprintf("−%d", removed), ui.TextStyle{Size: palette.SmallTextSize, Weight: draw2d.Mono, Color: palette.Danger})
 		}
-		colour := theme.InkQuiet
+		colour := palette.InkQuiet
 		if viewed == total {
-			colour = theme.Positive
+			colour = palette.Positive
 		}
 		context.Paint(ui.Layout{Width: ui.Fixed(64), Height: ui.Fixed(4)}, func(area draw2d.Rectangle, drawing *draw2d.List) {
-			drawing.Rectangle(area, 2, look.hover.Mix(theme.Ink, 0.12), draw2d.Color{}, 0)
+			drawing.Rectangle(area, 2, look.Hover.Mix(palette.Ink, 0.12), draw2d.Color{}, 0)
 			if viewed > 0 {
 				done := area
 				done.Width = area.Width * float32(viewed) / float32(max(total, 1))
 				drawing.Rectangle(done, 2, colour, draw2d.Color{}, 0)
 			}
 		})
-		context.Text(fmt.Sprintf("%d/%d", viewed, total), ui.TextStyle{Size: theme.SmallTextSize, Weight: draw2d.Mono, Color: colour})
+		context.Text(fmt.Sprintf("%d/%d", viewed, total), ui.TextStyle{Size: palette.SmallTextSize, Weight: draw2d.Mono, Color: colour})
 	}) {
 		application.openFirstUnviewedOf(index)
 	}

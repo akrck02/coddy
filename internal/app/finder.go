@@ -11,6 +11,7 @@ import (
 	"github.com/akrck02/code-review/internal/git"
 	"github.com/akrck02/code-review/internal/highlight"
 	"github.com/akrck02/code-review/internal/review"
+	"github.com/akrck02/code-review/internal/theme"
 	"github.com/akrck02/go-renderer/draw2d"
 	"github.com/akrck02/go-renderer/input"
 	ui "github.com/akrck02/go-ui"
@@ -216,11 +217,11 @@ func (finder *finderState) build(context *ui.Context, application *App) {
 	case keys.pressed(input.KeyTab):
 		finder.setScope(1 - finder.scope)
 	}
-	theme := context.Theme
+	palette := context.Theme
 	look := application.look
 	options := ui.LayerOptions{AlignX: ui.Center, AlignY: ui.Start, Padding: ui.Padding{Top: 64}, Width: ui.Fixed(760)}
 	dismissed := context.Modal("finder", options, func() {
-		panel := ui.Look{Fill: theme.Surface, Border: look.chosen, BorderWidth: 1, Radius: finderPanelRadius, Shadow: true}
+		panel := ui.Look{Fill: palette.Surface, Border: look.Chosen, BorderWidth: 1, Radius: finderPanelRadius, Shadow: true}
 		context.Frame(ui.Layout{Direction: ui.Vertical, Width: ui.Grow(), Padding: ui.Pad(8), Gap: 6}, panel, func() {
 			submitted := finder.buildQuery(context, application)
 			finder.refresh(application)
@@ -229,7 +230,7 @@ func (finder *finderState) build(context *ui.Context, application *App) {
 			finder.list.rowHeight = finder.rowHeight()
 			finder.list.count = count
 			finder.list.reveal(finder.selected)
-			onBar := finder.list.follow(context, keys, theme.ScrollStep)
+			onBar := finder.list.follow(context, keys, palette.ScrollStep)
 			x, y := context.Pointer()
 			if index := finder.list.rowAt(x, y); index >= 0 && !onBar && keys.clicked() {
 				finder.selected = index
@@ -258,24 +259,24 @@ func (finder *finderState) build(context *ui.Context, application *App) {
 // buildQuery is the field typed in, as a pill like the window's search field, with the switch
 // between names and content on its right. It tells whether Enter was pressed in it.
 func (finder *finderState) buildQuery(context *ui.Context, application *App) bool {
-	theme := context.Theme
+	palette := context.Theme
 	look := application.look
 	submitted := false
-	pill := ui.Look{Fill: look.hover.WithAlpha(0.7), Radius: 20, Border: theme.Primary.WithAlpha(0.5), BorderWidth: 1}
+	pill := ui.Look{Fill: look.Hover.WithAlpha(0.7), Radius: 20, Border: palette.Primary.WithAlpha(0.5), BorderWidth: 1}
 	context.Frame(ui.Layout{Width: ui.Grow(), Height: ui.Fixed(40), Padding: ui.Padding{Left: 14, Right: 5}, Gap: 10, AlignY: ui.Center}, pill, func() {
 		icon, placeholder := "search", "Find a file by its name, in any project"
 		if finder.scope == contentScope {
 			icon, placeholder = "text-search", "Find a text in the files of every project"
 		}
-		context.IconSized(icon, 16, theme.InkSoft)
+		context.IconSized(icon, 16, palette.InkSoft)
 		if finder.focusNext {
 			context.FocusField("query")
 			finder.focusNext = false
 		}
 		submitted = context.EntryField("query", &finder.query, ui.TextFieldOptions{Placeholder: placeholder, Plain: true, Width: ui.Grow()})
 		scope := int(finder.scope)
-		if iconSwitch(context, "finder scope", &scope, []iconChoice{
-			{"file-search", "File names (Tab)"}, {"text-search", "File content (Tab)"},
+		if theme.IconSwitch(context, "finder scope", &scope, []theme.IconChoice{
+			{Icon: "file-search", Name: "File names (Tab)"}, {Icon: "text-search", Name: "File content (Tab)"},
 		}) {
 			finder.setScope(finderScope(scope))
 		}
@@ -285,8 +286,8 @@ func (finder *finderState) buildQuery(context *ui.Context, application *App) boo
 
 // buildFooter says what was found and the keys, each in a key cap.
 func (finder *finderState) buildFooter(context *ui.Context) {
-	theme := context.Theme
-	quiet := ui.TextStyle{Size: theme.SmallTextSize, Color: theme.InkQuiet}
+	palette := context.Theme
+	quiet := ui.TextStyle{Size: palette.SmallTextSize, Color: palette.InkQuiet}
 	context.Box(ui.Layout{Width: ui.Grow(), Height: ui.Fixed(30), Padding: ui.PadXY(8, 0), Gap: 6, AlignY: ui.Center}, func() {
 		switch {
 		case finder.scope == contentScope && finder.searching:
@@ -313,15 +314,15 @@ func (finder *finderState) buildFooter(context *ui.Context) {
 
 // keyCap draws a key as a small rounded cap.
 func keyCap(context *ui.Context, key string) {
-	theme := context.Theme
+	palette := context.Theme
 	context.Frame(ui.Layout{Height: ui.Fixed(20), Padding: ui.PadXY(7, 0), AlignY: ui.Center},
-		ui.Look{Fill: theme.Chosen.WithAlpha(0.6), Radius: 6}, func() {
-			context.Text(key, ui.TextStyle{Size: theme.SmallTextSize - 1, Color: theme.InkSoft, Weight: draw2d.Medium})
+		ui.Look{Fill: palette.Chosen.WithAlpha(0.6), Radius: 6}, func() {
+			context.Text(key, ui.TextStyle{Size: palette.SmallTextSize - 1, Color: palette.InkSoft, Weight: draw2d.Medium})
 		})
 }
 
 func (finder *finderState) paint(context *ui.Context, application *App, drawing *draw2d.List) {
-	theme := context.Theme
+	palette := context.Theme
 	area := finder.list.area
 	drawing.PushClip(area)
 	if finder.count() == 0 {
@@ -332,7 +333,7 @@ func (finder *finderState) paint(context *ui.Context, application *App, drawing 
 				message = ""
 			}
 		}
-		drawing.Text(message, area.X+14, area.Y+24, theme.TextSize, draw2d.Regular, theme.InkQuiet)
+		drawing.Text(message, area.X+14, area.Y+24, palette.TextSize, draw2d.Regular, palette.InkQuiet)
 	}
 	pointerX, pointerY := context.Pointer()
 	hovered := finder.list.rowAt(pointerX, pointerY)
@@ -342,9 +343,9 @@ func (finder *finderState) paint(context *ui.Context, application *App, drawing 
 		rowArea := draw2d.Rectangle{X: area.X, Y: top + 1, Width: area.Width - scrollBarWidth - 2, Height: finder.rowHeight() - 2}
 		switch index {
 		case finder.selected:
-			drawing.Rectangle(rowArea, 8, application.look.chosen, draw2d.Color{}, 0)
+			drawing.Rectangle(rowArea, 8, application.look.Chosen, draw2d.Color{}, 0)
 		case hovered:
-			drawing.Rectangle(rowArea, 8, application.look.hover, draw2d.Color{}, 0)
+			drawing.Rectangle(rowArea, 8, application.look.Hover, draw2d.Color{}, 0)
 		}
 		if finder.scope == contentScope {
 			finder.paintHit(context, application, drawing, finder.hits[index], rowArea)
@@ -352,49 +353,49 @@ func (finder *finderState) paint(context *ui.Context, application *App, drawing 
 			finder.paintName(context, application, drawing, finder.matches[index], rowArea)
 		}
 	}
-	finder.list.paintBar(drawing, application.look.scrollThumb)
+	finder.list.paintBar(drawing, application.look.ScrollThumb)
 	drawing.PopClip()
 }
 
 // paintName paints a file found by its name: its icon, its name and, quieter, its project and
 // folder, with the letters that matched in the accent; its status on the right.
 func (finder *finderState) paintName(context *ui.Context, application *App, drawing *draw2d.List, match review.Match, row draw2d.Rectangle) {
-	theme := context.Theme
+	palette := context.Theme
 	measurer := context.Measurer()
-	size := theme.TextSize
+	size := palette.TextSize
 	metrics := measurer.MeasureText("Ag", size, draw2d.Regular, 1)
 	baseline := row.Y + (row.Height+metrics.Ascent-metrics.Descent)/2
 	candidate := match.Candidate
 	project := application.projects[candidate.Project]
 	change, changed := project.ChangeOf(candidate.Path)
-	icon, iconInk := fileIcon(candidate.Path, application.look)
+	icon, iconInk := theme.FileIcon(candidate.Path, application.look)
 	drawing.Icon(icon, row.X+12, row.Y+(row.Height-16)/2, 16, iconInk)
-	nameInk := theme.Ink
+	nameInk := palette.Ink
 	if changed {
-		nameInk = statusColour(theme, change.Status)
+		nameInk = statusColour(palette, change.Status)
 		letter := change.Status.Letter()
-		width := measurer.MeasureText(letter, theme.SmallTextSize, draw2d.Mono, 1).Width
-		drawing.Text(letter, row.Right()-14-width, baseline, theme.SmallTextSize, draw2d.Mono, nameInk)
+		width := measurer.MeasureText(letter, palette.SmallTextSize, draw2d.Mono, 1).Width
+		drawing.Text(letter, row.Right()-14-width, baseline, palette.SmallTextSize, draw2d.Mono, nameInk)
 	}
 	// the label is "project/folder/name": the name first and plain, then where it is, quiet
 	label := candidate.Label
 	slash := strings.LastIndexByte(label, '/')
 	x := row.X + 40
 	drawing.PushClip(draw2d.Rectangle{X: row.X, Y: row.Y, Width: row.Width - 40, Height: row.Height})
-	x = paintMatched(drawing, measurer, label, match.Positions, slash+1, len(label), x, baseline, size, nameInk, theme.Primary)
-	paintMatched(drawing, measurer, label, match.Positions, 0, max(slash, 0), x+10, baseline, theme.SmallTextSize, theme.InkQuiet, theme.Primary)
+	x = paintMatched(drawing, measurer, label, match.Positions, slash+1, len(label), x, baseline, size, nameInk, palette.Primary)
+	paintMatched(drawing, measurer, label, match.Positions, 0, max(slash, 0), x+10, baseline, palette.SmallTextSize, palette.InkQuiet, palette.Primary)
 	drawing.PopClip()
 }
 
 // paintHit paints a line found by its content: the line itself in the code's face, the text found
 // washed in the accent, and under it the file and the line's number.
 func (finder *finderState) paintHit(context *ui.Context, application *App, drawing *draw2d.List, hit contentHit, row draw2d.Rectangle) {
-	theme := context.Theme
+	palette := context.Theme
 	measurer := context.Measurer()
 	const codeSize = 13
 	code := measurer.MeasureText("M", codeSize, draw2d.Mono, 1)
-	small := measurer.MeasureText("Ag", theme.SmallTextSize, draw2d.Regular, 1)
-	icon, iconInk := fileIcon(hit.Path, application.look)
+	small := measurer.MeasureText("Ag", palette.SmallTextSize, draw2d.Regular, 1)
+	icon, iconInk := theme.FileIcon(hit.Path, application.look)
 	drawing.Icon(icon, row.X+12, row.Y+9, 16, iconInk)
 	left := row.X + 40
 	drawing.PushClip(draw2d.Rectangle{X: row.X, Y: row.Y, Width: row.Width - 8, Height: row.Height})
@@ -412,14 +413,14 @@ func (finder *finderState) paintHit(context *ui.Context, application *App, drawi
 	found := utf8.RuneCountInString(strings.TrimSpace(finder.asked))
 	matchX := left + float32(utf8.RuneCountInString(text[start:min(column, len(text))]))*code.Width
 	wash := draw2d.Rectangle{X: matchX - 1, Y: row.Y + 6, Width: float32(found)*code.Width + 2, Height: code.Ascent + code.Descent + 4}
-	drawing.Rectangle(wash, 3, theme.Primary.WithAlpha(0.3), draw2d.Color{}, 0)
-	drawing.Text(shown, left, codeBaseline, codeSize, draw2d.Mono, application.look.syntax.RoleColour(highlight.Plain))
+	drawing.Rectangle(wash, 3, palette.Primary.WithAlpha(0.3), draw2d.Color{}, 0)
+	drawing.Text(shown, left, codeBaseline, codeSize, draw2d.Mono, application.look.Syntax.RoleColour(highlight.Plain))
 	where := fmt.Sprintf("%s/%s:%d", application.projects[hit.project].Name, hit.Path, hit.Line)
-	whereInk := theme.InkQuiet
+	whereInk := palette.InkQuiet
 	if hit.changed {
-		whereInk = statusColour(theme, hit.status).WithAlpha(0.85)
+		whereInk = statusColour(palette, hit.status).WithAlpha(0.85)
 	}
-	drawing.Text(where, left, row.Bottom()-8-small.Descent, theme.SmallTextSize, draw2d.Regular, whereInk)
+	drawing.Text(where, left, row.Bottom()-8-small.Descent, palette.SmallTextSize, draw2d.Regular, whereInk)
 	drawing.PopClip()
 }
 

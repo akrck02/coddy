@@ -1,4 +1,6 @@
-package app
+// Package theme is how the reader looks: Zed's One colours, light and dark, the icon of each kind
+// of file, and the few controls of its own it draws (tool buttons, icon switches, fitted text).
+package theme
 
 import (
 	"github.com/akrck02/bubble"
@@ -11,47 +13,47 @@ import (
 // The type of the reader, in pixels, over Bubble's: a body of 14 on lines one and a half times as
 // tall.
 const (
-	bodySize   = 14
-	smallSize  = 12
-	lineHeight = 1.5
+	BodySize   = 14
+	SmallSize  = 12
+	LineHeight = 1.5
 )
 
-// look is everything the reader is painted with: go-ui's theme for the controls, and the colours of
+// Look is everything the reader is painted with: go-ui's theme for the controls, and the colours of
 // the code it paints itself. The shapes and spacing are Bubble 4's; the colours are Zed's One Dark
 // and One Light, because a reviewer spends hours on them: neutral greys with no tint of their own,
 // an editor a step darker (or lighter) than the panels around it, and colour kept for what means
 // something — green added, amber changed, red removed, blue for where the reader is.
-type look struct {
-	theme ui.Theme
+type Look struct {
+	Theme ui.Theme
 
-	editor           draw2d.Color // behind the code
-	lineNumber       draw2d.Color
-	activeLineNumber draw2d.Color
-	hover            draw2d.Color // a row under the pointer
-	chosen           draw2d.Color // the selected row
-	focusEdge        draw2d.Color // the selected row's edge while its pane has the keyboard
-	scrollThumb      draw2d.Color
+	Editor           draw2d.Color // behind the code
+	LineNumber       draw2d.Color
+	ActiveLineNumber draw2d.Color
+	Hover            draw2d.Color // a row under the pointer
+	Chosen           draw2d.Color // the selected row
+	FocusEdge        draw2d.Color // the selected row's edge while its pane has the keyboard
+	ScrollThumb      draw2d.Color
 
-	created, modified, deleted draw2d.Color
+	Created, Modified, Deleted draw2d.Color
 	// the washes behind added and removed lines, and the stronger ones behind the words that
 	// changed in them
-	createdLine, deletedLine draw2d.Color
-	createdWord, deletedWord draw2d.Color
+	CreatedLine, DeletedLine draw2d.Color
+	CreatedWord, DeletedWord draw2d.Color
 
-	syntax *highlight.Palette
+	Syntax *highlight.Palette
 }
 
-// designs are the light and the dark look, made once.
-type designs struct {
-	light, dark look
+// Designs are the light and the dark look, made once.
+type Designs struct {
+	Light, Dark Look
 }
 
-func newDesigns() designs {
-	return designs{light: oneLight(), dark: oneDark()}
+func NewDesigns() Designs {
+	return Designs{Light: oneLight(), Dark: oneDark()}
 }
 
 // oneDark is Zed's One Dark (assets/themes/one/one.json in zed-industries/zed).
-func oneDark() look {
+func oneDark() Look {
 	hex := draw2d.MustHex
 	colours := palette{
 		background: hex("#3b414d"), surface: hex("#2f343e"), editor: hex("#282c33"),
@@ -78,7 +80,7 @@ func oneDark() look {
 }
 
 // oneLight is Zed's One Light.
-func oneLight() look {
+func oneLight() Look {
 	hex := draw2d.MustHex
 	colours := palette{
 		background: hex("#dcdcdd"), surface: hex("#ebebec"), editor: hex("#fafafa"),
@@ -138,7 +140,7 @@ type palette struct {
 
 // look takes Bubble's shapes, spacing and type for a mode and paints them in these colours: every
 // colour of the theme is set here, so none of Bubble's paper (its warm beige) is left.
-func (colours palette) look(mode bubble.Mode, syntax map[highlight.Role]draw2d.Color) look {
+func (colours palette) look(mode bubble.Mode, syntax map[highlight.Role]draw2d.Color) Look {
 	options := bubble.DefaultOptions()
 	options.Mode = mode
 	options.Density = bubble.DensityCompact
@@ -164,143 +166,25 @@ func (colours palette) look(mode bubble.Mode, syntax map[highlight.Role]draw2d.C
 	theme.BackdropBlur = 0
 	theme.FieldFocusEdge = true
 
-	theme.TextSize, theme.SmallTextSize = bodySize, smallSize
-	theme.LineHeight, theme.HeadingLineHeight = lineHeight, lineHeight
+	theme.TextSize, theme.SmallTextSize = BodySize, SmallSize
+	theme.LineHeight, theme.HeadingLineHeight = LineHeight, LineHeight
 
-	return look{
-		theme:            theme,
-		editor:           colours.editor,
-		lineNumber:       colours.lineNumber,
-		activeLineNumber: colours.activeLineNumber,
-		hover:            colours.hover,
-		chosen:           colours.chosen,
-		focusEdge:        colours.focus,
-		scrollThumb:      colours.scrollThumb,
-		created:          colours.created,
-		modified:         colours.modified,
-		deleted:          colours.deleted,
-		createdLine:      colours.created.WithAlpha(colours.lineWash),
-		deletedLine:      colours.deleted.WithAlpha(colours.lineWash),
-		createdWord:      colours.created.WithAlpha(colours.wordWash),
-		deletedWord:      colours.deleted.WithAlpha(colours.wordWash),
-		syntax:           highlight.NewPalette(syntax),
+	return Look{
+		Theme:            theme,
+		Editor:           colours.editor,
+		LineNumber:       colours.lineNumber,
+		ActiveLineNumber: colours.activeLineNumber,
+		Hover:            colours.hover,
+		Chosen:           colours.chosen,
+		FocusEdge:        colours.focus,
+		ScrollThumb:      colours.scrollThumb,
+		Created:          colours.created,
+		Modified:         colours.modified,
+		Deleted:          colours.deleted,
+		CreatedLine:      colours.created.WithAlpha(colours.lineWash),
+		DeletedLine:      colours.deleted.WithAlpha(colours.lineWash),
+		CreatedWord:      colours.created.WithAlpha(colours.wordWash),
+		DeletedWord:      colours.deleted.WithAlpha(colours.wordWash),
+		Syntax:           highlight.NewPalette(syntax),
 	}
-}
-
-// iconChoice is one icon of a switch: its icon, and the words its tooltip says.
-type iconChoice struct {
-	icon, name string
-}
-
-const (
-	segmentSize     = 28
-	segmentIconSize = 16
-	segmentInset    = 2
-)
-
-// iconSwitch is a row of icons on a soft pill, the chosen one on a raised fill: a switch between
-// two or three views that takes little room. It returns true when the choice changes.
-func iconSwitch(context *ui.Context, name string, selected *int, choices []iconChoice) bool {
-	theme := context.Theme
-	changed := false
-	context.Push(name)
-	defer context.Pop()
-	pill := ui.Look{Fill: theme.Sunken, Radius: 6}
-	context.Frame(ui.Layout{Padding: ui.Pad(segmentInset), Gap: 2, AlignY: ui.Center}, pill, func() {
-		for index, choice := range choices {
-			chosen := index == *selected
-			ink, normal := theme.InkQuiet, ui.Look{Radius: 5}
-			if chosen {
-				ink, normal = theme.Ink, ui.Look{Fill: theme.Chosen, Radius: 5}
-			}
-			hovered := normal
-			if !chosen {
-				hovered.Fill = theme.Chosen.WithAlpha(0.5)
-			}
-			layout := ui.Layout{Width: ui.Fixed(segmentSize), Height: ui.Fixed(segmentSize - 4), AlignX: ui.Center, AlignY: ui.Center}
-			if context.Clickable(choice.name, layout, ui.Looks{Normal: normal, Hovered: hovered, Pressed: hovered}, func() {
-				context.IconSized(choice.icon, segmentIconSize, ink)
-			}) && !chosen {
-				*selected = index
-				changed = true
-			}
-			context.Tooltip(choice.name)
-		}
-	})
-	return changed
-}
-
-// toolButton is an icon-only button of a toolbar; one that is on is drawn on the chosen fill and in
-// the accent, so a setting's state reads at a glance without words.
-func toolButton(context *ui.Context, name, icon string, on bool) bool {
-	theme := context.Theme
-	ink, normal := theme.InkSoft, ui.Look{Radius: 6}
-	if on {
-		ink, normal = theme.Primary, ui.Look{Fill: theme.PrimaryTint, Radius: 6}
-	}
-	hovered := normal
-	if !on {
-		hovered.Fill = theme.Sunken
-	}
-	layout := ui.Layout{Width: ui.Fixed(30), Height: ui.Fixed(28), AlignX: ui.Center, AlignY: ui.Center}
-	clicked := context.Clickable(name, layout, ui.Looks{Normal: normal, Hovered: hovered, Pressed: hovered}, func() {
-		context.IconSized(icon, 16, ink)
-	})
-	context.Tooltip(name)
-	return clicked
-}
-
-// fitText shortens a text with an ellipsis until it fits a width; it gives "" when not even its
-// first letter and the ellipsis fit, so a narrow pane drops what it cannot show instead of
-// pushing its buttons out.
-func fitText(context *ui.Context, text string, style ui.TextStyle, width float32) string {
-	size := style.Size
-	if size == 0 {
-		size = context.Theme.TextSize
-	}
-	measure := func(words string) float32 {
-		return context.Measurer().MeasureText(words, size, style.Weight, 1).Width
-	}
-	if width <= 0 {
-		return ""
-	}
-	if measure(text) <= width {
-		return text
-	}
-	runes := []rune(text)
-	for cut := len(runes) - 1; cut > 0; cut-- {
-		shortened := string(runes[:cut]) + "…"
-		if measure(shortened) <= width {
-			return shortened
-		}
-	}
-	return ""
-}
-
-// textWidth is how wide a text is drawn in a style.
-func textWidth(context *ui.Context, text string, style ui.TextStyle) float32 {
-	size := style.Size
-	if size == 0 {
-		size = context.Theme.TextSize
-	}
-	return context.Measurer().MeasureText(text, size, style.Weight, 1).Width
-}
-
-// fitTextEnd shortens a text from its start, keeping its end: a folder's path is told apart by its
-// last folders.
-func fitTextEnd(context *ui.Context, text string, style ui.TextStyle, width float32) string {
-	if width <= 0 {
-		return ""
-	}
-	if textWidth(context, text, style) <= width {
-		return text
-	}
-	runes := []rune(text)
-	for cut := 1; cut < len(runes); cut++ {
-		shortened := "…" + string(runes[cut:])
-		if textWidth(context, shortened, style) <= width {
-			return shortened
-		}
-	}
-	return ""
 }

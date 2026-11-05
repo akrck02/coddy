@@ -1,6 +1,6 @@
 # 1. Split the reader into packages, one per mode
 
-> Status: building, plan changed at T8 · Author's approval: proposal ☑ plan ☑ (T8 changed, to approve)
+> Status: building · Author's approval: proposal ☑ plan ☑ (T8 change approved)
 
 ## Why
 
@@ -143,7 +143,7 @@ Each task leaves the reader working and every test passing.
 - [x] T5 — Move the Java tree and class kinds into `java` · serves R1 · test: `TestAJavaTreeMarksRootsAndJoinsPackages`
 - [x] T6 — Background work with keys and cancelling · `app/work.go`, which becomes `window` · serves R8 · test: `TestANewerSearchCancelsTheOlderOne`
 - [x] T7 — Commands, keys and the help built from them · `app/commands.go`, which becomes `window` · serves R7 · tests: `TestNoTwoCommandsShareAKeyInOneMode`, `TestTheHelpListsEveryCommand`
-- [ ] T8a — `theme` as a package: looks, file icons, the reader's controls · serves R1 · test: the tests of T1
+- [x] T8a — `theme` as a package: looks, file icons, the reader's controls · serves R1 · test: the tests of T1
 - [ ] T8b — `pane` as a package, and `workspace.FileReference` · serves R1 · test: the tests of T1
 - [ ] T8c — `viewer` as a package, with the interface it needs from the window · serves R1 · test: the tests of T1
 - [ ] T8d — `finder` as a package, with the fuzzy search · serves R1 · test: the tests of T1

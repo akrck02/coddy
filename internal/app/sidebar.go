@@ -6,6 +6,7 @@ import (
 
 	"github.com/akrck02/code-review/internal/git"
 	"github.com/akrck02/code-review/internal/java"
+	"github.com/akrck02/code-review/internal/theme"
 	"github.com/akrck02/code-review/internal/workspace"
 	"github.com/akrck02/go-renderer/draw2d"
 	ui "github.com/akrck02/go-ui"
@@ -384,8 +385,8 @@ func (sidebar *sidebarState) build(context *ui.Context, application *App) {
 	if sidebar.stale {
 		sidebar.rebuild(application)
 	}
-	theme := context.Theme
-	context.Frame(ui.Layout{Direction: ui.Vertical, Width: ui.Grow(), Height: ui.Grow()}, ui.Look{Fill: theme.Surface}, func() {
+	palette := context.Theme
+	context.Frame(ui.Layout{Direction: ui.Vertical, Width: ui.Grow(), Height: ui.Grow()}, ui.Look{Fill: palette.Surface}, func() {
 		context.Box(ui.Layout{Width: ui.Grow(), Height: ui.Fixed(40), Padding: ui.PadXY(headerPadding, 0), Gap: headerGap, AlignY: ui.Center}, func() {
 			if sidebar.entered != "" {
 				sidebar.buildEnteredHeader(context, application)
@@ -395,28 +396,28 @@ func (sidebar *sidebarState) build(context *ui.Context, application *App) {
 			if sidebar.mode == reviewMode {
 				title = "Review"
 			}
-			titleStyle := ui.TextStyle{Weight: draw2d.Medium, Color: theme.InkSoft}
+			titleStyle := ui.TextStyle{Weight: draw2d.Medium, Color: palette.InkSoft}
 			context.Text(title, titleStyle)
-			room := sidebar.headerRoom() - textWidth(context, title, titleStyle) - toolButtonWidth*2 - headerGap*3
+			room := sidebar.headerRoom() - theme.TextWidth(context, title, titleStyle) - toolButtonWidth*2 - headerGap*3
 			if sidebar.mode == reviewMode {
 				viewed, total := application.reviewProgress()
-				progressStyle := ui.TextStyle{Size: theme.SmallTextSize, Color: theme.InkQuiet}
+				progressStyle := ui.TextStyle{Size: palette.SmallTextSize, Color: palette.InkQuiet}
 				if total > 0 {
-					if progress := fitText(context, fmt.Sprintf("%d of %d viewed", viewed, total), progressStyle, room); progress != "" {
+					if progress := theme.FitText(context, fmt.Sprintf("%d of %d viewed", viewed, total), progressStyle, room); progress != "" {
 						context.Text(progress, progressStyle)
 					}
 				}
 			}
 			context.Spacer()
 			sidebar.buildChangedFilter(context)
-			if toolButton(context, "Collapse all", "chevrons-down-up", false) {
+			if theme.ToolButton(context, "Collapse all", "chevrons-down-up", false) {
 				sidebar.collapseAll(application)
 			}
 		})
 		sidebar.list.rowHeight = sidebarRowHeight
 		sidebar.list.count = len(sidebar.rows)
 		if !application.modalOpen() {
-			onBar := sidebar.list.follow(context, application.keys, theme.ScrollStep)
+			onBar := sidebar.list.follow(context, application.keys, palette.ScrollStep)
 			x, y := context.Pointer()
 			if index := sidebar.list.rowAt(x, y); index >= 0 && !onBar && application.keys.clicked() {
 				sidebar.selected = index
@@ -439,37 +440,37 @@ func (sidebar *sidebarState) build(context *ui.Context, application *App) {
 
 // buildEnteredHeader names the project the sidebar is in, with the way back to every project.
 func (sidebar *sidebarState) buildEnteredHeader(context *ui.Context, application *App) {
-	theme := context.Theme
+	palette := context.Theme
 	index := application.projectIndex(sidebar.entered)
 	if index < 0 {
 		return
 	}
 	project := application.projects[index]
-	if toolButton(context, "Every project (Esc)", "arrow-left", false) {
+	if theme.ToolButton(context, "Every project (Esc)", "arrow-left", false) {
 		sidebar.leave(application)
 		return
 	}
-	count, countStyle := "", ui.TextStyle{Size: theme.SmallTextSize, Weight: draw2d.Mono, Color: theme.Warning}
+	count, countStyle := "", ui.TextStyle{Size: palette.SmallTextSize, Weight: draw2d.Mono, Color: palette.Warning}
 	if sidebar.mode == reviewMode && len(project.Changes) > 0 {
 		viewed, total := application.reviewed.Progress(project)
-		count, countStyle.Color = fmt.Sprintf("%d/%d", viewed, total), theme.InkQuiet
+		count, countStyle.Color = fmt.Sprintf("%d/%d", viewed, total), palette.InkQuiet
 	} else if len(project.Changes) > 0 {
 		count = fmt.Sprint(len(project.Changes))
 	}
 	// what is left for the name and the branch once the buttons and the count have their room
 	room := sidebar.headerRoom() - toolButtonWidth - headerGap
 	if count != "" {
-		room -= textWidth(context, count, countStyle) + headerGap
+		room -= theme.TextWidth(context, count, countStyle) + headerGap
 	}
 	if sidebar.mode == filesMode {
 		room -= toolButtonWidth + headerGap
 	}
 	nameStyle := ui.TextStyle{Weight: draw2d.Medium}
-	name := fitText(context, project.Name, nameStyle, room)
+	name := theme.FitText(context, project.Name, nameStyle, room)
 	context.Text(name, nameStyle)
-	room -= textWidth(context, name, nameStyle) + headerGap
-	branchStyle := ui.TextStyle{Size: theme.SmallTextSize, Color: theme.InkQuiet}
-	if branch := fitText(context, project.Branch, branchStyle, room); len([]rune(branch)) > 3 {
+	room -= theme.TextWidth(context, name, nameStyle) + headerGap
+	branchStyle := ui.TextStyle{Size: palette.SmallTextSize, Color: palette.InkQuiet}
+	if branch := theme.FitText(context, project.Branch, branchStyle, room); len([]rune(branch)) > 3 {
 		context.Text(branch, branchStyle)
 	}
 	context.Spacer()
@@ -512,7 +513,7 @@ func (sidebar *sidebarState) buildChangedFilter(context *ui.Context) {
 	if sidebar.mode != filesMode {
 		return
 	}
-	if toolButton(context, "Only the changed files (g)", "file-diff", sidebar.onlyChanged) {
+	if theme.ToolButton(context, "Only the changed files (g)", "file-diff", sidebar.onlyChanged) {
 		sidebar.toggleChangedFilter()
 	}
 }
@@ -550,12 +551,12 @@ func (sidebar *sidebarState) collapseAll(application *App) {
 }
 
 func (sidebar *sidebarState) paint(context *ui.Context, application *App, drawing *draw2d.List) {
-	theme := context.Theme
+	palette := context.Theme
 	look := application.look
 	area := sidebar.list.area
 	measurer := context.Measurer()
-	size := theme.TextSize
-	small := theme.SmallTextSize
+	size := palette.TextSize
+	small := palette.SmallTextSize
 	metrics := measurer.MeasureText("Ag", size, draw2d.Regular, 1)
 	pointerX, pointerY := context.Pointer()
 	hovered := -1
@@ -572,19 +573,19 @@ func (sidebar *sidebarState) paint(context *ui.Context, application *App, drawin
 		isOpen := row.kind == fileRow && application.editor.isOpen() && application.editor.reference == reference
 		switch {
 		case index == sidebar.selected && application.focus == sidebarPane:
-			drawing.Rectangle(rowArea, 5, look.chosen, look.focusEdge, 1)
+			drawing.Rectangle(rowArea, 5, look.Chosen, look.FocusEdge, 1)
 		case index == sidebar.selected, isOpen:
 			// the selection of a pane without the keyboard, quieter than the one with it
-			drawing.Rectangle(rowArea, 5, look.hover.Mix(look.chosen, 0.5), draw2d.Color{}, 0)
+			drawing.Rectangle(rowArea, 5, look.Hover.Mix(look.Chosen, 0.5), draw2d.Color{}, 0)
 		case index == hovered:
-			drawing.Rectangle(rowArea, 5, look.hover, draw2d.Color{}, 0)
+			drawing.Rectangle(rowArea, 5, look.Hover, draw2d.Color{}, 0)
 		}
 		baseline := top + (sidebarRowHeight+metrics.Ascent-metrics.Descent)/2
 		x := sidebar.rowLeft(row)
 		iconTop := top + (sidebarRowHeight-treeIconSize)/2
-		ink := theme.Ink
+		ink := palette.Ink
 		if row.quiet {
-			ink = theme.InkQuiet
+			ink = palette.InkQuiet
 		}
 		weight := draw2d.Regular
 		label := row.label
@@ -594,11 +595,11 @@ func (sidebar *sidebarState) paint(context *ui.Context, application *App, drawin
 			if row.expanded {
 				chevron = "chevron-down"
 			}
-			drawing.Icon(chevron, x, iconTop, treeIconSize, theme.InkQuiet)
+			drawing.Icon(chevron, x, iconTop, treeIconSize, palette.InkQuiet)
 			x += treeIconSize + 4
 			icon, iconInk := folderIcon(row, look)
 			if row.kind == projectRow {
-				icon, iconInk, weight = "git-branch", theme.InkQuiet, draw2d.Medium
+				icon, iconInk, weight = "git-branch", palette.InkQuiet, draw2d.Medium
 			}
 			if row.role == workspace.ModuleFolder {
 				weight = draw2d.Medium
@@ -608,9 +609,9 @@ func (sidebar *sidebarState) paint(context *ui.Context, application *App, drawin
 		case fileRow:
 			// in the review mode the room a folder gives its chevron holds the viewed mark
 			if sidebar.mode == reviewMode {
-				check, checkInk := "circle", theme.InkQuiet
+				check, checkInk := "circle", palette.InkQuiet
 				if application.isViewed(reference) {
-					check, checkInk, ink = "circle-check", theme.InkSoft, theme.InkQuiet
+					check, checkInk, ink = "circle-check", palette.InkSoft, palette.InkQuiet
 				}
 				drawing.Icon(check, x, iconTop, treeIconSize, checkInk)
 			}
@@ -618,11 +619,11 @@ func (sidebar *sidebarState) paint(context *ui.Context, application *App, drawin
 			// a Java or Kotlin class is named without its extension and drawn by its kind, as
 			// IntelliJ draws it, once the file has been read
 			if kind := application.classKind(reference); kind != java.UnknownKind && kind != java.NoClass {
-				paintClassBadge(drawing, look, kind, x, iconTop, treeIconSize, ink == theme.InkQuiet)
+				paintClassBadge(drawing, look, kind, x, iconTop, treeIconSize, ink == palette.InkQuiet)
 				label = strings.TrimSuffix(strings.TrimSuffix(row.label, ".java"), ".kt")
 			} else {
-				icon, iconInk := fileIcon(row.label, look)
-				if ink == theme.InkQuiet {
+				icon, iconInk := theme.FileIcon(row.label, look)
+				if ink == palette.InkQuiet {
 					iconInk = iconInk.WithAlpha(0.5)
 				}
 				drawing.Icon(icon, x, iconTop, treeIconSize, iconInk)
@@ -631,18 +632,18 @@ func (sidebar *sidebarState) paint(context *ui.Context, application *App, drawin
 			// in the files mode the name says how the file changed, as Zed's project panel does;
 			// in the review mode every file changed, and the colour is kept for its counts
 			if row.status != git.Unchanged && sidebar.mode == filesMode {
-				ink = statusColour(theme, row.status)
+				ink = statusColour(palette, row.status)
 			}
 		case noteRow:
-			ink = theme.InkQuiet
+			ink = palette.InkQuiet
 		}
 		right := rowArea.Right() - 8
 		if row.kind == projectRow && index == hovered {
 			button := draw2d.Rectangle{X: rowArea.Right() - 4 - enterButtonWidth, Y: top + 3, Width: enterButtonWidth, Height: sidebarRowHeight - 6}
 			if sidebar.onEnter(index, pointerX) {
-				drawing.Rectangle(button, 4, look.chosen, draw2d.Color{}, 0)
+				drawing.Rectangle(button, 4, look.Chosen, draw2d.Color{}, 0)
 			}
-			drawing.Icon("arrow-right-to-line", button.X+(enterButtonWidth-14)/2, top+(sidebarRowHeight-14)/2, 14, theme.InkSoft)
+			drawing.Icon("arrow-right-to-line", button.X+(enterButtonWidth-14)/2, top+(sidebarRowHeight-14)/2, 14, palette.InkSoft)
 			right = button.X - 6
 		}
 		right = sidebar.paintRight(context, application, drawing, row, right, baseline, top)
@@ -652,7 +653,7 @@ func (sidebar *sidebarState) paint(context *ui.Context, application *App, drawin
 			labelWidth := measurer.MeasureText(row.label, size, weight, 1).Width
 			project := application.projects[row.project]
 			if project.Branch != "" {
-				drawing.Text(project.Branch, x+labelWidth+8, baseline, small, draw2d.Regular, theme.InkQuiet)
+				drawing.Text(project.Branch, x+labelWidth+8, baseline, small, draw2d.Regular, palette.InkQuiet)
 			}
 		}
 		drawing.PopClip()
@@ -662,9 +663,9 @@ func (sidebar *sidebarState) paint(context *ui.Context, application *App, drawin
 		if application.loading > 0 {
 			message = "Reading the projects…"
 		}
-		drawing.Text(message, area.X+16, area.Y+24, size, draw2d.Regular, theme.InkQuiet)
+		drawing.Text(message, area.X+16, area.Y+24, size, draw2d.Regular, palette.InkQuiet)
 	}
-	sidebar.list.paintBar(drawing, look.scrollThumb)
+	sidebar.list.paintBar(drawing, look.ScrollThumb)
 	drawing.PopClip()
 	if len(application.kindsWanted) > 0 {
 		context.RequestFrame(0) // the next frame starts reading the classes that came into sight
@@ -675,9 +676,9 @@ func (sidebar *sidebarState) paint(context *ui.Context, application *App, drawin
 // a file's status letter and, in the review mode, the lines it adds and removes; a project's
 // changed files, or how many of them were viewed.
 func (sidebar *sidebarState) paintRight(context *ui.Context, application *App, drawing *draw2d.List, row treeRow, right, baseline, top float32) float32 {
-	theme := context.Theme
+	palette := context.Theme
 	measurer := context.Measurer()
-	small := theme.SmallTextSize
+	small := palette.SmallTextSize
 	text := func(words string, colour draw2d.Color) {
 		width := measurer.MeasureText(words, small, draw2d.Mono, 1).Width
 		right -= width
@@ -689,18 +690,18 @@ func (sidebar *sidebarState) paintRight(context *ui.Context, application *App, d
 		if row.status == git.Unchanged {
 			return right
 		}
-		text(row.status.Letter(), statusColour(theme, row.status))
+		text(row.status.Letter(), statusColour(palette, row.status))
 		if sidebar.mode == reviewMode {
 			project := application.projects[row.project]
 			counts := project.Counts[row.path]
 			if counts.Binary {
-				text("bin", theme.InkQuiet)
+				text("bin", palette.InkQuiet)
 				break
 			}
 			viewed := application.isViewed(fileReference{row.project, row.path})
-			removedInk, addedInk := theme.Danger, theme.Positive
+			removedInk, addedInk := palette.Danger, palette.Positive
 			if viewed {
-				removedInk, addedInk = theme.InkQuiet, theme.InkQuiet
+				removedInk, addedInk = palette.InkQuiet, palette.InkQuiet
 			}
 			if counts.Removed > 0 {
 				text(fmt.Sprintf("−%d", counts.Removed), removedInk)
@@ -712,24 +713,24 @@ func (sidebar *sidebarState) paintRight(context *ui.Context, application *App, d
 	case projectRow:
 		project := application.projects[row.project]
 		if !project.Loaded {
-			text("…", theme.InkQuiet)
+			text("…", palette.InkQuiet)
 			break
 		}
 		if row.changed == 0 {
 			break
 		}
 		if sidebar.mode == filesMode {
-			text(fmt.Sprint(row.changed), theme.Warning)
+			text(fmt.Sprint(row.changed), palette.Warning)
 			break
 		}
 		viewed, total := application.reviewed.Progress(project)
-		colour := theme.InkQuiet
+		colour := palette.InkQuiet
 		if viewed == total {
-			colour = theme.Positive
+			colour = palette.Positive
 		}
 		text(fmt.Sprintf("%d/%d", viewed, total), colour)
 		bar := draw2d.Rectangle{X: right - 28, Y: top + sidebarRowHeight/2 - 1.5, Width: 28, Height: 3}
-		drawing.Rectangle(bar, 1.5, application.look.hover.Mix(theme.Ink, 0.12), draw2d.Color{}, 0)
+		drawing.Rectangle(bar, 1.5, application.look.Hover.Mix(palette.Ink, 0.12), draw2d.Color{}, 0)
 		if total > 0 && viewed > 0 {
 			done := bar
 			done.Width = bar.Width * float32(viewed) / float32(total)
@@ -739,7 +740,7 @@ func (sidebar *sidebarState) paintRight(context *ui.Context, application *App, d
 	case folderRow:
 		if row.changed > 0 && sidebar.mode == filesMode {
 			dot := draw2d.Rectangle{X: right - 6, Y: top + sidebarRowHeight/2 - 3, Width: 6, Height: 6}
-			drawing.Rectangle(dot, 3, theme.Warning.WithAlpha(0.8), draw2d.Color{}, 0)
+			drawing.Rectangle(dot, 3, palette.Warning.WithAlpha(0.8), draw2d.Color{}, 0)
 			right -= 14
 		}
 	}
@@ -747,14 +748,14 @@ func (sidebar *sidebarState) paintRight(context *ui.Context, application *App, d
 }
 
 // statusColour is a status's colour: green for new, amber for changed, red for deleted.
-func statusColour(theme ui.Theme, status git.Status) draw2d.Color {
+func statusColour(palette ui.Theme, status git.Status) draw2d.Color {
 	switch status {
 	case git.Added:
-		return theme.Positive
+		return palette.Positive
 	case git.Deleted:
-		return theme.Danger
+		return palette.Danger
 	case git.Unchanged:
-		return theme.Ink
+		return palette.Ink
 	}
-	return theme.Warning
+	return palette.Warning
 }

@@ -7,6 +7,7 @@ import (
 
 	"github.com/akrck02/code-review/internal/git"
 	"github.com/akrck02/code-review/internal/highlight"
+	"github.com/akrck02/code-review/internal/theme"
 	"github.com/akrck02/code-review/internal/workspace"
 	"github.com/akrck02/go-renderer/draw2d"
 	ui "github.com/akrck02/go-ui"
@@ -296,7 +297,7 @@ func (editor *editorState) openFold(index int) {
 // build adds the editor: a header naming the file, and its text.
 func (editor *editorState) build(context *ui.Context, application *App) {
 	look := application.look
-	context.Frame(ui.Layout{Direction: ui.Vertical, Width: ui.Grow(), Height: ui.Grow()}, ui.Look{Fill: look.editor}, func() {
+	context.Frame(ui.Layout{Direction: ui.Vertical, Width: ui.Grow(), Height: ui.Grow()}, ui.Look{Fill: look.Editor}, func() {
 		if !editor.showing {
 			if application.sidebar.mode == reviewMode && len(application.changedOrder) > 0 {
 				application.buildOverview(context)
@@ -306,7 +307,7 @@ func (editor *editorState) build(context *ui.Context, application *App) {
 			return
 		}
 		editor.buildHeader(context, application)
-		context.Frame(ui.Layout{Width: ui.Grow(), Height: ui.Fixed(1)}, ui.Look{Fill: look.hover}, nil)
+		context.Frame(ui.Layout{Width: ui.Grow(), Height: ui.Fixed(1)}, ui.Look{Fill: look.Hover}, nil)
 		editor.measure(context)
 		editor.list.rowHeight = editor.rowHeight
 		editor.list.count = editor.rowCount()
@@ -329,11 +330,11 @@ func (editor *editorState) build(context *ui.Context, application *App) {
 }
 
 func (editor *editorState) buildEmpty(context *ui.Context, application *App) {
-	theme := context.Theme
+	palette := context.Theme
 	context.Box(ui.Layout{Direction: ui.Vertical, Width: ui.Grow(), Height: ui.Grow(), AlignX: ui.Center, AlignY: ui.Center, Gap: 14}, func() {
-		context.IconSized("files", 40, theme.InkQuiet.WithAlpha(0.5))
+		context.IconSized("files", 40, palette.InkQuiet.WithAlpha(0.5))
 		if len(application.projects) == 0 {
-			context.Text("Open a repository, or a folder of repositories", ui.TextStyle{Color: theme.InkSoft})
+			context.Text("Open a repository, or a folder of repositories", ui.TextStyle{Color: palette.InkSoft})
 			if context.PrimaryIconButton("folder-open", "Open folder") {
 				application.pickerOpen = true
 			}
@@ -344,9 +345,9 @@ func (editor *editorState) buildEmpty(context *ui.Context, application *App) {
 				{"Find a file", "⌘P"}, {"Next changed file", "n"}, {"Review the changes", "2"}, {"Every key", "?"},
 			} {
 				context.Box(ui.Layout{Width: ui.Fixed(260), Gap: 12}, func() {
-					context.Text(hint[0], ui.TextStyle{Color: theme.InkQuiet})
+					context.Text(hint[0], ui.TextStyle{Color: palette.InkQuiet})
 					context.Spacer()
-					context.Text(hint[1], ui.TextStyle{Color: theme.InkSoft, Weight: draw2d.Mono})
+					context.Text(hint[1], ui.TextStyle{Color: palette.InkSoft, Weight: draw2d.Mono})
 				})
 			}
 		})
@@ -356,21 +357,21 @@ func (editor *editorState) buildEmpty(context *ui.Context, application *App) {
 // buildHeader names the file as a path to it, the folders quiet and the name plain, and says how it
 // changed; on its right, the ways to show it.
 func (editor *editorState) buildHeader(context *ui.Context, application *App) {
-	theme := context.Theme
+	palette := context.Theme
 	context.Box(ui.Layout{Width: ui.Grow(), Height: ui.Fixed(40), Padding: ui.PadXY(16, 0), Gap: 6, AlignY: ui.Center}, func() {
 		document := editor.document
 		folder, name := splitPath(editor.reference.path)
-		quiet := ui.TextStyle{Color: theme.InkQuiet}
+		quiet := ui.TextStyle{Color: palette.InkQuiet}
 		// a narrow editor keeps the file's name and its buttons, and drops the project, the
 		// status's word and the language; the folder takes what is left, cut from its start
 		compact := editor.list.area.Width > 0 && editor.list.area.Width < 700
-		room := editor.list.area.Width - 32 - textWidth(context, name, ui.TextStyle{Weight: draw2d.Medium}) - 40
+		room := editor.list.area.Width - 32 - theme.TextWidth(context, name, ui.TextStyle{Weight: draw2d.Medium}) - 40
 		if !compact {
-			room -= textWidth(context, editor.project.Name, quiet) + 20
+			room -= theme.TextWidth(context, editor.project.Name, quiet) + 20
 		}
 		if document != nil {
 			if !compact {
-				room -= textWidth(context, document.Language, ui.TextStyle{Size: theme.SmallTextSize}) + 12
+				room -= theme.TextWidth(context, document.Language, ui.TextStyle{Size: palette.SmallTextSize}) + 12
 			}
 			if document.Changed {
 				room -= 230 // the counts, the fold, view and viewed buttons
@@ -381,15 +382,15 @@ func (editor *editorState) buildHeader(context *ui.Context, application *App) {
 		}
 		if !compact {
 			context.Text(editor.project.Name, quiet)
-			context.IconSized("chevron-right", 12, theme.InkQuiet.WithAlpha(0.6))
+			context.IconSized("chevron-right", 12, palette.InkQuiet.WithAlpha(0.6))
 		}
-		if folder = fitTextEnd(context, folder, quiet, room); len([]rune(folder)) > 3 {
+		if folder = theme.FitTextEnd(context, folder, quiet, room); len([]rune(folder)) > 3 {
 			context.Text(folder, quiet)
-			context.IconSized("chevron-right", 12, theme.InkQuiet.WithAlpha(0.6))
+			context.IconSized("chevron-right", 12, palette.InkQuiet.WithAlpha(0.6))
 		}
-		nameInk := theme.Ink
+		nameInk := palette.Ink
 		if document != nil && document.Changed {
-			nameInk = statusColour(theme, document.Change.Status)
+			nameInk = statusColour(palette, document.Change.Status)
 		}
 		context.Text(name, ui.TextStyle{Weight: draw2d.Medium, Color: nameInk})
 		if document == nil {
@@ -400,21 +401,21 @@ func (editor *editorState) buildHeader(context *ui.Context, application *App) {
 			change := document.Change
 			context.Box(ui.Layout{Width: ui.Fixed(4)}, nil)
 			if !compact {
-				context.Text(statusName(change.Status), ui.TextStyle{Size: theme.SmallTextSize, Color: statusColour(theme, change.Status)})
+				context.Text(statusName(change.Status), ui.TextStyle{Size: palette.SmallTextSize, Color: statusColour(palette, change.Status)})
 			}
 			if change.OldPath != change.Path && !compact {
-				context.Text("from "+change.OldPath, ui.TextStyle{Size: theme.SmallTextSize, Color: theme.InkQuiet})
+				context.Text("from "+change.OldPath, ui.TextStyle{Size: palette.SmallTextSize, Color: palette.InkQuiet})
 			}
 			if editor.added > 0 {
-				context.Text(fmt.Sprintf("+%d", editor.added), ui.TextStyle{Color: theme.Positive, Weight: draw2d.Mono, Size: theme.SmallTextSize})
+				context.Text(fmt.Sprintf("+%d", editor.added), ui.TextStyle{Color: palette.Positive, Weight: draw2d.Mono, Size: palette.SmallTextSize})
 			}
 			if editor.gone > 0 {
-				context.Text(fmt.Sprintf("−%d", editor.gone), ui.TextStyle{Color: theme.Danger, Weight: draw2d.Mono, Size: theme.SmallTextSize})
+				context.Text(fmt.Sprintf("−%d", editor.gone), ui.TextStyle{Color: palette.Danger, Weight: draw2d.Mono, Size: palette.SmallTextSize})
 			}
 		}
 		context.Spacer()
 		if !compact {
-			context.Text(document.Language, ui.TextStyle{Size: theme.SmallTextSize, Color: theme.InkQuiet})
+			context.Text(document.Language, ui.TextStyle{Size: palette.SmallTextSize, Color: palette.InkQuiet})
 		}
 		if !document.Changed {
 			return
@@ -425,13 +426,13 @@ func (editor *editorState) buildHeader(context *ui.Context, application *App) {
 			if editor.fullContext {
 				icon, tip = "fold-vertical", "Fold the unchanged lines (f)"
 			}
-			if toolButton(context, tip, icon, false) {
+			if theme.ToolButton(context, tip, icon, false) {
 				editor.toggleContext()
 			}
 		}
 		mode := int(editor.mode)
-		if iconSwitch(context, "view mode", &mode, []iconChoice{
-			{"file-diff", "The changes (d)"}, {"file-code", "The whole file (d)"},
+		if theme.IconSwitch(context, "view mode", &mode, []theme.IconChoice{
+			{Icon: "file-diff", Name: "The changes (d)"}, {Icon: "file-code", Name: "The whole file (d)"},
 		}) {
 			editor.setMode(viewMode(mode))
 		}
@@ -440,7 +441,7 @@ func (editor *editorState) buildHeader(context *ui.Context, application *App) {
 		if viewed {
 			icon = "circle-check"
 		}
-		if toolButton(context, "Viewed (v)", icon, viewed) {
+		if theme.ToolButton(context, "Viewed (v)", icon, viewed) {
 			application.toggleViewed(editor.reference, true)
 		}
 	})
@@ -484,7 +485,7 @@ const gutterMarkWidth float32 = 3
 // file view as marks beside the numbers, in the diff on washes of green and red, stronger behind
 // the words that changed.
 func (editor *editorState) paint(context *ui.Context, application *App, drawing *draw2d.List) {
-	theme := context.Theme
+	palette := context.Theme
 	look := application.look
 	area := editor.list.area
 	document := editor.document
@@ -496,7 +497,7 @@ func (editor *editorState) paint(context *ui.Context, application *App, drawing 
 		if !document.Binary {
 			message = document.Error
 		}
-		drawing.Text(message, area.X+24, area.Y+32, theme.TextSize, draw2d.Regular, theme.InkQuiet)
+		drawing.Text(message, area.X+24, area.Y+32, palette.TextSize, draw2d.Regular, palette.InkQuiet)
 		return
 	}
 	diff := editor.mode == diffView && document.Changed
@@ -517,11 +518,11 @@ func (editor *editorState) paint(context *ui.Context, application *App, drawing 
 		if !diff {
 			number := index + 1
 			if number == editor.markedLine {
-				drawing.Rectangle(draw2d.Rectangle{X: area.X, Y: top, Width: area.Width, Height: editor.rowHeight}, 0, look.hover, draw2d.Color{}, 0)
+				drawing.Rectangle(draw2d.Rectangle{X: area.X, Y: top, Width: area.Width, Height: editor.rowHeight}, 0, look.Hover, draw2d.Color{}, 0)
 			}
-			numberInk := look.lineNumber
+			numberInk := look.LineNumber
 			if number == editor.markedLine {
-				numberInk = look.activeLineNumber
+				numberInk = look.ActiveLineNumber
 			}
 			editor.paintNumber(drawing, number, area.X, numberWidth, baseline, numberInk)
 			editor.paintMark(drawing, look, editor.marks[number], area.X+numberWidth+4, top)
@@ -531,24 +532,24 @@ func (editor *editorState) paint(context *ui.Context, application *App, drawing 
 		row := editor.rows[index]
 		rowArea := draw2d.Rectangle{X: area.X, Y: top, Width: area.Width, Height: editor.rowHeight}
 		if row.IsFold() {
-			drawing.Rectangle(rowArea, 0, look.hover.WithAlpha(0.6), draw2d.Color{}, 0)
-			drawing.Icon("unfold-vertical", area.X+gutter-20, top+(editor.rowHeight-12)/2, 12, theme.InkQuiet)
+			drawing.Rectangle(rowArea, 0, look.Hover.WithAlpha(0.6), draw2d.Color{}, 0)
+			drawing.Icon("unfold-vertical", area.X+gutter-20, top+(editor.rowHeight-12)/2, 12, palette.InkQuiet)
 			label := fmt.Sprintf("%d unchanged lines", row.Folded)
-			drawing.Text(label, codeLeft, baseline, theme.SmallTextSize, draw2d.Regular, theme.InkQuiet)
+			drawing.Text(label, codeLeft, baseline, palette.SmallTextSize, draw2d.Regular, palette.InkQuiet)
 			continue
 		}
 		line := row.Line
 		var code highlight.Line
-		sign, signColour := "", theme.InkQuiet
+		sign, signColour := "", palette.InkQuiet
 		var lineWash, wordWash, edge draw2d.Color
 		switch line.Kind {
 		case git.Insertion:
-			lineWash, wordWash, edge = look.createdLine, look.createdWord, look.created
-			sign, signColour = "+", look.created
+			lineWash, wordWash, edge = look.CreatedLine, look.CreatedWord, look.Created
+			sign, signColour = "+", look.Created
 			code = lineAt(document.NewLines, line.NewNumber)
 		case git.Removal:
-			lineWash, wordWash, edge = look.deletedLine, look.deletedWord, look.deleted
-			sign, signColour = "−", look.deleted
+			lineWash, wordWash, edge = look.DeletedLine, look.DeletedWord, look.Deleted
+			sign, signColour = "−", look.Deleted
 			code = lineAt(document.OldLines, line.OldNumber)
 		default:
 			code = lineAt(document.NewLines, line.NewNumber)
@@ -564,10 +565,10 @@ func (editor *editorState) paint(context *ui.Context, application *App, drawing 
 				drawing.PopClip()
 			}
 		}
-		numberInk := look.lineNumber
+		numberInk := look.LineNumber
 		if line.Kind != git.Removal && line.NewNumber == editor.markedLine && editor.markedLine > 0 {
-			drawing.Rectangle(rowArea, 0, look.hover.WithAlpha(0.8), draw2d.Color{}, 0)
-			numberInk = look.activeLineNumber
+			drawing.Rectangle(rowArea, 0, look.Hover.WithAlpha(0.8), draw2d.Color{}, 0)
+			numberInk = look.ActiveLineNumber
 		}
 		if line.Kind != git.Context {
 			numberInk = signColour.WithAlpha(0.75)
@@ -579,28 +580,28 @@ func (editor *editorState) paint(context *ui.Context, application *App, drawing 
 		}
 		editor.paintCode(drawing, application, code, codeArea, baseline)
 	}
-	editor.list.paintBar(drawing, look.scrollThumb)
+	editor.list.paintBar(drawing, look.ScrollThumb)
 	editor.paintChangeMarks(drawing, look)
 	drawing.PopClip()
 }
 
 // paintMark paints a line's mark in the file view's gutter: a bar for a line added (green) or
 // changed (amber), a small wedge where lines were removed (red).
-func (editor *editorState) paintMark(drawing *draw2d.List, look look, mark workspace.Mark, x, top float32) {
+func (editor *editorState) paintMark(drawing *draw2d.List, look theme.Look, mark workspace.Mark, x, top float32) {
 	switch mark {
 	case workspace.AddedMark:
-		drawing.Rectangle(draw2d.Rectangle{X: x, Y: top, Width: gutterMarkWidth, Height: editor.rowHeight}, 0, look.created, draw2d.Color{}, 0)
+		drawing.Rectangle(draw2d.Rectangle{X: x, Y: top, Width: gutterMarkWidth, Height: editor.rowHeight}, 0, look.Created, draw2d.Color{}, 0)
 	case workspace.ModifiedMark:
-		drawing.Rectangle(draw2d.Rectangle{X: x, Y: top, Width: gutterMarkWidth, Height: editor.rowHeight}, 0, look.modified, draw2d.Color{}, 0)
+		drawing.Rectangle(draw2d.Rectangle{X: x, Y: top, Width: gutterMarkWidth, Height: editor.rowHeight}, 0, look.Modified, draw2d.Color{}, 0)
 	case workspace.RemovedAbove:
-		drawing.Rectangle(draw2d.Rectangle{X: x - 1, Y: top - 2, Width: 8, Height: 4}, 2, look.deleted, draw2d.Color{}, 0)
+		drawing.Rectangle(draw2d.Rectangle{X: x - 1, Y: top - 2, Width: 8, Height: 4}, 2, look.Deleted, draw2d.Color{}, 0)
 	case workspace.RemovedBelow:
-		drawing.Rectangle(draw2d.Rectangle{X: x - 1, Y: top + editor.rowHeight - 2, Width: 8, Height: 4}, 2, look.deleted, draw2d.Color{}, 0)
+		drawing.Rectangle(draw2d.Rectangle{X: x - 1, Y: top + editor.rowHeight - 2, Width: 8, Height: 4}, 2, look.Deleted, draw2d.Color{}, 0)
 	}
 }
 
 // paintChangeMarks marks where the changes are along the scroll bar, as a map of the file.
-func (editor *editorState) paintChangeMarks(drawing *draw2d.List, look look) {
+func (editor *editorState) paintChangeMarks(drawing *draw2d.List, look theme.Look) {
 	bar := editor.list.barArea()
 	mark := func(index, count int, colour draw2d.Color) {
 		y := bar.Y + float32(index)/float32(count)*bar.Height
@@ -611,9 +612,9 @@ func (editor *editorState) paintChangeMarks(drawing *draw2d.List, look look) {
 			switch {
 			case row.IsFold() || row.Line.Kind == git.Context:
 			case row.Line.Kind == git.Removal:
-				mark(index, len(editor.rows), look.deleted)
+				mark(index, len(editor.rows), look.Deleted)
 			default:
-				mark(index, len(editor.rows), look.created)
+				mark(index, len(editor.rows), look.Created)
 			}
 		}
 		return
@@ -622,11 +623,11 @@ func (editor *editorState) paintChangeMarks(drawing *draw2d.List, look look) {
 	for number, kind := range editor.marks {
 		switch kind {
 		case workspace.AddedMark:
-			mark(number-1, count, look.created)
+			mark(number-1, count, look.Created)
 		case workspace.ModifiedMark:
-			mark(number-1, count, look.modified)
+			mark(number-1, count, look.Modified)
 		default:
-			mark(number-1, count, look.deleted)
+			mark(number-1, count, look.Deleted)
 		}
 	}
 }
@@ -660,7 +661,7 @@ func (editor *editorState) paintCode(drawing *draw2d.List, application *App, lin
 		if x+float32(len(span.Text))*editor.charWidth < area.X || isBlank(span.Text) {
 			continue
 		}
-		drawing.Text(span.Text, x, baseline, editor.codeSize, draw2d.Mono, application.look.syntax.Colour(span.Kind))
+		drawing.Text(span.Text, x, baseline, editor.codeSize, draw2d.Mono, application.look.Syntax.Colour(span.Kind))
 	}
 	drawing.PopClip()
 }

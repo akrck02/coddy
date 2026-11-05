@@ -4,6 +4,7 @@ import (
 	"github.com/akrck02/code-review/internal/git"
 	"github.com/akrck02/code-review/internal/highlight"
 	"github.com/akrck02/code-review/internal/java"
+	"github.com/akrck02/code-review/internal/theme"
 	"github.com/akrck02/code-review/internal/workspace"
 	"github.com/akrck02/go-renderer/draw2d"
 )
@@ -78,8 +79,8 @@ var classRoles = map[java.ClassKind]highlight.Role{
 }
 
 // paintClassBadge draws a class's kind as IntelliJ does: its letter in a round badge.
-func paintClassBadge(drawing *draw2d.List, look look, kind java.ClassKind, x, y, size float32, quiet bool) {
-	colour := look.syntax.RoleColour(classRoles[kind])
+func paintClassBadge(drawing *draw2d.List, look theme.Look, kind java.ClassKind, x, y, size float32, quiet bool) {
+	colour := look.Syntax.RoleColour(classRoles[kind])
 	if quiet {
 		colour = colour.WithAlpha(0.5)
 	}
@@ -91,20 +92,20 @@ func paintClassBadge(drawing *draw2d.List, look look, kind java.ClassKind, x, y,
 
 // folderIcon is a folder's icon and its tint: by its role in a Java project, as IntelliJ marks
 // source roots blue, test roots green and resources apart.
-func folderIcon(row treeRow, look look) (string, draw2d.Color) {
-	quiet := look.theme.InkQuiet
+func folderIcon(row treeRow, look theme.Look) (string, draw2d.Color) {
+	quiet := look.Theme.InkQuiet
 	open := row.expanded
 	switch row.role {
 	case workspace.ModuleFolder:
-		return "package", look.syntax.RoleColour(highlight.Function)
+		return "package", look.Syntax.RoleColour(highlight.Function)
 	case workspace.SourceRoot:
-		return "folder-code", look.syntax.RoleColour(highlight.Function)
+		return "folder-code", look.Syntax.RoleColour(highlight.Function)
 	case workspace.TestRoot:
-		return "folder-code", look.syntax.RoleColour(highlight.String)
+		return "folder-code", look.Syntax.RoleColour(highlight.String)
 	case workspace.ResourceRoot:
-		return "folder-cog", look.syntax.RoleColour(highlight.Number)
+		return "folder-cog", look.Syntax.RoleColour(highlight.Number)
 	case workspace.TestResourceRoot:
-		return "folder-cog", look.syntax.RoleColour(highlight.String)
+		return "folder-cog", look.Syntax.RoleColour(highlight.String)
 	case workspace.PackageFolder:
 		return "folder-dot", quiet
 	}

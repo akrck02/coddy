@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/akrck02/code-review/internal/theme"
 	"github.com/akrck02/go-renderer/draw2d"
 	ui "github.com/akrck02/go-ui"
 )
@@ -63,7 +64,7 @@ func (application *App) Build(context *ui.Context) {
 
 func (application *App) applyTheme(context *ui.Context) {
 	application.setLook()
-	context.Theme = application.look.theme
+	context.Theme = application.look.Theme
 }
 
 func (application *App) modalOpen() bool {
@@ -118,7 +119,7 @@ func (application *App) copyPath(context *ui.Context) {
 // buildModeRail is the strip on the far left that chooses what the reader is doing: reading the
 // files, or reviewing the changes. Two places, always in sight, one key each.
 func (application *App) buildModeRail(context *ui.Context) {
-	theme := context.Theme
+	palette := context.Theme
 	context.Box(ui.Layout{Direction: ui.Vertical, Width: ui.Fixed(48), Height: ui.Grow(), Padding: ui.PadXY(0, 10), Gap: 6, AlignX: ui.Center}, func() {
 		for _, place := range []struct {
 			mode       sidebarMode
@@ -128,13 +129,13 @@ func (application *App) buildModeRail(context *ui.Context) {
 			{reviewMode, "git-pull-request", "Review (2): only the changed files, as diffs, marked as viewed one by one"},
 		} {
 			chosen := application.sidebar.mode == place.mode
-			ink, normal := theme.InkQuiet, ui.Look{Radius: 8}
+			ink, normal := palette.InkQuiet, ui.Look{Radius: 8}
 			if chosen {
-				ink, normal = theme.Ink, ui.Look{Fill: application.look.chosen, Radius: 8}
+				ink, normal = palette.Ink, ui.Look{Fill: application.look.Chosen, Radius: 8}
 			}
 			hovered := normal
 			if !chosen {
-				hovered.Fill = application.look.hover
+				hovered.Fill = application.look.Hover
 			}
 			layout := ui.Layout{Width: ui.Fixed(36), Height: ui.Fixed(36), AlignX: ui.Center, AlignY: ui.Center}
 			if context.Clickable(place.name, layout, ui.Looks{Normal: normal, Hovered: hovered, Pressed: hovered}, func() {
@@ -145,7 +146,7 @@ func (application *App) buildModeRail(context *ui.Context) {
 			context.Tooltip(place.name)
 		}
 		context.Spacer()
-		if toolButton(context, "Keys (?)", "keyboard", false) {
+		if theme.ToolButton(context, "Keys (?)", "keyboard", false) {
 			application.helpOpen = true
 		}
 	})
@@ -154,47 +155,47 @@ func (application *App) buildModeRail(context *ui.Context) {
 // buildTitleBar is the top of the window: the workspace on the left, a search field in the middle
 // that opens the finder, and the comparison's settings on the right, as icons.
 func (application *App) buildTitleBar(context *ui.Context) {
-	theme := context.Theme
+	palette := context.Theme
 	context.Box(ui.Layout{Width: ui.Grow(), Height: ui.Fixed(44), Padding: ui.PadXY(14, 0), Gap: 8, AlignY: ui.Center}, func() {
 		context.Box(ui.Layout{Width: ui.Grow(), Gap: 8, AlignY: ui.Center}, func() {
 			context.Text(application.title(), ui.TextStyle{Weight: draw2d.Medium})
 			if base := application.settings.Base; base != "" {
-				context.Text("against "+base, ui.TextStyle{Size: theme.SmallTextSize, Color: theme.InkQuiet})
+				context.Text("against "+base, ui.TextStyle{Size: palette.SmallTextSize, Color: palette.InkQuiet})
 			}
 		})
 		// a pill, a shade off the bar with a hairline edge, lit towards the accent under the
 		// pointer; the shortcut sits in a key cap of its own
 		look := application.look
-		normal := ui.Look{Fill: look.hover.WithAlpha(0.7), Radius: 17, Border: look.chosen.WithAlpha(0.6), BorderWidth: 1}
+		normal := ui.Look{Fill: look.Hover.WithAlpha(0.7), Radius: 17, Border: look.Chosen.WithAlpha(0.6), BorderWidth: 1}
 		hovered := normal
-		hovered.Fill, hovered.Border = look.hover, theme.Primary.WithAlpha(0.45)
+		hovered.Fill, hovered.Border = look.Hover, palette.Primary.WithAlpha(0.45)
 		search := ui.Layout{Width: ui.Fixed(400), Height: ui.Fixed(34), Padding: ui.Padding{Left: 14, Right: 6}, Gap: 10, AlignY: ui.Center}
 		if context.Clickable("search files", search, ui.Looks{Normal: normal, Hovered: hovered, Pressed: hovered}, func() {
-			context.IconSized("search", 15, theme.InkSoft)
-			context.Text("Search files", ui.TextStyle{Color: theme.InkQuiet})
+			context.IconSized("search", 15, palette.InkSoft)
+			context.Text("Search files", ui.TextStyle{Color: palette.InkQuiet})
 			context.Spacer()
-			keyCap := ui.Look{Fill: look.chosen.WithAlpha(0.55), Radius: 11}
+			keyCap := ui.Look{Fill: look.Chosen.WithAlpha(0.55), Radius: 11}
 			context.Frame(ui.Layout{Height: ui.Fixed(22), Padding: ui.PadXY(9, 0), AlignY: ui.Center}, keyCap, func() {
-				context.Text("⌘P", ui.TextStyle{Size: theme.SmallTextSize, Color: theme.InkSoft, Weight: draw2d.Medium})
+				context.Text("⌘P", ui.TextStyle{Size: palette.SmallTextSize, Color: palette.InkSoft, Weight: draw2d.Medium})
 			})
 		}) {
 			application.finder.show(namesScope)
 		}
 		context.Box(ui.Layout{Width: ui.Grow(), Gap: 4, AlignY: ui.Center}, func() {
 			context.Spacer()
-			if toolButton(context, "Only the projects with changes (h)", "list-filter", application.onlyChanged) {
+			if theme.ToolButton(context, "Only the projects with changes (h)", "list-filter", application.onlyChanged) {
 				application.setOnlyChanged(!application.onlyChanged)
 			}
-			if toolButton(context, "Count the changes not committed yet (w)", "file-pen-line", application.settings.WorkingTree) {
+			if theme.ToolButton(context, "Count the changes not committed yet (w)", "file-pen-line", application.settings.WorkingTree) {
 				application.settings.WorkingTree = !application.settings.WorkingTree
 				application.clearDocuments()
 				application.reloadAll()
 				application.toast = workingTreeNote(application.settings.WorkingTree)
 			}
-			if toolButton(context, "Compare against another branch, tag or commit (b)", "git-branch", false) {
+			if theme.ToolButton(context, "Compare against another branch, tag or commit (b)", "git-branch", false) {
 				application.openBaseDialog()
 			}
-			if toolButton(context, "Read the projects again (r)", "refresh-cw", false) {
+			if theme.ToolButton(context, "Read the projects again (r)", "refresh-cw", false) {
 				application.reloadAll()
 			}
 			context.MenuButton("ellipsis", "", func() {
@@ -230,19 +231,19 @@ func (application *App) title() string {
 // buildStatusBar says where the development stands: its projects and changed files, how much of
 // it has been viewed, and where the open file's branch stands against its base.
 func (application *App) buildStatusBar(context *ui.Context) {
-	theme := context.Theme
-	small := ui.TextStyle{Size: theme.SmallTextSize, Color: theme.InkSoft}
+	palette := context.Theme
+	small := ui.TextStyle{Size: palette.SmallTextSize, Color: palette.InkSoft}
 	context.Box(ui.Layout{Width: ui.Grow(), Height: ui.Fixed(28), Padding: ui.PadXY(14, 0), Gap: 16, AlignY: ui.Center}, func() {
 		context.Text(fmt.Sprintf("%d projects · %d with changes · %d changed files",
 			len(application.projects), application.projectsWithChanges(), len(application.changedOrder)), small)
 		if viewed, total := application.reviewProgress(); total > 0 {
 			context.Box(ui.Layout{Gap: 6, AlignY: ui.Center}, func() {
-				colour := theme.InkQuiet
+				colour := palette.InkQuiet
 				if viewed == total {
-					colour = theme.Positive
+					colour = palette.Positive
 				}
 				context.Paint(ui.Layout{Width: ui.Fixed(56), Height: ui.Fixed(4)}, func(area draw2d.Rectangle, drawing *draw2d.List) {
-					drawing.Rectangle(area, 2, application.look.hover.Mix(theme.Ink, 0.12), draw2d.Color{}, 0)
+					drawing.Rectangle(area, 2, application.look.Hover.Mix(palette.Ink, 0.12), draw2d.Color{}, 0)
 					if viewed > 0 {
 						done := area
 						done.Width = area.Width * float32(viewed) / float32(total)
@@ -264,12 +265,12 @@ func (application *App) buildStatusBar(context *ui.Context) {
 				}
 			}
 			if project.Base != "" {
-				context.IconSized("git-branch", 12, theme.InkQuiet)
+				context.IconSized("git-branch", 12, palette.InkQuiet)
 				context.Text(fmt.Sprintf("%s ← %s · %d commits", project.Branch, project.Base, project.Ahead), small)
 			}
 		}
 		if !application.settings.WorkingTree {
-			context.Text("commits only", ui.TextStyle{Size: theme.SmallTextSize, Color: theme.Warning})
+			context.Text("commits only", ui.TextStyle{Size: palette.SmallTextSize, Color: palette.Warning})
 		}
 	})
 }

@@ -9,6 +9,7 @@ import (
 	"github.com/akrck02/code-review/internal/git"
 	"github.com/akrck02/code-review/internal/java"
 	"github.com/akrck02/code-review/internal/review"
+	"github.com/akrck02/code-review/internal/theme"
 	"github.com/akrck02/code-review/internal/workspace"
 	"github.com/akrck02/go-ui/uidrive"
 )
@@ -71,8 +72,8 @@ type App struct {
 	onlyChanged bool
 	// reviewed keeps the changed files marked as viewed
 	reviewed *review.Reviewed
-	look     look
-	designs  designs
+	look     theme.Look
+	designs  theme.Designs
 	// classKinds are what the Java and Kotlin files declare, read as they come into sight;
 	// kindsWanted are those asked for since the last frame
 	classKinds  map[fileReference]java.ClassKind
@@ -100,7 +101,7 @@ func New(settings Settings) *App {
 		dark:          settings.Dark,
 		onlyChanged:   settings.OnlyChanged,
 		focus:         sidebarPane,
-		designs:       newDesigns(),
+		designs:       theme.NewDesigns(),
 		reviewed:      review.OpenReviewed(settings.ReviewedPath),
 		classKinds:    map[fileReference]java.ClassKind{},
 	}
@@ -130,9 +131,9 @@ func (application *App) Folders() []string { return application.folders }
 // setLook picks the light or the dark look.
 func (application *App) setLook() {
 	if application.dark {
-		application.look = application.designs.dark
+		application.look = application.designs.Dark
 	} else {
-		application.look = application.designs.light
+		application.look = application.designs.Light
 	}
 }
 

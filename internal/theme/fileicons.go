@@ -1,4 +1,4 @@
-package app
+package theme
 
 import (
 	"path"
@@ -51,13 +51,13 @@ var namedKinds = map[string]fileKind{
 	"pom.xml": {"package", highlight.Property}, ".editorconfig": {"file-cog", highlight.Comment},
 }
 
-// fileIcon is the icon a file is drawn with, and its tint.
-func fileIcon(name string, look look) (string, draw2d.Color) {
+// FileIcon is the icon a file is drawn with, and its tint.
+func FileIcon(name string, look Look) (string, draw2d.Color) {
 	kind, found := kindOf(name)
 	if !found {
-		return "file", look.theme.InkQuiet
+		return "file", look.Theme.InkQuiet
 	}
-	return kind.icon, look.syntax.RoleColour(kind.role).WithAlpha(0.85)
+	return kind.icon, look.Syntax.RoleColour(kind.role).WithAlpha(0.85)
 }
 
 func kindOf(name string) (fileKind, bool) {
