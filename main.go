@@ -56,6 +56,7 @@ func main() {
 	})
 	options.Driver = reader.Driver()
 	options.Hidden = func() {
+		reader.Closed()
 		_ = window.KeepPreference(foldersPreference, strings.Join(reader.Folders(), "\n"))
 	}
 	if err := window.Run(options, func(context *ui.Context) { reader.Build(context) }); err != nil {

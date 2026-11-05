@@ -26,6 +26,7 @@ func (application *App) Build(context *ui.Context) {
 		application.themeSet = true
 	}
 	application.keys = keys{state: application.tap.state}
+	windowOpen.Store(true)
 	application.takeResults()
 	application.handleKeys(context)
 

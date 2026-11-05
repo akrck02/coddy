@@ -5,6 +5,7 @@ package app
 import (
 	"sort"
 	"strings"
+	"sync/atomic"
 
 	"github.com/akrck02/code-review/internal/git"
 	"github.com/akrck02/code-review/internal/highlight"
@@ -114,9 +115,28 @@ func (application *App) later(work func() func()) {
 	go func() {
 		apply := work()
 		application.results <- apply
-		window.Wake()
+		application.wake()
 	}()
 }
+
+// windowOpen is set once the window has drawn its first frame and cleared when it closes: the
+// window can only be woken in between. Work that finishes before the first frame needs no waking,
+// as that frame takes its result.
+var windowOpen atomic.Bool
+
+// wake asks the window for a frame, when there is a window to ask.
+func (application *App) wake() {
+	if !windowOpen.Load() {
+		return
+	}
+	defer func() {
+		_ = recover() // the window closed between the check and the call: there is nothing to wake
+	}()
+	window.Wake()
+}
+
+// Closed tells the reader its window has closed, so work still running does not wake it.
+func (application *App) Closed() { windowOpen.Store(false) }
 
 // takeResults applies what finished since the last frame.
 func (application *App) takeResults() {
