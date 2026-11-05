@@ -1,6 +1,6 @@
 # 1. Split the reader into packages, one per mode
 
-> Status: proposed · Author's approval: proposal ☐ plan ☐
+> Status: proposed · Author's approval: proposal ☑ plan ☐
 
 ## Why
 
