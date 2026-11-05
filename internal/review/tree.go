@@ -11,8 +11,9 @@ type Folder struct {
 	Name    string // its name, or the chain's names joined by "/"
 	Path    string // from the project's top, without a trailing "/"
 	Folders []*Folder
-	Files   []string // the paths of the files directly inside it
-	Changed int      // how many changed files are inside it, at any depth
+	Files   []string   // the paths of the files directly inside it
+	Changed int        // how many changed files are inside it, at any depth
+	Role    FolderRole // what it is to a build tool, in a Java project's tree
 }
 
 // BuildTree makes a tree of folders from file paths. isChanged tells which files to count as

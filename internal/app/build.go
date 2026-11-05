@@ -28,6 +28,7 @@ func (application *App) Build(context *ui.Context) {
 	application.keys = keys{state: application.tap.state}
 	windowOpen.Store(true)
 	application.takeResults()
+	application.readClassKinds()
 	application.handleKeys(context)
 
 	context.Frame(ui.Layout{Direction: ui.Vertical, Width: ui.Grow(), Height: ui.Grow()}, ui.Look{Fill: context.Theme.Background}, func() {

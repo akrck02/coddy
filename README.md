@@ -55,6 +55,11 @@ It has two modes, chosen on the rail at the far left (or with `1`, `2`, `c`):
 - **Every other file stays readable**: the *Files* mode lists them all, and the finder finds them.
 - **Enter a project** to see only its tree, from its top (Enter on its row, `e`, or the → that
   shows on its row under the pointer); `Esc` goes back to every project.
+- **Java and Kotlin projects shown as IntelliJ shows them**: Gradle and Maven modules marked,
+  source roots blue (`src/main/java`, `kotlin`…), test roots green, resources apart, the packages
+  inside a root joined with dots (`app.coast.platform.dal`), and classes named without their
+  extension with a badge for their kind (C class, I interface, E enum, @ annotation, R record, O
+  Kotlin object), read from the files as they come into sight.
 - **Icons by file type** in the tree and the finder, tinted with the code's own colours.
 - **Syntax colouring** for Java, Kotlin, Vue, SQL, Gradle, Groovy, XML, YAML, Markdown and the
   rest of chroma's languages; text that is not UTF-8 is read as Latin-1.

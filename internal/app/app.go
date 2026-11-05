@@ -72,10 +72,14 @@ type App struct {
 	reviewed *review.Reviewed
 	look     look
 	designs  designs
-	tap      *inputTap
-	keys     keys
-	toast    string
-	themeSet bool
+	// classKinds are what the Java and Kotlin files declare, read as they come into sight;
+	// kindsWanted are those asked for since the last frame
+	classKinds  map[fileReference]review.ClassKind
+	kindsWanted []fileReference
+	tap         *inputTap
+	keys        keys
+	toast       string
+	themeSet    bool
 }
 
 // fileReference names a file of a project.
@@ -97,6 +101,7 @@ func New(settings Settings) *App {
 		focus:         sidebarPane,
 		designs:       newDesigns(),
 		reviewed:      review.OpenReviewed(settings.ReviewedPath),
+		classKinds:    map[fileReference]review.ClassKind{},
 	}
 	application.sidebar = newSidebar()
 	if settings.Review {
@@ -233,6 +238,7 @@ func (application *App) reload(index int) {
 		<-readers
 		return func() {
 			application.loading--
+			application.forgetClassKinds(path)
 			for position, current := range application.projects {
 				if current.Path == path {
 					application.projects[position] = loaded

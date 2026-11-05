@@ -39,6 +39,7 @@ type treeRow struct {
 	status   git.Status
 	changed  int // changed files inside a project or a folder
 	quiet    bool
+	role     review.FolderRole
 }
 
 type sidebarState struct {
@@ -96,12 +97,16 @@ func (sidebar *sidebarState) tree(application *App, project int) *review.Folder 
 	}
 	model := application.projects[project]
 	isChanged := func(path string) bool { _, changed := model.ChangeOf(path); return changed }
-	var tree *review.Folder
+	paths := model.Files
 	if sidebar.listsChangesOnly() {
-		tree = review.BuildTree(changedPaths(model), isChanged)
-	} else {
-		tree = review.BuildTree(model.Files, isChanged)
+		paths = changedPaths(model)
 	}
+	// a Gradle or Maven project is shown as IntelliJ shows it: modules, source roots, packages
+	build := review.BuildTree
+	if review.IsJavaProject(model.Files) {
+		build = review.BuildJavaTree
+	}
+	tree := build(paths, isChanged)
 	sidebar.trees[key] = tree
 	return tree
 }
@@ -201,7 +206,7 @@ func (sidebar *sidebarState) addFolder(application *App, project int, folder *re
 		expanded := sidebar.isExpanded(application, project, child.Path, false)
 		sidebar.rows = append(sidebar.rows, treeRow{
 			kind: folderRow, project: project, path: child.Path, label: child.Name, depth: depth,
-			expanded: expanded, changed: child.Changed,
+			expanded: expanded, changed: child.Changed, role: child.Role,
 		})
 		if expanded {
 			sidebar.addFolder(application, project, child, depth+1)
@@ -575,6 +580,7 @@ func (sidebar *sidebarState) paint(context *ui.Context, application *App, drawin
 			ink = theme.InkQuiet
 		}
 		weight := draw2d.Regular
+		label := row.label
 		switch row.kind {
 		case projectRow, folderRow:
 			chevron := "chevron-right"
@@ -583,13 +589,14 @@ func (sidebar *sidebarState) paint(context *ui.Context, application *App, drawin
 			}
 			drawing.Icon(chevron, x, iconTop, treeIconSize, theme.InkQuiet)
 			x += treeIconSize + 4
-			icon := "folder"
+			icon, iconInk := folderIcon(row, look)
 			if row.kind == projectRow {
-				icon, weight = "git-branch", draw2d.Medium
-			} else if row.expanded {
-				icon = "folder-open"
+				icon, iconInk, weight = "git-branch", theme.InkQuiet, draw2d.Medium
 			}
-			drawing.Icon(icon, x, iconTop, treeIconSize, theme.InkQuiet)
+			if row.role == review.ModuleFolder {
+				weight = draw2d.Medium
+			}
+			drawing.Icon(icon, x, iconTop, treeIconSize, iconInk)
 			x += treeIconSize + 7
 		case fileRow:
 			// in the review mode the room a folder gives its chevron holds the viewed mark
@@ -601,11 +608,18 @@ func (sidebar *sidebarState) paint(context *ui.Context, application *App, drawin
 				drawing.Icon(check, x, iconTop, treeIconSize, checkInk)
 			}
 			x += treeIconSize + 4
-			icon, iconInk := fileIcon(row.label, look)
-			if ink == theme.InkQuiet {
-				iconInk = iconInk.WithAlpha(0.5)
+			// a Java or Kotlin class is named without its extension and drawn by its kind, as
+			// IntelliJ draws it, once the file has been read
+			if kind := application.classKind(reference); kind != review.UnknownKind && kind != review.NoClass {
+				paintClassBadge(drawing, look, kind, x, iconTop, treeIconSize, ink == theme.InkQuiet)
+				label = strings.TrimSuffix(strings.TrimSuffix(row.label, ".java"), ".kt")
+			} else {
+				icon, iconInk := fileIcon(row.label, look)
+				if ink == theme.InkQuiet {
+					iconInk = iconInk.WithAlpha(0.5)
+				}
+				drawing.Icon(icon, x, iconTop, treeIconSize, iconInk)
 			}
-			drawing.Icon(icon, x, iconTop, treeIconSize, iconInk)
 			x += treeIconSize + 7
 			// in the files mode the name says how the file changed, as Zed's project panel does;
 			// in the review mode every file changed, and the colour is kept for its counts
@@ -626,7 +640,7 @@ func (sidebar *sidebarState) paint(context *ui.Context, application *App, drawin
 		}
 		right = sidebar.paintRight(context, application, drawing, row, right, baseline, top)
 		drawing.PushClip(draw2d.Rectangle{X: area.X, Y: top, Width: max(right-area.X-8, 0), Height: sidebarRowHeight})
-		drawing.Text(row.label, x, baseline, size, weight, ink)
+		drawing.Text(label, x, baseline, size, weight, ink)
 		if row.kind == projectRow {
 			labelWidth := measurer.MeasureText(row.label, size, weight, 1).Width
 			project := application.projects[row.project]
@@ -645,6 +659,9 @@ func (sidebar *sidebarState) paint(context *ui.Context, application *App, drawin
 	}
 	sidebar.list.paintBar(drawing, look.scrollThumb)
 	drawing.PopClip()
+	if len(application.kindsWanted) > 0 {
+		context.RequestFrame(0) // the next frame starts reading the classes that came into sight
+	}
 }
 
 // paintRight paints what a row shows on its right, from right to left, and returns where it ends:
