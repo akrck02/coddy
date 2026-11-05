@@ -562,7 +562,8 @@ func (sidebar *sidebarState) paint(context *ui.Context, application *App, drawin
 		case index == sidebar.selected && application.focus == sidebarPane:
 			drawing.Rectangle(rowArea, 5, look.chosen, look.focusEdge, 1)
 		case index == sidebar.selected, isOpen:
-			drawing.Rectangle(rowArea, 5, look.chosen.WithAlpha(0.7), draw2d.Color{}, 0)
+			// the selection of a pane without the keyboard, quieter than the one with it
+			drawing.Rectangle(rowArea, 5, look.hover.Mix(look.chosen, 0.5), draw2d.Color{}, 0)
 		case index == hovered:
 			drawing.Rectangle(rowArea, 5, look.hover, draw2d.Color{}, 0)
 		}

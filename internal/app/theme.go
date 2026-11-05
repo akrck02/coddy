@@ -97,11 +97,31 @@ func oneLight() look {
 		highlight.Escape: hex("#7c7e86"), highlight.Function: hex("#5b79e3"), highlight.TypeName: hex("#3882b7"),
 		highlight.Comment: hex("#a2a3a7"), highlight.DocComment: hex("#7c7e86"), highlight.Number: hex("#ad6e25"),
 		highlight.Constant: hex("#c18401"), highlight.Boolean: hex("#ad6e25"), highlight.Attribute: hex("#5c78e2"),
-		highlight.Property: hex("#d3604f"), highlight.Variable: hex("#242529"), highlight.Punctuation: hex("#242529"),
+		highlight.Property: hex("#d3604f"), highlight.Variable: hex("#242529"), highlight.Punctuation: hex("#4d4f52"),
 		highlight.Operator: hex("#3882b7"), highlight.Tag: hex("#5c78e2"), highlight.Title: hex("#d3604f"),
 		highlight.Namespace: hex("#242529"), highlight.Preprocess: hex("#a449ab"), highlight.Label: hex("#5c78e2"),
 	}
+	// Dark letters on a light ground are drawn thinner than light on dark, and Zed's colours,
+	// drawn as they are, read grey and faint. Zed makes up for it in its text renderer; the reader
+	// makes up for it in the colours: every ink a step deeper, the grounds as Zed has them.
+	for role, colour := range syntax {
+		syntax[role] = deeper(colour, lightInkDepth)
+	}
+	for _, colour := range []*draw2d.Color{
+		&colours.ink, &colours.inkSoft, &colours.inkQuiet, &colours.lineNumber, &colours.activeLineNumber,
+		&colours.created, &colours.modified, &colours.deleted,
+	} {
+		*colour = deeper(*colour, lightInkDepth)
+	}
 	return colours.look(bubble.ModeLight, syntax)
+}
+
+// lightInkDepth is how far the light theme's inks go towards black.
+const lightInkDepth = 0.22
+
+// deeper takes a colour towards black, keeping how see-through it is.
+func deeper(colour draw2d.Color, amount float32) draw2d.Color {
+	return colour.Mix(draw2d.Color{0, 0, 0, colour[3]}, amount)
 }
 
 // palette is the handful of colours a look is made from, named as Zed's themes name them.
