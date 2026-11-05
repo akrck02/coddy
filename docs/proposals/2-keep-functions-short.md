@@ -1,6 +1,6 @@
 # 2. Keep every function short
 
-> Status: proposed · Author's approval: proposal ☐ plan ☐
+> Status: building · Author's approval: proposal ☑ plan ☑
 
 ## Why
 
@@ -59,7 +59,7 @@ and after, on a small repository it makes, and compares the pictures.
 
 ## Tasks
 
-- [ ] T1 — Captures of both modes, light and dark, before any change · serves R1 · test: the pictures
+- [x] T1 — Captures of both modes, light and dark, before any change · serves R1 · test: the pictures
 - [ ] T2 — `sidebar`: `paint`, `Build`, `paintRight`, `Rebuild`, `buildEnteredHeader` · serves R2, R3 · test: the tests of T1 of proposal 1
 - [ ] T3 — `viewer`: `paint`, `buildHeader` · serves R2, R3 · test: the same
 - [ ] T4 — `finder`: `searchContent`, `Build` · serves R2, R3 · test: the same
