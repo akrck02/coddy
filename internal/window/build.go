@@ -37,19 +37,7 @@ func (application *Window) Build(context *ui.Context) {
 		application.buildTitleBar(context)
 		context.Frame(ui.Layout{Width: ui.Grow(), Height: ui.Fixed(1)}, ui.Look{Fill: context.Theme.Line}, nil)
 		context.Box(ui.Layout{Width: ui.Grow(), Height: ui.Grow()}, func() {
-			application.buildModeRail(context)
-			context.Frame(ui.Layout{Width: ui.Fixed(1), Height: ui.Grow()}, ui.Look{Fill: context.Theme.Line}, nil)
-			// the sidebar never takes more than two fifths of the window, so the code keeps its room
-			// when the window is made narrow
-			windowWidth, _ := context.Size()
-			widest := min(max(windowWidth*0.4, 220), 720)
-			application.sidebar.Width = min(application.sidebar.Width, widest)
-			context.Resizable("sidebar", ui.RightSide, &application.sidebar.Width, 220, widest,
-				ui.Layout{Direction: ui.Vertical, Height: ui.Grow()}, func() {
-					application.sidebar.Build(context, application)
-				})
-			context.Frame(ui.Layout{Width: ui.Fixed(1), Height: ui.Grow()}, ui.Look{Fill: context.Theme.Line}, nil)
-			application.viewer.Build(context, application)
+			application.buildPanes(context)
 		})
 		context.Frame(ui.Layout{Width: ui.Grow(), Height: ui.Fixed(1)}, ui.Look{Fill: context.Theme.Line}, nil)
 		application.buildStatusBar(context)
@@ -63,6 +51,23 @@ func (application *Window) Build(context *ui.Context) {
 		context.Toast(application.toast, false)
 		application.toast = ""
 	}
+}
+
+// buildPanes lays the mode rail, the sidebar and the viewer side by side.
+func (application *Window) buildPanes(context *ui.Context) {
+	application.buildModeRail(context)
+	context.Frame(ui.Layout{Width: ui.Fixed(1), Height: ui.Grow()}, ui.Look{Fill: context.Theme.Line}, nil)
+	// the sidebar never takes more than two fifths of the window, so the code keeps its room
+	// when the window is made narrow
+	windowWidth, _ := context.Size()
+	widest := min(max(windowWidth*0.4, 220), 720)
+	application.sidebar.Width = min(application.sidebar.Width, widest)
+	context.Resizable("sidebar", ui.RightSide, &application.sidebar.Width, 220, widest,
+		ui.Layout{Direction: ui.Vertical, Height: ui.Grow()}, func() {
+			application.sidebar.Build(context, application)
+		})
+	context.Frame(ui.Layout{Width: ui.Fixed(1), Height: ui.Grow()}, ui.Look{Fill: context.Theme.Line}, nil)
+	application.viewer.Build(context, application)
 }
 
 func (application *Window) applyTheme(context *ui.Context) {
@@ -160,58 +165,74 @@ func (application *Window) buildTitleBar(context *ui.Context) {
 				context.Text("against "+base, ui.TextStyle{Size: palette.SmallTextSize, Color: palette.InkQuiet})
 			}
 		})
-		// a pill, a shade off the bar with a hairline edge, lit towards the accent under the
-		// pointer; the shortcut sits in a key cap of its own
-		look := application.look
-		normal := ui.Look{Fill: look.Hover.WithAlpha(0.7), Radius: 17, Border: look.Chosen.WithAlpha(0.6), BorderWidth: 1}
-		hovered := normal
-		hovered.Fill, hovered.Border = look.Hover, palette.Primary.WithAlpha(0.45)
-		search := ui.Layout{Width: ui.Fixed(400), Height: ui.Fixed(34), Padding: ui.Padding{Left: 14, Right: 6}, Gap: 10, AlignY: ui.Center}
-		if context.Clickable("search files", search, ui.Looks{Normal: normal, Hovered: hovered, Pressed: hovered}, func() {
-			context.IconSized("search", 15, palette.InkSoft)
-			context.Text("Search files", ui.TextStyle{Color: palette.InkQuiet})
-			context.Spacer()
-			keyCap := ui.Look{Fill: look.Chosen.WithAlpha(0.55), Radius: 11}
-			context.Frame(ui.Layout{Height: ui.Fixed(22), Padding: ui.PadXY(9, 0), AlignY: ui.Center}, keyCap, func() {
-				context.Text("⌘P", ui.TextStyle{Size: palette.SmallTextSize, Color: palette.InkSoft, Weight: draw2d.Medium})
-			})
-		}) {
-			application.finder.Show(finder.NamesScope)
-		}
+		application.buildSearchField(context)
 		context.Box(ui.Layout{Width: ui.Grow(), Gap: 4, AlignY: ui.Center}, func() {
 			context.Spacer()
-			if theme.ToolButton(context, "Only the projects with changes (h)", "list-filter", application.onlyChanged) {
-				application.setOnlyChanged(!application.onlyChanged)
-			}
-			if theme.ToolButton(context, "Count the changes not committed yet (w)", "file-pen-line", application.settings.WorkingTree) {
-				application.settings.WorkingTree = !application.settings.WorkingTree
-				application.clearDocuments()
-				application.reloadAll()
-				application.toast = workingTreeNote(application.settings.WorkingTree)
-			}
-			if theme.ToolButton(context, "Compare against another branch, tag or commit (b)", "git-branch", false) {
-				application.openBaseDialog()
-			}
-			if theme.ToolButton(context, "Read the projects again (r)", "refresh-cw", false) {
-				application.reloadAll()
-			}
-			context.MenuButton("ellipsis", "", func() {
-				if context.MenuItem("folder-open", "Open folder…", "o") {
-					application.pickerOpen = true
-				}
-				if context.MenuItem("sun-moon", "Light or dark", "t") {
-					application.dark = !application.dark
-					application.applyTheme(context)
-				}
-				if context.MenuItem("keyboard", "Keys", "?") {
-					application.helpOpen = true
-				}
-				context.Separator()
-				if context.MenuItem("x", "Close all projects", "") {
-					application.closeAll()
-				}
-			})
+			application.buildComparisonButtons(context)
+			application.buildMenu(context)
 		})
+	})
+}
+
+// buildSearchField is a pill, a shade off the bar with a hairline edge, lit towards the accent under
+// the pointer, that opens the finder; the shortcut sits in a key cap of its own.
+func (application *Window) buildSearchField(context *ui.Context) {
+	palette := context.Theme
+	look := application.look
+	normal := ui.Look{Fill: look.Hover.WithAlpha(0.7), Radius: 17, Border: look.Chosen.WithAlpha(0.6), BorderWidth: 1}
+	hovered := normal
+	hovered.Fill, hovered.Border = look.Hover, palette.Primary.WithAlpha(0.45)
+	search := ui.Layout{Width: ui.Fixed(400), Height: ui.Fixed(34), Padding: ui.Padding{Left: 14, Right: 6}, Gap: 10, AlignY: ui.Center}
+	if context.Clickable("search files", search, ui.Looks{Normal: normal, Hovered: hovered, Pressed: hovered}, func() {
+		context.IconSized("search", 15, palette.InkSoft)
+		context.Text("Search files", ui.TextStyle{Color: palette.InkQuiet})
+		context.Spacer()
+		keyCap := ui.Look{Fill: look.Chosen.WithAlpha(0.55), Radius: 11}
+		context.Frame(ui.Layout{Height: ui.Fixed(22), Padding: ui.PadXY(9, 0), AlignY: ui.Center}, keyCap, func() {
+			context.Text("⌘P", ui.TextStyle{Size: palette.SmallTextSize, Color: palette.InkSoft, Weight: draw2d.Medium})
+		})
+	}) {
+		application.finder.Show(finder.NamesScope)
+	}
+}
+
+// buildComparisonButtons are the comparison's settings: the projects listed, the changes counted,
+// the base, and reading again.
+func (application *Window) buildComparisonButtons(context *ui.Context) {
+	if theme.ToolButton(context, "Only the projects with changes (h)", "list-filter", application.onlyChanged) {
+		application.setOnlyChanged(!application.onlyChanged)
+	}
+	if theme.ToolButton(context, "Count the changes not committed yet (w)", "file-pen-line", application.settings.WorkingTree) {
+		application.settings.WorkingTree = !application.settings.WorkingTree
+		application.clearDocuments()
+		application.reloadAll()
+		application.toast = workingTreeNote(application.settings.WorkingTree)
+	}
+	if theme.ToolButton(context, "Compare against another branch, tag or commit (b)", "git-branch", false) {
+		application.openBaseDialog()
+	}
+	if theme.ToolButton(context, "Read the projects again (r)", "refresh-cw", false) {
+		application.reloadAll()
+	}
+}
+
+// buildMenu is the menu of what is done less often: opening a folder, the theme, the keys, closing.
+func (application *Window) buildMenu(context *ui.Context) {
+	context.MenuButton("ellipsis", "", func() {
+		if context.MenuItem("folder-open", "Open folder…", "o") {
+			application.pickerOpen = true
+		}
+		if context.MenuItem("sun-moon", "Light or dark", "t") {
+			application.dark = !application.dark
+			application.applyTheme(context)
+		}
+		if context.MenuItem("keyboard", "Keys", "?") {
+			application.helpOpen = true
+		}
+		context.Separator()
+		if context.MenuItem("x", "Close all projects", "") {
+			application.closeAll()
+		}
 	})
 }
 
@@ -235,18 +256,7 @@ func (application *Window) buildStatusBar(context *ui.Context) {
 			len(application.projects), application.projectsWithChanges(), len(application.changedOrder)), small)
 		if viewed, total, words := application.progress(); total > 0 {
 			context.Box(ui.Layout{Gap: 6, AlignY: ui.Center}, func() {
-				colour := palette.InkQuiet
-				if viewed == total {
-					colour = palette.Positive
-				}
-				context.Paint(ui.Layout{Width: ui.Fixed(56), Height: ui.Fixed(4)}, func(area draw2d.Rectangle, drawing *draw2d.List) {
-					drawing.Rectangle(area, 2, application.look.Hover.Mix(palette.Ink, 0.12), draw2d.Color{}, 0)
-					if viewed > 0 {
-						done := area
-						done.Width = area.Width * float32(viewed) / float32(total)
-						drawing.Rectangle(done, 2, colour, draw2d.Color{}, 0)
-					}
-				})
+				application.buildProgress(context, viewed, total)
 				context.Text(words, small)
 			})
 		}
@@ -255,21 +265,43 @@ func (application *Window) buildStatusBar(context *ui.Context) {
 		}
 		context.Spacer()
 		if application.viewer.IsOpen() {
-			project := application.viewer.Project
-			for _, current := range application.projects {
-				if current.Path == project.Path {
-					project = current
-				}
-			}
-			if project.Base != "" {
-				context.IconSized("git-branch", 12, palette.InkQuiet)
-				context.Text(fmt.Sprintf("%s ← %s · %d commits", project.Branch, project.Base, project.Ahead), small)
-			}
+			application.buildBranch(context, small)
 		}
 		if !application.settings.WorkingTree {
 			context.Text("commits only", ui.TextStyle{Size: palette.SmallTextSize, Color: palette.Warning})
 		}
 	})
+}
+
+// buildProgress is a small bar of how far the mode's work has gone, green once it is done.
+func (application *Window) buildProgress(context *ui.Context, viewed, total int) {
+	palette := context.Theme
+	colour := palette.InkQuiet
+	if viewed == total {
+		colour = palette.Positive
+	}
+	context.Paint(ui.Layout{Width: ui.Fixed(56), Height: ui.Fixed(4)}, func(area draw2d.Rectangle, drawing *draw2d.List) {
+		drawing.Rectangle(area, 2, application.look.Hover.Mix(palette.Ink, 0.12), draw2d.Color{}, 0)
+		if viewed > 0 {
+			done := area
+			done.Width = area.Width * float32(viewed) / float32(total)
+			drawing.Rectangle(done, 2, colour, draw2d.Color{}, 0)
+		}
+	})
+}
+
+// buildBranch says where the open file's branch stands against its base, as the project is now.
+func (application *Window) buildBranch(context *ui.Context, small ui.TextStyle) {
+	project := application.viewer.Project
+	for _, current := range application.projects {
+		if current.Path == project.Path {
+			project = current
+		}
+	}
+	if project.Base != "" {
+		context.IconSized("git-branch", 12, context.Theme.InkQuiet)
+		context.Text(fmt.Sprintf("%s ← %s · %d commits", project.Branch, project.Base, project.Ahead), small)
+	}
 }
 
 func (application *Window) openBaseDialog() {
@@ -300,34 +332,48 @@ func (application *Window) buildBaseDialog(context *ui.Context) {
 	}
 	apply := false
 	dismissed := context.Sheet("Compare against", ui.SheetOptions{}, func() {
-		context.Caption("A branch, a tag or a commit. Empty: each project's default branch (origin/main, master…).")
-		if dialog.focusNext {
-			context.FocusField("base")
-			dialog.focusNext = false
-		}
-		if context.EntryField("base", &dialog.ref, ui.TextFieldOptions{Placeholder: "origin/master", Weight: draw2d.Mono}) {
-			apply = true
-		}
-		if dialog.forProject != "" {
-			context.Tabs("base scope", &dialog.forAll, baseName(dialog.forProject), "Every project")
-		}
-		context.Row(func() {
-			context.Spacer()
-			if context.Button("Cancel") {
-				dialog.open = false
-			}
-			if context.PrimaryButton("Compare") {
-				apply = true
-			}
-		})
+		apply = application.buildBaseSheet(context)
 	})
 	if dismissed {
 		dialog.open = false
 	}
-	if !apply {
-		return
+	if apply {
+		dialog.open = false
+		application.applyBase()
 	}
-	dialog.open = false
+}
+
+// buildBaseSheet is what the base dialog holds: the field, which projects, and its buttons. It
+// tells whether the base was asked for.
+func (application *Window) buildBaseSheet(context *ui.Context) bool {
+	dialog := &application.base
+	apply := false
+	context.Caption("A branch, a tag or a commit. Empty: each project's default branch (origin/main, master…).")
+	if dialog.focusNext {
+		context.FocusField("base")
+		dialog.focusNext = false
+	}
+	if context.EntryField("base", &dialog.ref, ui.TextFieldOptions{Placeholder: "origin/master", Weight: draw2d.Mono}) {
+		apply = true
+	}
+	if dialog.forProject != "" {
+		context.Tabs("base scope", &dialog.forAll, baseName(dialog.forProject), "Every project")
+	}
+	context.Row(func() {
+		context.Spacer()
+		if context.Button("Cancel") {
+			dialog.open = false
+		}
+		if context.PrimaryButton("Compare") {
+			apply = true
+		}
+	})
+	return apply
+}
+
+// applyBase compares every project, or the one the dialog was opened for, against the base typed.
+func (application *Window) applyBase() {
+	dialog := &application.base
 	ref := strings.TrimSpace(dialog.ref)
 	if dialog.forAll == 1 || dialog.forProject == "" {
 		application.settings.Base = ref

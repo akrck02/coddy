@@ -63,7 +63,7 @@ and after, on a small repository it makes, and compares the pictures.
 - [x] T2 — `sidebar`: `paint`, `Build`, `paintRight`, `Rebuild`, `buildEnteredHeader` · serves R2, R3 · test: the tests of T1 of proposal 1
 - [x] T3 — `viewer`: `paint`, `buildHeader` · serves R2, R3 · test: the same
 - [x] T4 — `finder`: `searchContent`, `Build` · serves R2, R3 · test: the same
-- [ ] T5 — `window` and `main`: the title bar, the base dialog, the status bar, `Build`, `main` · serves R2, R3 · test: the same
+- [x] T5 — `window` and `main`: the title bar, the base dialog, the status bar, `Build`, `main` · serves R2, R3 · test: the same
 - [ ] T6 — The rest: `RoleOf`, `look`, `LoadProject`, `buildOverviewRow`, `parseUnifiedDiff` · serves R2, R3 · test: the same
 - [ ] T7 — The shortcut tests' tables as functions · serves R2 · test: they still pass
 - [ ] T8 — `TestNoFunctionIsLongerThanFortyLines`, and the captures compared with T1 · serves R1, R2

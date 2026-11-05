@@ -32,39 +32,10 @@ const (
 func main() {
 	options := platform.Options{Title: "Code review", MinWidth: 900, MinHeight: 520}
 	options.RegisterFlags(flag.CommandLine)
-	base := flag.String("base", "", "compare every project against this branch, tag or commit (default: each one's main or master)")
-	committed := flag.Bool("committed", false, "compare the last commit only, leaving out changes not committed yet")
-	light := flag.Bool("light", false, "start in the light theme")
-	open := flag.String("open", "", "open this file at the start, as project/path/in/it")
-	find := flag.String("find", "", "open the finder at the start, searching the files' content for this text")
-	reviewing := flag.Bool("review", false, "start in the review mode: the changed files, as diffs")
-	codeFont := flag.String("code-font", "", "a TrueType file to read the code in (default: SF Mono, else Go Mono)")
-	allProjects := flag.Bool("all", false, "show every project, not only those with changes (the choice is remembered otherwise)")
-	flag.Usage = func() {
-		fmt.Fprintln(flag.CommandLine.Output(), "usage: code-review [flags] [repository or folder of repositories …]")
-		flag.PrintDefaults()
-	}
+	asked := registerFlags()
 	flag.Parse()
-
-	folders := flag.Args()
-	if len(folders) == 0 {
-		if remembered, found := platform.Preference(foldersPreference); found && remembered != "" {
-			folders = existing(strings.Split(remembered, "\n"))
-		}
-	}
-	options.Fonts = overlay.Fonts{Mono: monospaced(*codeFont)}
-
-	reader, err := window.New(window.Settings{
-		Folders:     folders,
-		Base:        *base,
-		WorkingTree: !*committed,
-		Dark:        options.Dark || !*light,
-		OnlyChanged: onlyChanged(*allProjects),
-		Open:        *open,
-		Find:        *find,
-		Mode:        startMode(*reviewing),
-		Synchronous: options.CapturePath != "",
-	},
+	options.Fonts = overlay.Fonts{Mono: monospaced(*asked.codeFont)}
+	reader, err := window.New(settingsOf(asked, options),
 		files.New(),
 		// the files marked as viewed are kept in the reader's own folder, never in the repositories
 		review.New(review.DefaultReviewedPath()),
@@ -72,6 +43,59 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	run(options, reader)
+}
+
+// commandLine is what the flags ask for, read once they are parsed.
+type commandLine struct {
+	base, open, find, codeFont               *string
+	committed, light, reviewing, allProjects *bool
+}
+
+// registerFlags declares the reader's own flags, beside the platform's.
+func registerFlags() commandLine {
+	asked := commandLine{
+		base:        flag.String("base", "", "compare every project against this branch, tag or commit (default: each one's main or master)"),
+		committed:   flag.Bool("committed", false, "compare the last commit only, leaving out changes not committed yet"),
+		light:       flag.Bool("light", false, "start in the light theme"),
+		open:        flag.String("open", "", "open this file at the start, as project/path/in/it"),
+		find:        flag.String("find", "", "open the finder at the start, searching the files' content for this text"),
+		reviewing:   flag.Bool("review", false, "start in the review mode: the changed files, as diffs"),
+		codeFont:    flag.String("code-font", "", "a TrueType file to read the code in (default: SF Mono, else Go Mono)"),
+		allProjects: flag.Bool("all", false, "show every project, not only those with changes (the choice is remembered otherwise)"),
+	}
+	flag.Usage = func() {
+		fmt.Fprintln(flag.CommandLine.Output(), "usage: code-review [flags] [repository or folder of repositories …]")
+		flag.PrintDefaults()
+	}
+	return asked
+}
+
+// settingsOf is how the reader starts: the folders named, or else those open last time, and what
+// the flags ask for.
+func settingsOf(asked commandLine, options platform.Options) window.Settings {
+	folders := flag.Args()
+	if len(folders) == 0 {
+		if remembered, found := platform.Preference(foldersPreference); found && remembered != "" {
+			folders = existing(strings.Split(remembered, "\n"))
+		}
+	}
+	return window.Settings{
+		Folders:     folders,
+		Base:        *asked.base,
+		WorkingTree: !*asked.committed,
+		Dark:        options.Dark || !*asked.light,
+		OnlyChanged: onlyChanged(*asked.allProjects),
+		Open:        *asked.open,
+		Find:        *asked.find,
+		Mode:        startMode(*asked.reviewing),
+		Synchronous: options.CapturePath != "",
+	}
+}
+
+// run shows the window until it is closed, and keeps the folders open and the projects shown for
+// the next time.
+func run(options platform.Options, reader *window.Window) {
 	options.Driver = reader.Driver()
 	options.Hidden = func() {
 		reader.Closed()
