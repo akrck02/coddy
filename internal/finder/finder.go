@@ -140,6 +140,12 @@ func (finder *Finder) refresh(window Window) {
 	finder.searchContent(window, strings.TrimSpace(finder.Query))
 }
 
+// searchedProject is a project the content search reads: its place in the window and its folder.
+type searchedProject struct {
+	project int
+	path    string
+}
+
 // searchContent looks for a text in every project shown, a few at a time, after a short pause
 // so that typing a word does not start a search for each of its letters.
 func (finder *Finder) searchContent(window Window, text string) {
@@ -148,16 +154,7 @@ func (finder *Finder) searchContent(window Window, text string) {
 		finder.Hits, finder.searching, finder.truncated = nil, false, false
 		return
 	}
-	type searched struct {
-		project int
-		path    string
-	}
-	var projects []searched
-	for index, project := range window.Projects() {
-		if window.Searchable(index) {
-			projects = append(projects, searched{index, project.Path})
-		}
-	}
+	projects := searchableProjects(window)
 	options := git.GrepOptions{WorkingTree: window.WorkingTree(), PerFile: contentPerFile}
 	synchronous := window.Synchronous()
 	finder.searching = true
@@ -169,43 +166,64 @@ func (finder *Finder) searchContent(window Window, text string) {
 				return nil // a newer search, typed during the pause
 			}
 		}
-		found := make([][]git.Hit, len(projects))
-		var group sync.WaitGroup
-		for position, project := range projects {
-			group.Add(1)
-			go func() {
-				defer group.Done()
-				window.Read(stop, func() {
-					found[position], _ = git.Grep(project.path, text, options) // a project git cannot search shows no lines
-				})
-			}()
-		}
-		group.Wait()
-		return func() {
-			finder.Hits, finder.truncated = nil, false
-			for position, hits := range found {
-				index := projects[position].project
-				if index >= len(window.Projects()) {
-					continue
-				}
-				project := window.Projects()[index]
-				for _, hit := range hits {
-					change, changed := project.ChangeOf(hit.Path)
-					finder.Hits = append(finder.Hits, ContentHit{index, changed, change.Status, hit})
-				}
-			}
-			// the development's own files first: they are what is being reviewed
-			sort.SliceStable(finder.Hits, func(first, second int) bool {
-				return finder.Hits[first].changed && !finder.Hits[second].changed
-			})
-			if len(finder.Hits) > contentHitLimit {
-				finder.Hits, finder.truncated = finder.Hits[:contentHitLimit], true
-			}
-			finder.searching = false
-			finder.selected = 0
-			finder.list.Offset = 0
-		}
+		found := grepProjects(stop, window, projects, text, options)
+		return func() { finder.takeHits(window, projects, found) }
 	})
+}
+
+// searchableProjects lists the projects the window lets the finder search.
+func searchableProjects(window Window) []searchedProject {
+	var projects []searchedProject
+	for index, project := range window.Projects() {
+		if window.Searchable(index) {
+			projects = append(projects, searchedProject{index, project.Path})
+		}
+	}
+	return projects
+}
+
+// grepProjects searches every project at once, as many as the window lets read together, and
+// returns each one's hits in the same order.
+func grepProjects(stop context.Context, window Window, projects []searchedProject, text string, options git.GrepOptions) [][]git.Hit {
+	found := make([][]git.Hit, len(projects))
+	var group sync.WaitGroup
+	for position, project := range projects {
+		group.Add(1)
+		go func() {
+			defer group.Done()
+			window.Read(stop, func() {
+				found[position], _ = git.Grep(project.path, text, options) // a project git cannot search shows no lines
+			})
+		}()
+	}
+	group.Wait()
+	return found
+}
+
+// takeHits lists the hits found, the development's own files first, up to the limit.
+func (finder *Finder) takeHits(window Window, projects []searchedProject, found [][]git.Hit) {
+	finder.Hits, finder.truncated = nil, false
+	for position, hits := range found {
+		index := projects[position].project
+		if index >= len(window.Projects()) {
+			continue
+		}
+		project := window.Projects()[index]
+		for _, hit := range hits {
+			change, changed := project.ChangeOf(hit.Path)
+			finder.Hits = append(finder.Hits, ContentHit{index, changed, change.Status, hit})
+		}
+	}
+	// the development's own files first: they are what is being reviewed
+	sort.SliceStable(finder.Hits, func(first, second int) bool {
+		return finder.Hits[first].changed && !finder.Hits[second].changed
+	})
+	if len(finder.Hits) > contentHitLimit {
+		finder.Hits, finder.truncated = finder.Hits[:contentHitLimit], true
+	}
+	finder.searching = false
+	finder.selected = 0
+	finder.list.Offset = 0
 }
 
 func (finder *Finder) choose(window Window) {
@@ -225,11 +243,28 @@ func (finder *Finder) choose(window Window) {
 	window.OpenAt(reference, line)
 }
 
+// Build adds the finder over the window while it is open: the field, the list and the footer.
 func (finder *Finder) Build(context *ui.Context, window Window) {
 	if !finder.Open {
 		return
 	}
-	keys := window.Keys()
+	finder.followKeys(window.Keys())
+	palette := context.Theme
+	look := window.Look()
+	options := ui.LayerOptions{AlignX: ui.Center, AlignY: ui.Start, Padding: ui.Padding{Top: 64}, Width: ui.Fixed(760)}
+	dismissed := context.Modal("finder", options, func() {
+		panel := ui.Look{Fill: palette.Surface, Border: look.Chosen, BorderWidth: 1, Radius: finderPanelRadius, Shadow: true}
+		context.Frame(ui.Layout{Direction: ui.Vertical, Width: ui.Grow(), Padding: ui.Pad(8), Gap: 6}, panel, func() {
+			finder.buildPanel(context, window)
+		})
+	})
+	if dismissed {
+		finder.Open = false
+	}
+}
+
+// followKeys moves the selection with the arrows and the page keys, and Tab switches the scope.
+func (finder *Finder) followKeys(keys pane.Keys) {
 	switch {
 	case keys.Typed(input.KeyDown):
 		finder.selected++
@@ -242,42 +277,35 @@ func (finder *Finder) Build(context *ui.Context, window Window) {
 	case keys.Pressed(input.KeyTab):
 		finder.setScope(1 - finder.Scope)
 	}
-	palette := context.Theme
-	look := window.Look()
-	options := ui.LayerOptions{AlignX: ui.Center, AlignY: ui.Start, Padding: ui.Padding{Top: 64}, Width: ui.Fixed(760)}
-	dismissed := context.Modal("finder", options, func() {
-		panel := ui.Look{Fill: palette.Surface, Border: look.Chosen, BorderWidth: 1, Radius: finderPanelRadius, Shadow: true}
-		context.Frame(ui.Layout{Direction: ui.Vertical, Width: ui.Grow(), Padding: ui.Pad(8), Gap: 6}, panel, func() {
-			submitted := finder.buildQuery(context, window)
-			finder.refresh(window)
-			count := finder.count()
-			finder.selected = min(max(finder.selected, 0), max(count-1, 0))
-			finder.list.RowHeight = finder.rowHeight()
-			finder.list.Count = count
-			finder.list.Reveal(finder.selected)
-			onBar := finder.list.Follow(context, keys, palette.ScrollStep)
-			x, y := context.Pointer()
-			if index := finder.list.RowAt(x, y); index >= 0 && !onBar && keys.Clicked() {
-				finder.selected = index
-				submitted = true
-			}
-			rows := min(max(count, 1), finderRows)
-			if finder.Scope == ContentScope {
-				rows = min(max(count, 1), contentRows)
-			}
-			height := float32(rows) * finder.rowHeight()
-			context.Paint(ui.Layout{Width: ui.Grow(), Height: ui.Fixed(height)}, func(area draw2d.Rectangle, drawing *draw2d.List) {
-				finder.list.Place(area)
-				finder.paint(context, window, drawing)
-			})
-			finder.buildFooter(context)
-			if submitted {
-				finder.choose(window)
-			}
-		})
+}
+
+// buildPanel adds what the finder's panel holds, and opens what was chosen in it.
+func (finder *Finder) buildPanel(context *ui.Context, window Window) {
+	submitted := finder.buildQuery(context, window)
+	finder.refresh(window)
+	count := finder.count()
+	finder.selected = min(max(finder.selected, 0), max(count-1, 0))
+	finder.list.RowHeight = finder.rowHeight()
+	finder.list.Count = count
+	finder.list.Reveal(finder.selected)
+	onBar := finder.list.Follow(context, window.Keys(), context.Theme.ScrollStep)
+	x, y := context.Pointer()
+	if index := finder.list.RowAt(x, y); index >= 0 && !onBar && window.Keys().Clicked() {
+		finder.selected = index
+		submitted = true
+	}
+	rows := min(max(count, 1), finderRows)
+	if finder.Scope == ContentScope {
+		rows = min(max(count, 1), contentRows)
+	}
+	height := float32(rows) * finder.rowHeight()
+	context.Paint(ui.Layout{Width: ui.Grow(), Height: ui.Fixed(height)}, func(area draw2d.Rectangle, drawing *draw2d.List) {
+		finder.list.Place(area)
+		finder.paint(context, window, drawing)
 	})
-	if dismissed {
-		finder.Open = false
+	finder.buildFooter(context)
+	if submitted {
+		finder.choose(window)
 	}
 }
 
