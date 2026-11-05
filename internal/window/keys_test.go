@@ -92,10 +92,10 @@ func selectRow(test *testing.T, application *Window, label string) {
 }
 
 func openPath(application *Window) string {
-	if !application.editor.IsOpen() || application.editor.Document == nil {
+	if !application.viewer.IsOpen() || application.viewer.Document == nil {
 		return ""
 	}
-	return application.editor.Project.Name + "/" + application.editor.Document.Path
+	return application.viewer.Project.Name + "/" + application.viewer.Document.Path
 }
 
 // shortcut is one key of the help, the state it is pressed in, and what must be true after it.
@@ -152,7 +152,7 @@ func addAFileUnseen(test *testing.T, application *Window, window *uitest.Window)
 }
 
 func focusEditor(test *testing.T, application *Window, window *uitest.Window) {
-	application.focus = editorPane
+	application.focus = viewerPane
 }
 
 func TestEveryWindowShortcutDoesItsJob(test *testing.T) {
@@ -203,7 +203,7 @@ func TestEveryWindowShortcutDoesItsJob(test *testing.T) {
 			prepare: func(test *testing.T, application *Window, window *uitest.Window) { application.focus = sidebarPane },
 			press:   func(window *uitest.Window) { press(window, input.KeyTab) },
 			holds: func(application *Window) string {
-				return unless(application.focus == editorPane, "the focus stayed on the sidebar")
+				return unless(application.focus == viewerPane, "the focus stayed on the sidebar")
 			}},
 		{name: "m opens the changed file before", review: true,
 			prepare: func(test *testing.T, application *Window, window *uitest.Window) {
@@ -217,7 +217,7 @@ func TestEveryWindowShortcutDoesItsJob(test *testing.T) {
 		{name: "] goes to the next run of changes", open: "tides/coast.txt", long: true, prepare: focusEditor,
 			press: func(window *uitest.Window) { press(window, input.KeyRightBracket) },
 			holds: func(application *Window) string {
-				return unless(application.editor.List.Offset > 0, "the file did not move down to the second change")
+				return unless(application.viewer.List.Offset > 0, "the file did not move down to the second change")
 			}},
 		{name: "[ goes back to the run of changes before", open: "tides/coast.txt", long: true,
 			prepare: func(test *testing.T, application *Window, window *uitest.Window) {
@@ -226,17 +226,17 @@ func TestEveryWindowShortcutDoesItsJob(test *testing.T) {
 			},
 			press: func(window *uitest.Window) { press(window, input.KeyLeftBracket) },
 			holds: func(application *Window) string {
-				return unless(application.editor.List.Offset == 0, "the file did not move back up to the first change")
+				return unless(application.viewer.List.Offset == 0, "the file did not move back up to the first change")
 			}},
 		{name: "d shows the file open as its diff", open: "lighthouse/src/lamp.go",
 			press: func(window *uitest.Window) { press(window, input.KeyD) },
 			holds: func(application *Window) string {
-				return unless(application.editor.Mode == viewer.DiffView, "the file is not shown as a diff")
+				return unless(application.viewer.Mode == viewer.DiffView, "the file is not shown as a diff")
 			}},
 		{name: "f shows every unchanged line of a diff", open: "tides/coast.txt", long: true, review: true,
 			press: func(window *uitest.Window) { press(window, input.KeyF) },
 			holds: func(application *Window) string {
-				return unless(application.editor.RowCount() == longFileLines+changedLines, fmt.Sprintf("the diff shows %d rows, want all %d lines and the %d old ones", application.editor.RowCount(), longFileLines, changedLines))
+				return unless(application.viewer.RowCount() == longFileLines+changedLines, fmt.Sprintf("the diff shows %d rows, want all %d lines and the %d old ones", application.viewer.RowCount(), longFileLines, changedLines))
 			}},
 		{name: "c switches between the two modes",
 			press: func(window *uitest.Window) { press(window, input.KeyC) },
@@ -323,7 +323,7 @@ func TestEverySidebarShortcutDoesItsJob(test *testing.T) {
 			},
 			press: func(window *uitest.Window) { press(window, input.KeyEnter) },
 			holds: func(application *Window) string {
-				return unless(openPath(application) == "lighthouse/notes.txt" && application.focus == editorPane, "notes.txt is not open with the focus on it")
+				return unless(openPath(application) == "lighthouse/notes.txt" && application.focus == viewerPane, "notes.txt is not open with the focus on it")
 			}},
 		{name: "Space opens a file and stays in the sidebar",
 			prepare: func(test *testing.T, application *Window, window *uitest.Window) {
@@ -340,7 +340,7 @@ func TestEverySidebarShortcutDoesItsJob(test *testing.T) {
 }
 
 func TestEveryFileShortcutDoesItsJob(test *testing.T) {
-	offset := func(application *Window) float32 { return application.editor.List.Offset }
+	offset := func(application *Window) float32 { return application.viewer.List.Offset }
 	scrolledDown := func(application *Window) string {
 		return unless(offset(application) > 0, "the file did not scroll down")
 	}
@@ -349,7 +349,7 @@ func TestEveryFileShortcutDoesItsJob(test *testing.T) {
 		press(window, input.KeyEnd)
 	}
 	scrolledUp := func(application *Window) string {
-		return unless(offset(application) < application.editor.List.ContentHeight()-application.editor.List.Area.Height, "the file did not scroll up")
+		return unless(offset(application) < application.viewer.List.ContentHeight()-application.viewer.List.Area.Height, "the file did not scroll up")
 	}
 	var rowsFolded int
 	shortcuts := []shortcut{
@@ -360,7 +360,7 @@ func TestEveryFileShortcutDoesItsJob(test *testing.T) {
 		{name: "Space scrolls down a page", open: "tides/coast.txt", long: true, prepare: focusEditor,
 			press: func(window *uitest.Window) { press(window, input.KeySpace) },
 			holds: func(application *Window) string {
-				return unless(offset(application) > 10*application.editor.List.RowHeight, "the file did not scroll a page")
+				return unless(offset(application) > 10*application.viewer.List.RowHeight, "the file did not scroll a page")
 			}},
 		{name: "End goes to the bottom", open: "tides/coast.txt", long: true, prepare: focusEditor,
 			press: func(window *uitest.Window) { press(window, input.KeyEnd) },
@@ -379,11 +379,11 @@ func TestEveryFileShortcutDoesItsJob(test *testing.T) {
 		{name: "Enter opens the fold in sight", open: "tides/coast.txt", long: true, review: true,
 			prepare: func(test *testing.T, application *Window, window *uitest.Window) {
 				focusEditor(test, application, window)
-				rowsFolded = application.editor.RowCount()
+				rowsFolded = application.viewer.RowCount()
 			},
 			press: func(window *uitest.Window) { press(window, input.KeyEnter) },
 			holds: func(application *Window) string {
-				return unless(application.editor.RowCount() > rowsFolded, fmt.Sprintf("the diff still shows %d rows", rowsFolded))
+				return unless(application.viewer.RowCount() > rowsFolded, fmt.Sprintf("the diff still shows %d rows", rowsFolded))
 			}},
 	}
 	for _, key := range shortcuts {

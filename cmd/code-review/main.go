@@ -54,7 +54,7 @@ func main() {
 	}
 	options.Fonts = overlay.Fonts{Mono: monospaced(*codeFont)}
 
-	reader := window.New(window.Settings{
+	reader, err := window.New(window.Settings{
 		Folders:     folders,
 		Base:        *base,
 		WorkingTree: !*committed,
@@ -69,6 +69,9 @@ func main() {
 		// the files marked as viewed are kept in the reader's own folder, never in the repositories
 		review.New(review.DefaultReviewedPath()),
 	)
+	if err != nil {
+		log.Fatal(err)
+	}
 	options.Driver = reader.Driver()
 	options.Hidden = func() {
 		reader.Closed()

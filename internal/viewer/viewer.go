@@ -120,14 +120,14 @@ func (view *Viewer) Start(reference workspace.FileReference, project *workspace.
 	view.List.Offset, view.List.OffsetX = 0, 0
 }
 
-// Show puts a file's text in the view once it has been read: as its diff when reviewing a
-// changed file, whole otherwise.
-func (view *Viewer) Show(document *workspace.Document, reviewing bool) {
+// Show puts a file's text in the view once it has been read: as its diff when showChanges asks for
+// it and the file changed, whole otherwise.
+func (view *Viewer) Show(document *workspace.Document, showChanges bool) {
 	keepPlace := view.Document != nil && view.Document.Path == document.Path
 	view.Document = document
 	if !keepPlace {
 		view.Mode = FileView
-		if document.Changed && reviewing {
+		if document.Changed && showChanges {
 			view.Mode = DiffView
 		}
 	}
@@ -377,7 +377,7 @@ func (view *Viewer) buildEmpty(context *ui.Context, window Window) {
 		}
 		context.Box(ui.Layout{Direction: ui.Vertical, Gap: 6}, func() {
 			for _, hint := range [][2]string{
-				{"Find a file", "⌘P"}, {"Next changed file", "n"}, {"Review the changes", "2"}, {"Every key", "?"},
+				{"Find a file", "⌘P"}, {"Next changed file", "n"}, {"Another mode", "c"}, {"Every key", "?"},
 			} {
 				context.Box(ui.Layout{Width: ui.Fixed(260), Gap: 12}, func() {
 					context.Text(hint[0], ui.TextStyle{Color: palette.InkQuiet})
@@ -397,7 +397,7 @@ func (view *Viewer) buildHeader(context *ui.Context, window Window) {
 		document := view.Document
 		folder, name := splitPath(view.Reference.Path)
 		quiet := ui.TextStyle{Color: palette.InkQuiet}
-		// a narrow editor keeps the file's name and its buttons, and drops the project, the
+		// a narrow view keeps the file's name and its buttons, and drops the project, the
 		// status's word and the language; the folder takes what is left, cut from its start
 		compact := view.List.Area.Width > 0 && view.List.Area.Width < 700
 		room := view.List.Area.Width - 32 - theme.TextWidth(context, name, ui.TextStyle{Weight: draw2d.Medium}) - 40

@@ -29,7 +29,7 @@ func OpenReviewed(path string) *Reviewed {
 		return reviewed
 	}
 	if content, err := os.ReadFile(path); err == nil {
-		_ = json.Unmarshal(content, &reviewed.marked) // a damaged file starts empty, as its comment says
+		_ = json.Unmarshal(content, &reviewed.marked) // a damaged file starts empty, as a missing one does
 	}
 	if reviewed.marked == nil {
 		reviewed.marked = map[string]map[string]string{}

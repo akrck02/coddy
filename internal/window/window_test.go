@@ -98,7 +98,7 @@ func TestNOpensTheChangedFilesOneAfterTheOther(test *testing.T) {
 	for range 3 {
 		window.PressKey(input.KeyN)
 		window.Frames(2)
-		document := application.editor.Document
+		document := application.viewer.Document
 		if document == nil || !document.Changed {
 			test.Fatalf("n opened no changed file")
 		}
@@ -107,7 +107,7 @@ func TestNOpensTheChangedFilesOneAfterTheOther(test *testing.T) {
 	if got := strings.Join(opened, ","); got != "src/beam.go,src/lamp.go,notes.txt" {
 		test.Errorf("n opened %s", got)
 	}
-	added, removed := application.editor.Added, application.editor.Gone
+	added, removed := application.viewer.Added, application.viewer.Gone
 	if added != 0 || removed != 1 {
 		test.Errorf("the deleted file shows +%d −%d, want +0 −1", added, removed)
 	}
@@ -117,18 +117,18 @@ func TestTheDiffOfAChangedFileMarksItsLines(test *testing.T) {
 	application := newReader(Settings{Folders: []string{makeRepository(test)}, WorkingTree: true, Synchronous: true,
 		Open: "lighthouse/src/lamp.go", Mode: "Review"})
 	newWindow(test, application)
-	if application.editor.Mode != viewer.DiffView {
+	if application.viewer.Mode != viewer.DiffView {
 		test.Fatalf("a changed file opened in the file view")
 	}
-	if application.editor.Added != 1 || application.editor.Gone != 1 {
-		test.Errorf("lamp.go shows +%d −%d, want +1 −1", application.editor.Added, application.editor.Gone)
+	if application.viewer.Added != 1 || application.viewer.Gone != 1 {
+		test.Errorf("lamp.go shows +%d −%d, want +1 −1", application.viewer.Added, application.viewer.Gone)
 	}
-	if len(application.editor.Hunks) != 1 {
-		test.Errorf("found %d runs of changes, want 1", len(application.editor.Hunks))
+	if len(application.viewer.Hunks) != 1 {
+		test.Errorf("found %d runs of changes, want 1", len(application.viewer.Hunks))
 	}
 	application.toggleView()
-	if application.editor.Mode != viewer.FileView || application.editor.RowCount() != 5 {
-		test.Errorf("the file view shows %d lines, want 5", application.editor.RowCount())
+	if application.viewer.Mode != viewer.FileView || application.viewer.RowCount() != 5 {
+		test.Errorf("the file view shows %d lines, want 5", application.viewer.RowCount())
 	}
 }
 
@@ -149,7 +149,7 @@ func TestTheFinderOpensAnUnchangedFileByPartOfItsName(test *testing.T) {
 	if application.finder.Open {
 		test.Fatal("Enter left the finder open")
 	}
-	document := application.editor.Document
+	document := application.viewer.Document
 	if document == nil || document.Path != "src/keeper.go" || document.Changed {
 		test.Fatalf("the finder opened %+v, want the unchanged src/keeper.go", document)
 	}
@@ -228,22 +228,22 @@ func TestTheFilesModeShowsAChangedFileWholeWithItsChangesMarked(test *testing.T)
 	if application.mode.Name() != "Files" {
 		test.Fatal("the reader did not start in the files mode")
 	}
-	editor := &application.editor
-	if editor.Mode != viewer.FileView || editor.RowCount() != 5 {
-		test.Fatalf("lamp.go opened in mode %d with %d rows, want the whole file of 5 lines", editor.Mode, editor.RowCount())
+	view := &application.viewer
+	if view.Mode != viewer.FileView || view.RowCount() != 5 {
+		test.Fatalf("lamp.go opened in mode %d with %d rows, want the whole file of 5 lines", view.Mode, view.RowCount())
 	}
-	if editor.Marks[4] != workspace.ModifiedMark {
-		test.Errorf("the changed line 4 is marked %d, want modified", editor.Marks[4])
+	if view.Marks[4] != workspace.ModifiedMark {
+		test.Errorf("the changed line 4 is marked %d, want modified", view.Marks[4])
 	}
-	if len(editor.Hunks) != 1 || editor.Hunks[0] != 3 {
-		test.Errorf("the runs of marked lines are %v, want [3]", editor.Hunks)
+	if len(view.Hunks) != 1 || view.Hunks[0] != 3 {
+		test.Errorf("the runs of marked lines are %v, want [3]", view.Hunks)
 	}
 	window.PressKey(input.Key2)
 	window.Frames(2)
-	if application.mode.Name() != "Review" || editor.Mode != viewer.DiffView {
+	if application.mode.Name() != "Review" || view.Mode != viewer.DiffView {
 		test.Errorf("2 did not move to the review mode with the file as its diff")
 	}
-	if span, found := editor.Inline[editor.Hunks[0]]; !found || span.Start != 11 {
+	if span, found := view.Inline[view.Hunks[0]]; !found || span.Start != 11 {
 		test.Errorf("the changed word of the replaced line is %+v (found %v), want it from column 11, after the indent and \"return \"", span, found)
 	}
 }
@@ -260,7 +260,7 @@ func TestMarkingAFileViewedOpensTheNextOneNotViewed(test *testing.T) {
 	if !reviewing.IsViewed(workspace.FileReference{Project: 0, Path: "src/lamp.go"}) {
 		test.Fatal("v did not mark lamp.go as viewed")
 	}
-	if document := application.editor.Document; document == nil || document.Path != "notes.txt" {
+	if document := application.viewer.Document; document == nil || document.Path != "notes.txt" {
 		test.Fatalf("v did not open the next file not viewed, notes.txt")
 	}
 	if viewed, total := reviewing.Progress(); viewed != 1 || total != 3 {
@@ -342,15 +342,19 @@ func TestTheFinderFindsATextAndOpensItsLine(test *testing.T) {
 	}
 	window.PressKey(input.KeyEnter)
 	window.Frames(2)
-	editor := application.editor
-	if editor.Document == nil || editor.Document.Path != "src/beam.go" || editor.MarkedLine != 3 {
-		test.Fatalf("Enter opened %+v at line %d, want src/beam.go at line 3", editor.Document, editor.MarkedLine)
+	view := application.viewer
+	if view.Document == nil || view.Document.Path != "src/beam.go" || view.MarkedLine != 3 {
+		test.Fatalf("Enter opened %+v at line %d, want src/beam.go at line 3", view.Document, view.MarkedLine)
 	}
 }
 
 // newReader makes a reader with the program's two modes, keeping the viewed marks only in memory.
 func newReader(settings Settings) *Window {
-	return New(settings, files.New(), review.New(""))
+	reader, err := New(settings, files.New(), review.New(""))
+	if err != nil {
+		panic(err) // the two modes are given: this cannot happen
+	}
+	return reader
 }
 
 // startIn names the mode a test starts in: the review mode, or the first.
@@ -359,4 +363,18 @@ func startIn(reviewing bool) string {
 		return "Review"
 	}
 	return ""
+}
+
+func TestAChangedFileCanBeMarkedAsViewedFromTheFilesMode(test *testing.T) {
+	application := newReader(Settings{Folders: []string{makeRepository(test)}, WorkingTree: true, Synchronous: true,
+		Open: "lighthouse/src/lamp.go"})
+	newWindow(test, application)
+	file := workspace.FileReference{Project: 0, Path: "src/lamp.go"}
+	if application.mode.Name() != "Files" {
+		test.Fatalf("the reader started in the %s mode, want Files", application.mode.Name())
+	}
+	button, shown := application.FileButton(file)
+	if !shown || button.Tip != "Viewed (v)" {
+		test.Errorf("the files mode shows %+v (shown %t) in the header, want the Viewed button", button, shown)
+	}
 }

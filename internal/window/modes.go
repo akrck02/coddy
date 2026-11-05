@@ -1,18 +1,18 @@
 package window
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/akrck02/code-review/internal/mode"
+	"github.com/akrck02/code-review/internal/pane"
 	"github.com/akrck02/code-review/internal/viewer"
+	"github.com/akrck02/go-renderer/input"
 	ui "github.com/akrck02/go-ui"
 )
 
 // startModes gives each mode its window and turns on the one named, or the first.
 func (application *Window) startModes(modes []mode.Mode, name string) {
-	if len(modes) == 0 {
-		panic("the reader needs a mode") // main registers them; a reader without one cannot list
-	}
 	application.modes = modes
 	application.mode = modes[0]
 	for _, each := range modes {
@@ -34,23 +34,17 @@ func (application *Window) setMode(chosen mode.Mode) {
 	application.sidebar.Listing = chosen
 	application.sidebar.Stale = true
 	if chosen.ShowsChanges() {
-		application.editor.SetMode(viewer.DiffView)
+		application.viewer.SetMode(viewer.DiffView)
 	} else {
-		application.editor.SetMode(viewer.FileView)
+		application.viewer.SetMode(viewer.FileView)
 	}
-	if application.editor.IsOpen() {
-		application.sidebar.RevealFile(application, application.editor.Reference)
+	if application.viewer.IsOpen() {
+		application.sidebar.RevealFile(application, application.viewer.Reference)
 	}
 }
 
-// stepMode turns on the mode at a place in the rail, counting from 1; 0 turns on the next one.
-func (application *Window) stepMode(place int) {
-	if place > 0 {
-		if place <= len(application.modes) {
-			application.setMode(application.modes[place-1])
-		}
-		return
-	}
+// nextMode turns on the next mode on the rail, going round.
+func (application *Window) nextMode() {
 	for index, each := range application.modes {
 		if each == application.mode {
 			application.setMode(application.modes[(index+1)%len(application.modes)])
@@ -59,10 +53,26 @@ func (application *Window) stepMode(place int) {
 	}
 }
 
-// modeCommands are the keys of every mode, which work whatever mode is on, as each acts on its
-// own state.
+// modeCommands are the keys that turn each mode on, by its place on the rail, and then the keys
+// of every mode, which work whatever mode is on, as each acts on its own state.
 func (application *Window) modeCommands() []command {
 	var result []command
+	for index, each := range application.modes {
+		if index >= 9 {
+			break // the number keys run out; the rail and c still reach the rest
+		}
+		chosen := each
+		result = append(result, command{
+			description: chosen.Name() + " mode",
+			keys:        []pane.Press{pane.Key(input.Key1+input.Key(index), fmt.Sprint(index+1))},
+			do:          func(application *Window, _ *ui.Context, _ int) { application.setMode(chosen) },
+		})
+	}
+	result = append(result, command{
+		description: "The next mode",
+		keys:        []pane.Press{pane.Key(input.KeyC, "c")},
+		do:          func(application *Window, _ *ui.Context, _ int) { application.nextMode() },
+	})
 	for _, each := range application.modes {
 		for _, declared := range each.Commands() {
 			do := declared.Do
@@ -81,12 +91,13 @@ func (application *Window) allCommands() []command {
 	return append(append([]command{}, commands...), application.modeCommands()...)
 }
 
-// progress is how far the first mode with work to count has gone, for the status bar.
-func (application *Window) progress() (done, total int) {
+// progress is how far the first mode with work to count has gone, for the status bar, with the
+// words the mode says it in.
+func (application *Window) progress() (done, total int, words string) {
 	for _, each := range application.modes {
 		if done, total = each.Progress(); total > 0 {
-			return done, total
+			return done, total, each.Header()
 		}
 	}
-	return 0, 0
+	return 0, 0, ""
 }

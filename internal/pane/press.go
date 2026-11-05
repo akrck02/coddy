@@ -19,11 +19,16 @@ type Press struct {
 	Repeats bool
 	Step    int
 	Label   string // how the help writes it
+	// AnyModifiers runs the command whatever modifiers are held: for Esc, Tab, [ and ], which
+	// have always answered with Command or Alt down too
+	AnyModifiers bool
 }
 
 // Matches tells which of a command's keys the frame's input pressed.
 func (press Press) Matches(keys Keys) bool {
 	switch {
+	case press.AnyModifiers:
+		return keys.Pressed(press.Key)
 	case press.Text != "":
 		return strings.Contains(keys.TypedText(), press.Text)
 	case press.Command:
@@ -48,4 +53,9 @@ func StepKey(code input.Key, label string, step int) Press {
 // CommandKey is a key pressed with Command.
 func CommandKey(code input.Key, label string) Press {
 	return Press{Key: code, Label: label, Command: true}
+}
+
+// AnyKey is a key that runs its command whatever modifiers are held.
+func AnyKey(code input.Key, label string) Press {
+	return Press{Key: code, Label: label, AnyModifiers: true}
 }

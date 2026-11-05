@@ -17,7 +17,7 @@ type place int
 const (
 	anywhere place = iota
 	inSidebar
-	inEditor
+	inViewer
 )
 
 // command is one thing the reader does from the keyboard: the keys that do it, what the help says
@@ -58,8 +58,8 @@ func (application *Window) isIn(where place) bool {
 	switch where {
 	case inSidebar:
 		return application.focus == sidebarPane
-	case inEditor:
-		return application.focus == editorPane
+	case inViewer:
+		return application.focus == viewerPane
 	}
 	return true
 }
@@ -85,7 +85,7 @@ var commands = []command{
 		}},
 	{description: "Compare against another branch, tag or commit", keys: []pane.Press{pane.Key(input.KeyB, "b")},
 		do: func(application *Window, _ *ui.Context, _ int) { application.openBaseDialog() }},
-	{description: "Back to every project", keys: []pane.Press{pane.Key(input.KeyEscape, "Esc"), pane.Key(input.KeyBackspace, "Backspace")},
+	{description: "Back to every project", keys: []pane.Press{pane.AnyKey(input.KeyEscape, "Esc"), pane.AnyKey(input.KeyBackspace, "Backspace")},
 		applies: func(application *Window) bool { return application.sidebar.Entered != "" },
 		do: func(application *Window, _ *ui.Context, _ int) {
 			application.sidebar.Leave(application)
@@ -93,25 +93,22 @@ var commands = []command{
 		}},
 	{description: "Enter the project: the sidebar lists only its tree", keys: []pane.Press{pane.Key(input.KeyE, "e")},
 		do: func(application *Window, _ *ui.Context, _ int) { application.enterCurrentProject() }},
-	{description: "Move between the sidebar and the editor", keys: []pane.Press{pane.Key(input.KeyTab, "Tab")},
+	{description: "Move between the sidebar and the file", keys: []pane.Press{pane.AnyKey(input.KeyTab, "Tab")},
 		do: func(application *Window, _ *ui.Context, _ int) { application.toggleFocus() }},
 	{description: "Next / previous changed file, across every project",
 		keys: []pane.Press{{Key: input.KeyN, Label: "n", Step: 1}, {Key: input.KeyM, Label: "m", Step: -1}},
 		do:   func(application *Window, _ *ui.Context, step int) { application.stepChangedFile(step) }},
 	{description: "Next / previous change in the file",
-		keys: []pane.Press{{Key: input.KeyRightBracket, Label: "]", Step: 1}, {Key: input.KeyLeftBracket, Label: "[", Step: -1}},
-		do:   func(application *Window, _ *ui.Context, step int) { application.editor.StepHunk(step) }},
+		keys: []pane.Press{{Key: input.KeyRightBracket, Label: "]", Step: 1, AnyModifiers: true}, {Key: input.KeyLeftBracket, Label: "[", Step: -1, AnyModifiers: true}},
+		do:   func(application *Window, _ *ui.Context, step int) { application.viewer.StepHunk(step) }},
 	{description: "Diff or the whole file", keys: []pane.Press{pane.Key(input.KeyD, "d")},
 		do: func(application *Window, _ *ui.Context, _ int) { application.toggleView() }},
 	{description: "Fold the unchanged lines, or show them all", keys: []pane.Press{pane.Key(input.KeyF, "f")},
 		do: func(application *Window, _ *ui.Context, _ int) {
-			if application.editor.Mode == viewer.DiffView {
-				application.editor.ToggleContext()
+			if application.viewer.Mode == viewer.DiffView {
+				application.viewer.ToggleContext()
 			}
 		}},
-	{description: "The first mode, the second, or the next one: files, review",
-		keys: []pane.Press{{Key: input.Key1, Label: "1", Step: 1}, {Key: input.Key2, Label: "2", Step: 2}, pane.Key(input.KeyC, "c")},
-		do:   func(application *Window, _ *ui.Context, step int) { application.stepMode(step) }},
 	{description: "Only the projects with changes, or every project (sidebar and finder)", keys: []pane.Press{pane.Key(input.KeyH, "h")},
 		do: func(application *Window, _ *ui.Context, _ int) { application.setOnlyChanged(!application.onlyChanged) }},
 	{description: "Count the changes not committed yet, or only commits", keys: []pane.Press{pane.Key(input.KeyW, "w")},
@@ -150,24 +147,24 @@ var commands = []command{
 			application.sidebar.OpenSelected(application, step == 1)
 		}},
 
-	{description: "Scroll a line down / up", place: inEditor,
+	{description: "Scroll a line down / up", place: inViewer,
 		keys: []pane.Press{pane.StepKey(input.KeyDown, "↓", 1), pane.StepKey(input.KeyJ, "j", 1), pane.StepKey(input.KeyUp, "↑", -1), pane.StepKey(input.KeyK, "k", -1)},
-		do:   func(application *Window, _ *ui.Context, step int) { application.editor.ScrollLines(step) }},
-	{description: "Scroll a page up", place: inEditor,
+		do:   func(application *Window, _ *ui.Context, step int) { application.viewer.ScrollLines(step) }},
+	{description: "Scroll a page up", place: inViewer,
 		keys: []pane.Press{{Key: input.KeySpace, Shift: true, Label: "Shift+Space", Step: -pane.PageStep, Repeats: true},
 			pane.StepKey(input.KeyPageUp, "PgUp", -pane.PageStep)},
-		do: func(application *Window, _ *ui.Context, step int) { application.editor.ScrollLines(step) }},
-	{description: "Scroll a page down", place: inEditor,
+		do: func(application *Window, _ *ui.Context, step int) { application.viewer.ScrollLines(step) }},
+	{description: "Scroll a page down", place: inViewer,
 		keys: []pane.Press{pane.StepKey(input.KeySpace, "Space", pane.PageStep), pane.StepKey(input.KeyPageDown, "PgDn", pane.PageStep)},
-		do:   func(application *Window, _ *ui.Context, step int) { application.editor.ScrollLines(step) }},
-	{description: "Go to the top / bottom", place: inEditor,
+		do:   func(application *Window, _ *ui.Context, step int) { application.viewer.ScrollLines(step) }},
+	{description: "Go to the top / bottom", place: inViewer,
 		keys: []pane.Press{{Key: input.KeyHome, Label: "Home", Step: -pane.EndStep}, {Key: input.KeyEnd, Label: "End", Step: pane.EndStep}},
-		do:   func(application *Window, _ *ui.Context, step int) { application.editor.ScrollLines(step) }},
-	{description: "Scroll sideways", place: inEditor,
+		do:   func(application *Window, _ *ui.Context, step int) { application.viewer.ScrollLines(step) }},
+	{description: "Scroll sideways", place: inViewer,
 		keys: []pane.Press{pane.StepKey(input.KeyRight, "→", 1), pane.StepKey(input.KeyLeft, "←", -1)},
-		do:   func(application *Window, _ *ui.Context, step int) { application.editor.ScrollSideways(step) }},
-	{description: "Open a fold in sight", place: inEditor, keys: []pane.Press{pane.Key(input.KeyEnter, "Enter")},
-		do: func(application *Window, _ *ui.Context, _ int) { application.editor.OpenFoldInSight() }},
+		do:   func(application *Window, _ *ui.Context, step int) { application.viewer.ScrollSideways(step) }},
+	{description: "Open a fold in sight", place: inViewer, keys: []pane.Press{pane.Key(input.KeyEnter, "Enter")},
+		do: func(application *Window, _ *ui.Context, _ int) { application.viewer.OpenFoldInSight() }},
 }
 
 // helpRow is a command as the help shows it: its keys and what it does.

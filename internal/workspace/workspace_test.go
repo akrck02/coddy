@@ -9,7 +9,7 @@ import (
 
 // TestReadingARealRepository reads a repository named by REVIEW_REPOSITORY, to try the reading
 // against real developments; without it the test is skipped.
-func TestReadingARealRepository(test *testing.T) {
+func TestARealRepositoryIsReadWithItsChanges(test *testing.T) {
 	path := os.Getenv("REVIEW_REPOSITORY")
 	if path == "" {
 		test.Skip("set REVIEW_REPOSITORY to a repository to read")

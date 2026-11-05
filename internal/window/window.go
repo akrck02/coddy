@@ -15,6 +15,7 @@ import (
 	"github.com/akrck02/code-review/internal/theme"
 	"github.com/akrck02/code-review/internal/viewer"
 	"github.com/akrck02/code-review/internal/workspace"
+	"github.com/akrck02/go-renderer/failure"
 	"github.com/akrck02/go-ui/uidrive"
 )
 
@@ -42,7 +43,7 @@ type focusedPane int
 
 const (
 	sidebarPane focusedPane = iota
-	editorPane
+	viewerPane
 )
 
 // Window is the reader. Its fields are only touched from the goroutine that builds the interface;
@@ -61,7 +62,7 @@ type Window struct {
 	documentCache map[workspace.FileReference]*workspace.Document
 
 	sidebar sidebar.Sidebar
-	editor  viewer.Viewer
+	viewer  viewer.Viewer
 	finder  finder.Finder
 	base    baseDialog
 	focus   focusedPane
@@ -87,8 +88,11 @@ type Window struct {
 }
 
 // New makes a reader for these settings, with its modes in the rail's order; Driver must be given
-// to the window it runs in.
-func New(settings Settings, modes ...mode.Mode) *Window {
+// to the window it runs in. It needs one mode at least (NoMode).
+func New(settings Settings, modes ...mode.Mode) (*Window, error) {
+	if len(modes) == 0 {
+		return nil, failure.Wrap(NoMode, "main registers the modes", nil)
+	}
 	application := &Window{
 		settings:      settings,
 		projectBases:  map[string]string{},
@@ -103,7 +107,7 @@ func New(settings Settings, modes ...mode.Mode) *Window {
 	}
 	application.sidebar = sidebar.New()
 	application.startModes(modes, settings.Mode)
-	application.editor = viewer.New()
+	application.viewer = viewer.New()
 	application.setLook()
 	application.openFolders(settings.Folders)
 	if settings.Open != "" {
@@ -113,7 +117,7 @@ func New(settings Settings, modes ...mode.Mode) *Window {
 		application.finder.Show(finder.ContentScope)
 		application.finder.Query = settings.Find
 	}
-	return application
+	return application, nil
 }
 
 // Driver is what lets the reader see the keys: give it to window.Options.Driver.
@@ -155,7 +159,7 @@ func (application *Window) openFolders(folders []string) {
 		return strings.ToLower(application.projects[first].Name) < strings.ToLower(application.projects[second].Name)
 	})
 	application.documentCache = map[workspace.FileReference]*workspace.Document{}
-	application.editor.Close()
+	application.viewer.Close()
 	application.reloadAll()
 }
 
@@ -164,7 +168,7 @@ func (application *Window) closeAll() {
 	application.projects = nil
 	application.folders = nil
 	application.documentCache = map[workspace.FileReference]*workspace.Document{}
-	application.editor.Close()
+	application.viewer.Close()
 	application.projectsChanged()
 }
 
@@ -183,13 +187,13 @@ func (application *Window) reload(index int) {
 	options := workspace.LoadOptions{Base: application.baseFor(path), WorkingTree: application.settings.WorkingTree}
 	application.projects[index] = &workspace.Project{Name: project.Name, Path: path}
 	application.loading++
-	application.work.run("project "+path, func(stop cancellation) func() {
+	settle := func() { application.loading-- } // also when a newer reading replaced this one
+	application.work.runSettling("project "+path, func(stop cancellation) func() {
 		var loaded *workspace.Project
 		if !application.work.read(stop, func() { loaded = workspace.LoadProject(path, options) }) {
 			return nil
 		}
 		return func() {
-			application.loading--
 			application.forgetClassKinds(path)
 			for position, current := range application.projects {
 				if current.Path == path {
@@ -202,9 +206,9 @@ func (application *Window) reload(index int) {
 				}
 			}
 			application.projectsChanged()
-			application.editor.Reopen(path, application.openFile)
+			application.viewer.Reopen(path, application.openFile)
 		}
-	})
+	}, settle)
 }
 
 // baseFor is the base a project is compared against: its own, the one for all, or its default.
@@ -249,19 +253,19 @@ func walkFiles(folder *workspace.Folder, visit func(path string)) {
 	}
 }
 
-// openFile opens a file of a project in the editor, reading it on another goroutine.
+// openFile opens a file of a project in the viewer, reading it on another goroutine.
 func (application *Window) openFile(reference workspace.FileReference) {
 	if reference.Project < 0 || reference.Project >= len(application.projects) {
 		return
 	}
 	project := application.projects[reference.Project]
-	application.editor.Start(reference, project)
+	application.viewer.Start(reference, project)
 	if document, cached := application.documentCache[reference]; cached {
-		application.editor.Show(document, application.mode.ShowsChanges())
+		application.viewer.Show(document, application.mode.ShowsChanges())
 		return
 	}
 	workingTree := application.settings.WorkingTree
-	request := application.editor.Request
+	request := application.viewer.Request
 	application.work.run("", func(cancellation) func() {
 		document := workspace.OpenDocument(project, reference.Path, workingTree)
 		return func() {
@@ -269,8 +273,8 @@ func (application *Window) openFile(reference workspace.FileReference) {
 				application.documentCache = map[workspace.FileReference]*workspace.Document{}
 			}
 			application.documentCache[reference] = document
-			if application.editor.Request == request {
-				application.editor.Show(document, application.mode.ShowsChanges())
+			if application.viewer.Request == request {
+				application.viewer.Show(document, application.mode.ShowsChanges())
 			}
 		}
 	})
@@ -278,11 +282,11 @@ func (application *Window) openFile(reference workspace.FileReference) {
 
 // openFileAt opens a file and shows one of its lines, marked; 0 shows its top (or first change).
 func (application *Window) openFileAt(reference workspace.FileReference, line int) {
-	application.editor.GoTo = line
+	application.viewer.GoTo = line
 	application.openFile(reference)
-	editor := &application.editor
-	if editor.GoTo > 0 && editor.Document != nil && editor.Reference == reference {
-		editor.RevealLine(editor.GoTo)
+	view := &application.viewer
+	if view.GoTo > 0 && view.Document != nil && view.Reference == reference {
+		view.RevealLine(view.GoTo)
 	}
 }
 
@@ -299,7 +303,7 @@ func (application *Window) stepChangedFile(step int) {
 	}
 	current := -1
 	for index, reference := range order {
-		if reference == application.editor.Reference && application.editor.IsOpen() {
+		if reference == application.viewer.Reference && application.viewer.IsOpen() {
 			current = index
 			break
 		}
@@ -367,7 +371,7 @@ func (application *Window) openByLabel(label string) {
 			reference := workspace.FileReference{Project: candidate.Project, Path: candidate.Path}
 			application.openFile(reference)
 			application.sidebar.RevealFile(application, reference)
-			application.focus = editorPane
+			application.focus = viewerPane
 			return
 		}
 	}

@@ -49,7 +49,7 @@ func (application *Window) Build(context *ui.Context) {
 					application.sidebar.Build(context, application)
 				})
 			context.Frame(ui.Layout{Width: ui.Fixed(1), Height: ui.Grow()}, ui.Look{Fill: context.Theme.Line}, nil)
-			application.editor.Build(context, application)
+			application.viewer.Build(context, application)
 		})
 		context.Frame(ui.Layout{Width: ui.Grow(), Height: ui.Fixed(1)}, ui.Look{Fill: context.Theme.Line}, nil)
 		application.buildStatusBar(context)
@@ -80,8 +80,8 @@ func (application *Window) enterCurrentProject() {
 		application.sidebar.Enter(application, row.Project)
 		return
 	}
-	if application.editor.IsOpen() {
-		application.sidebar.Enter(application, application.editor.Reference.Project)
+	if application.viewer.IsOpen() {
+		application.sidebar.Enter(application, application.viewer.Reference.Project)
 	}
 }
 
@@ -93,28 +93,28 @@ func workingTreeNote(on bool) string {
 }
 
 func (application *Window) toggleFocus() {
-	if application.focus == sidebarPane && application.editor.IsOpen() {
-		application.focus = editorPane
+	if application.focus == sidebarPane && application.viewer.IsOpen() {
+		application.focus = viewerPane
 		return
 	}
 	application.focus = sidebarPane
 }
 
 func (application *Window) toggleView() {
-	editor := &application.editor
-	if editor.Mode == viewer.DiffView {
-		editor.SetMode(viewer.FileView)
+	view := &application.viewer
+	if view.Mode == viewer.DiffView {
+		view.SetMode(viewer.FileView)
 	} else {
-		editor.SetMode(viewer.DiffView)
+		view.SetMode(viewer.DiffView)
 	}
 }
 
 // copyPath puts the open file's path, from the project's top, on the clipboard.
 func (application *Window) copyPath(context *ui.Context) {
-	if !application.editor.IsOpen() {
+	if !application.viewer.IsOpen() {
 		return
 	}
-	path := application.editor.Project.Name + "/" + application.editor.Reference.Path
+	path := application.viewer.Project.Name + "/" + application.viewer.Reference.Path
 	context.Copy(path)
 	application.toast = "Copied " + path
 }
@@ -225,15 +225,15 @@ func (application *Window) title() string {
 	return fmt.Sprintf("%s and %d more", baseName(application.folders[0]), len(application.folders)-1)
 }
 
-// buildStatusBar says where the development stands: its projects and changed files, how much of
-// it has been viewed, and where the open file's branch stands against its base.
+// buildStatusBar says where the development stands: its projects and changed files, how far a
+// mode's work has gone, and where the open file's branch stands against its base.
 func (application *Window) buildStatusBar(context *ui.Context) {
 	palette := context.Theme
 	small := ui.TextStyle{Size: palette.SmallTextSize, Color: palette.InkSoft}
 	context.Box(ui.Layout{Width: ui.Grow(), Height: ui.Fixed(28), Padding: ui.PadXY(14, 0), Gap: 16, AlignY: ui.Center}, func() {
 		context.Text(fmt.Sprintf("%d projects · %d with changes · %d changed files",
 			len(application.projects), application.projectsWithChanges(), len(application.changedOrder)), small)
-		if viewed, total := application.progress(); total > 0 {
+		if viewed, total, words := application.progress(); total > 0 {
 			context.Box(ui.Layout{Gap: 6, AlignY: ui.Center}, func() {
 				colour := palette.InkQuiet
 				if viewed == total {
@@ -247,15 +247,15 @@ func (application *Window) buildStatusBar(context *ui.Context) {
 						drawing.Rectangle(done, 2, colour, draw2d.Color{}, 0)
 					}
 				})
-				context.Text(fmt.Sprintf("%d of %d viewed", viewed, total), small)
+				context.Text(words, small)
 			})
 		}
 		if application.loading > 0 {
 			context.Text(fmt.Sprintf("reading %d…", application.loading), small)
 		}
 		context.Spacer()
-		if application.editor.IsOpen() {
-			project := application.editor.Project
+		if application.viewer.IsOpen() {
+			project := application.viewer.Project
 			for _, current := range application.projects {
 				if current.Path == project.Path {
 					project = current
@@ -277,8 +277,8 @@ func (application *Window) openBaseDialog() {
 	dialog.open = true
 	dialog.focusNext = true
 	dialog.forProject = ""
-	if application.editor.IsOpen() {
-		dialog.forProject = application.editor.Project.Path
+	if application.viewer.IsOpen() {
+		dialog.forProject = application.viewer.Project.Path
 	} else if row, ok := application.sidebar.SelectedRow(); ok && row.Project >= 0 {
 		dialog.forProject = application.projects[row.Project].Path
 	}
@@ -355,7 +355,7 @@ func (application *Window) buildHelp(context *ui.Context) {
 			application.buildHelpColumn(context, "Anywhere", application.helpRows(anywhere))
 			context.Box(ui.Layout{Direction: ui.Vertical, Gap: 16}, func() {
 				application.buildHelpColumn(context, "In the sidebar", application.helpRows(inSidebar))
-				application.buildHelpColumn(context, "In the file", application.helpRows(inEditor))
+				application.buildHelpColumn(context, "In the file", application.helpRows(inViewer))
 			})
 		})
 		context.Row(func() {

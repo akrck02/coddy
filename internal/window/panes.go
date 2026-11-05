@@ -5,6 +5,7 @@ import (
 
 	"github.com/akrck02/code-review/internal/finder"
 	"github.com/akrck02/code-review/internal/java"
+	"github.com/akrck02/code-review/internal/mode"
 	"github.com/akrck02/code-review/internal/pane"
 	"github.com/akrck02/code-review/internal/sidebar"
 	"github.com/akrck02/code-review/internal/theme"
@@ -29,7 +30,7 @@ func (application *Window) HasProjects() bool { return len(application.projects)
 func (application *Window) OpenFolder() { application.pickerOpen = true }
 
 // FocusViewer gives the keyboard to the file's view.
-func (application *Window) FocusViewer() { application.focus = editorPane }
+func (application *Window) FocusViewer() { application.focus = viewerPane }
 
 // BuildInsteadOfAFile shows what the mode that is on shows while no file is open, if anything.
 func (application *Window) BuildInsteadOfAFile(context *ui.Context) bool {
@@ -71,7 +72,7 @@ func (application *Window) Read(stop context.Context, reading func()) bool {
 func (application *Window) OpenAt(file workspace.FileReference, line int) {
 	application.openFileAt(file, line)
 	application.sidebar.RevealFile(application, file)
-	application.focus = editorPane
+	application.focus = viewerPane
 }
 
 // ProjectIndex is a project's place in Projects, by its path; -1 when it is not open.
@@ -90,12 +91,12 @@ func (application *Window) OpenFile(file workspace.FileReference) { application.
 
 // OpenedFile is the file the viewer shows, if any.
 func (application *Window) OpenedFile() (workspace.FileReference, bool) {
-	return application.editor.Reference, application.editor.IsOpen()
+	return application.viewer.Reference, application.viewer.IsOpen()
 }
 
 // IsOpened tells whether the viewer shows a file.
 func (application *Window) IsOpened(file workspace.FileReference) bool {
-	return application.editor.IsOpen() && application.editor.Reference == file
+	return application.viewer.IsOpen() && application.viewer.Reference == file
 }
 
 // FocusSidebar gives the keyboard to the sidebar.
@@ -115,21 +116,43 @@ func (application *Window) Loading() bool { return application.loading > 0 }
 // ReadingKinds tells whether class kinds are being read.
 func (application *Window) ReadingKinds() bool { return len(application.kindsWanted) > 0 }
 
-// FileButton is the button the mode that is on puts in the viewer's header.
+// FileButton is the viewer header's button for a file: the one of the mode that is on, else the
+// first mode that has one, so a file can be marked as viewed whatever the mode, as v can.
 func (application *Window) FileButton(file workspace.FileReference) (viewer.Button, bool) {
-	return application.mode.FileButton(file)
+	if owner := application.buttonOwner(file); owner != nil {
+		return owner.FileButton(file)
+	}
+	return viewer.Button{}, false
 }
 
-// PressFileButton presses the mode's button for the file open, moving on as a reviewer would.
+// PressFileButton presses the header's button for the file open, moving on as a reviewer would.
 func (application *Window) PressFileButton(file workspace.FileReference) {
-	application.mode.Press(file, true)
+	if owner := application.buttonOwner(file); owner != nil {
+		owner.Press(file, true)
+	}
 }
 
-// ListEveryFile turns to the first mode that lists every file.
+// buttonOwner is the mode whose button the viewer's header shows for a file, if any.
+func (application *Window) buttonOwner(file workspace.FileReference) mode.Mode {
+	if _, shown := application.mode.FileButton(file); shown {
+		return application.mode
+	}
+	for _, each := range application.modes {
+		if _, shown := each.FileButton(file); shown {
+			return each
+		}
+	}
+	return nil
+}
+
+// ListEveryFile turns to the first mode that lists every file. It is asked by the sidebar while
+// it reveals a file, so it only changes what the sidebar lists; the sidebar goes on revealing.
 func (application *Window) ListEveryFile() {
 	for _, each := range application.modes {
 		if !each.ChangesOnly() {
-			application.setMode(each)
+			application.mode = each
+			application.sidebar.Listing = each
+			application.sidebar.Stale = true
 			return
 		}
 	}
@@ -154,14 +177,14 @@ func (application *Window) Target() (file workspace.FileReference, inViewer bool
 	case application.focus == sidebarPane:
 		if row, ok := application.sidebar.SelectedRow(); ok && row.Kind == sidebar.FileRow {
 			file, found = workspace.FileReference{Project: row.Project, Path: row.Path}, true
-		} else if application.editor.IsOpen() {
-			file, found = application.editor.Reference, true
+		} else if application.viewer.IsOpen() {
+			file, found = application.viewer.Reference, true
 		}
-	case application.editor.IsOpen():
-		file, found = application.editor.Reference, true
+	case application.viewer.IsOpen():
+		file, found = application.viewer.Reference, true
 	}
-	opened := application.editor.IsOpen() && application.editor.Reference == file
-	return file, found && (application.focus == editorPane || opened), found
+	opened := application.viewer.IsOpen() && application.viewer.Reference == file
+	return file, found && (application.focus == viewerPane || opened), found
 }
 
 // ToggleChangedFilter lists only the changed files in the sidebar, or every file again.

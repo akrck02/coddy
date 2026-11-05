@@ -92,6 +92,7 @@ func LoadProject(path string, options LoadOptions) *Project {
 		project.Error = err.Error()
 	}
 	project.setChanges(changes)
+	// counts that cannot be read leave the files without their +/− numbers; the changes still show
 	project.Counts, _ = git.CountLines(path, project.Comparison(options.WorkingTree))
 	if project.Counts == nil {
 		project.Counts = map[string]git.LineCounts{}
@@ -132,6 +133,8 @@ func fingerprints(repository, mergeBase string, changes []git.Change, workingTre
 	result := make(map[string]string, len(changes))
 	var blobs map[string]string
 	if !workingTree {
+		// a git that cannot list the content ids leaves the marks following only the base, not each
+		// file's text: still usable, and nothing better can be had from it
 		blobs, _ = git.BlobsAt(repository, "HEAD")
 	}
 	for _, change := range changes {

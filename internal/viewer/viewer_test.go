@@ -27,7 +27,7 @@ func TestAnUnchangedFileIsOnlyShownWhole(test *testing.T) {
 	}
 }
 
-func TestAChangedFileOpensOnItsChangesWhenReviewing(test *testing.T) {
+func TestAChangedFileOpensOnItsChangesWhenAsked(test *testing.T) {
 	view := New()
 	file := workspace.FileReference{Project: 0, Path: "lighthouse/lamp.txt"}
 	view.Start(file, &workspace.Project{Name: "lighthouse"})

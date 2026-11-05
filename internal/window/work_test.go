@@ -59,3 +59,24 @@ func TestJobsWithoutAKeyAllFinish(test *testing.T) {
 		test.Errorf("%d of 3 jobs without a key showed their result", finished)
 	}
 }
+
+func TestAJobReplacedByANewerOneStillSettles(test *testing.T) {
+	jobs := newWork(false)
+	running := 0
+	for range 2 {
+		running++
+		jobs.runSettling(search, func(stop cancellation) func() {
+			<-stop.Done() // the first waits to be replaced; the second is cancelled below
+			return nil
+		}, func() { running-- })
+	}
+	jobs.cancel(search)
+	deadline := time.Now().Add(waitTo)
+	for running > 0 && time.Now().Before(deadline) {
+		jobs.take()
+		time.Sleep(time.Millisecond)
+	}
+	if running != 0 {
+		test.Errorf("%d jobs never settled", running)
+	}
+}

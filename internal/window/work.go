@@ -45,6 +45,13 @@ func newWork(synchronous bool) *work {
 // run starts a job. The job returns what to do with its result on the interface's goroutine; it
 // should stop early, returning nil, once its context is cancelled. An empty key replaces nothing.
 func (work *work) run(key string, do func(stop cancellation) func()) {
+	work.runSettling(key, do, nil)
+}
+
+// runSettling is run, with settle called on the interface's goroutine once the job is over,
+// whether its result was applied, dropped for a newer job, or there was none: for counting the
+// jobs still running.
+func (work *work) runSettling(key string, do func(stop cancellation) func(), settle func()) {
 	stop, cancel := context.WithCancel(context.Background())
 	current := &job{cancel: cancel}
 	if key != "" {
@@ -55,6 +62,9 @@ func (work *work) run(key string, do func(stop cancellation) func()) {
 		return func() {
 			if key != "" && work.running[key] == current {
 				delete(work.running, key)
+			}
+			if settle != nil {
+				settle()
 			}
 			if current.replaced || apply == nil {
 				return // a newer job of the same key took over, or this one found nothing to do
