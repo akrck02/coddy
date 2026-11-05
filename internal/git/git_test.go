@@ -1,0 +1,52 @@
+package git
+
+import (
+	"errors"
+	"testing"
+)
+
+func TestOnlyReadOnlyCommandsRun(test *testing.T) {
+	for _, command := range []string{"commit", "push", "fetch", "checkout", "reset", "add", "update-index", "gc", "status"} {
+		if _, err := run(".", command); !errors.Is(err, ErrNotReadOnly) {
+			test.Errorf("git %s was allowed to run", command)
+		}
+	}
+}
+
+func TestNameStatusReadsRenamesAndDeletions(test *testing.T) {
+	changes := parseNameStatus([]string{"M", "a.go", "R087", "old/b.go", "new/b.go", "D", "c.go", "A", "d.go"})
+	if len(changes) != 4 {
+		test.Fatalf("read %d changes, want 4", len(changes))
+	}
+	rename := changes[1]
+	if rename.Status != Renamed || rename.OldPath != "old/b.go" || rename.Path != "new/b.go" {
+		test.Errorf("rename read as %+v", rename)
+	}
+	if changes[2].Status != Deleted || changes[3].Status != Added {
+		test.Errorf("statuses read as %v and %v", changes[2].Status, changes[3].Status)
+	}
+}
+
+func TestAUnifiedDiffIsNumberedOnBothSides(test *testing.T) {
+	output := "diff --git a/x b/x\nindex 1..2 100644\n--- a/x\n+++ b/x\n@@ -1,3 +1,3 @@\n one\n-two\n+TWO\n three\n\\ No newline at end of file\n"
+	diff, err := parseUnifiedDiff([]byte(output))
+	if err != nil {
+		test.Fatal(err)
+	}
+	want := []DiffLine{{Context, 1, 1}, {Removal, 2, 0}, {Insertion, 0, 2}, {Context, 3, 3}}
+	if len(diff.Lines) != len(want) {
+		test.Fatalf("read %d lines, want %d", len(diff.Lines), len(want))
+	}
+	for index, line := range want {
+		if diff.Lines[index] != line {
+			test.Errorf("line %d is %+v, want %+v", index, diff.Lines[index], line)
+		}
+	}
+}
+
+func TestABinaryDiffIsMarked(test *testing.T) {
+	diff, _ := parseUnifiedDiff([]byte("diff --git a/x b/x\nBinary files a/x and b/x differ\n"))
+	if !diff.Binary {
+		test.Error("a binary diff was not marked")
+	}
+}
