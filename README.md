@@ -74,7 +74,7 @@ You need Go 1.25 or later and the Xcode command line tools (`xcode-select --inst
 is opened through cgo and drawn with Metal.
 
 ```bash
-go build -o bin/code-review .
+go build -o bin/code-review ./cmd/code-review
 ./bin/code-review /path/to/workspace                 # a folder of repositories
 ./bin/code-review ../api ../web                      # or the repositories themselves
 ./bin/code-review -base origin/release/2.4 /path/to/workspace
