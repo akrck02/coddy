@@ -3,6 +3,9 @@
 package review
 
 import (
+	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"path/filepath"
 	"sort"
 
@@ -23,6 +26,11 @@ type Project struct {
 
 	Changes []git.Change // sorted by path
 	Files   []string     // every file, sorted
+	// Counts are the lines each changed file adds and removes, by its path now.
+	Counts map[string]git.LineCounts
+	// Fingerprints name each changed file's text as the development has it, so a file marked as
+	// reviewed is seen again when it changes.
+	Fingerprints map[string]string
 
 	changeIndex map[string]int
 
@@ -84,6 +92,11 @@ func LoadProject(path string, options LoadOptions) *Project {
 		project.Error = err.Error()
 	}
 	project.setChanges(changes)
+	project.Counts, _ = git.CountLines(path, project.Comparison(options.WorkingTree))
+	if project.Counts == nil {
+		project.Counts = map[string]git.LineCounts{}
+	}
+	project.Fingerprints = fingerprints(path, project.MergeBase, changes, options.WorkingTree, project.Counts)
 	// a file deleted by the development is no longer in the working tree, but it is still worth
 	// finding in the tree to read what was removed
 	for _, change := range changes {
@@ -91,6 +104,60 @@ func LoadProject(path string, options LoadOptions) *Project {
 	}
 	project.Files = sortedUnique(files)
 	return project
+}
+
+// TotalCounts adds up the lines the development adds and removes in this project.
+func (project *Project) TotalCounts() (added, removed int) {
+	for _, counts := range project.Counts {
+		added += counts.Added
+		removed += counts.Removed
+	}
+	return added, removed
+}
+
+// fingerprints names the text of each changed file: the content id git gives it in the last
+// commit, or a hash of the file on disk when changes not committed yet count. Each starts with
+// the base, so choosing another base starts the review again. New files git does not know are
+// counted here too, as wholly added.
+func fingerprints(repository, mergeBase string, changes []git.Change, workingTree bool, counts map[string]git.LineCounts) map[string]string {
+	result := make(map[string]string, len(changes))
+	var blobs map[string]string
+	if !workingTree {
+		blobs, _ = git.BlobsAt(repository, "HEAD")
+	}
+	for _, change := range changes {
+		key := mergeBase + ":"
+		switch {
+		case change.Status == git.Deleted:
+			key += "deleted"
+		case !workingTree:
+			key += blobs[change.Path]
+		default:
+			content, err := git.ReadWorkingFile(repository, change.Path)
+			if err != nil {
+				key += "unreadable"
+				break
+			}
+			sum := sha256.Sum256(content)
+			key += hex.EncodeToString(sum[:12])
+			if change.Untracked {
+				counts[change.Path] = git.LineCounts{Added: countLines(content), Binary: isBinary(content)}
+			}
+		}
+		result[change.Path] = key
+	}
+	return result
+}
+
+func countLines(content []byte) int {
+	if len(content) == 0 {
+		return 0
+	}
+	lines := bytes.Count(content, []byte{'\n'})
+	if content[len(content)-1] != '\n' {
+		lines++
+	}
+	return lines
 }
 
 func (project *Project) setChanges(changes []git.Change) {

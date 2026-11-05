@@ -30,19 +30,20 @@ func (application *App) Build(context *ui.Context) {
 	application.takeResults()
 	application.handleKeys(context)
 
-	theme := context.Theme
-	context.Box(ui.Layout{Direction: ui.Vertical, Width: ui.Grow(), Height: ui.Grow()}, func() {
-		application.buildToolbar(context)
-		context.Separator()
+	context.Frame(ui.Layout{Direction: ui.Vertical, Width: ui.Grow(), Height: ui.Grow()}, ui.Look{Fill: context.Theme.Background}, func() {
+		application.buildTitleBar(context)
+		context.Frame(ui.Layout{Width: ui.Grow(), Height: ui.Fixed(1)}, ui.Look{Fill: context.Theme.Line}, nil)
 		context.Box(ui.Layout{Width: ui.Grow(), Height: ui.Grow()}, func() {
+			application.buildModeRail(context)
+			context.Frame(ui.Layout{Width: ui.Fixed(1), Height: ui.Grow()}, ui.Look{Fill: context.Theme.Line}, nil)
 			context.Resizable("sidebar", ui.RightSide, &application.sidebar.width, 220, 720,
 				ui.Layout{Direction: ui.Vertical, Height: ui.Grow()}, func() {
 					application.sidebar.build(context, application)
 				})
-			context.Frame(ui.Layout{Width: ui.Fixed(1), Height: ui.Grow()}, ui.Look{Fill: theme.Line}, nil)
+			context.Frame(ui.Layout{Width: ui.Fixed(1), Height: ui.Grow()}, ui.Look{Fill: context.Theme.Line}, nil)
 			application.editor.build(context, application)
 		})
-		context.Separator()
+		context.Frame(ui.Layout{Width: ui.Grow(), Height: ui.Fixed(1)}, ui.Look{Fill: context.Theme.Line}, nil)
 		application.buildStatusBar(context)
 	})
 
@@ -57,12 +58,8 @@ func (application *App) Build(context *ui.Context) {
 }
 
 func (application *App) applyTheme(context *ui.Context) {
-	if application.dark {
-		context.Theme = application.designs.dark
-	} else {
-		context.Theme = application.designs.light
-	}
-	application.setPalette()
+	application.setLook()
+	context.Theme = application.look.theme
 }
 
 func (application *App) modalOpen() bool {
@@ -106,8 +103,15 @@ func (application *App) handleKeys(context *ui.Context) {
 			application.editor.toggleContext()
 		}
 	case keys.plain(input.KeyC):
-		application.sidebar.mode = 1 - application.sidebar.mode
-		application.sidebar.stale = true
+		application.setMode(1 - application.sidebar.mode)
+	case keys.plain(input.Key1):
+		application.setMode(filesMode)
+	case keys.plain(input.Key2):
+		application.setMode(reviewMode)
+	case keys.plain(input.KeyV):
+		if reference, ok := application.markTarget(); ok {
+			application.toggleViewed(reference, application.focus == editorPane || application.editor.reference == reference)
+		}
 	case keys.plain(input.KeyH):
 		application.setOnlyChanged(!application.onlyChanged)
 	case keys.plain(input.KeyW):
@@ -163,48 +167,98 @@ func (application *App) copyPath(context *ui.Context) {
 	application.toast = "Copied " + path
 }
 
-func (application *App) buildToolbar(context *ui.Context) {
-	context.Box(ui.Layout{Width: ui.Grow(), Height: ui.Fixed(44), Padding: ui.PadXY(10, 0), Gap: 6, AlignY: ui.Center}, func() {
-		context.IconSized("git-compare", 18, context.Theme.Primary)
-		context.Text(application.title(), ui.TextStyle{Weight: draw2d.Bold})
-		context.Spacer()
-		if toggleIcon(context, "square-check", "square", "Only changed projects", application.onlyChanged) {
-			application.setOnlyChanged(!application.onlyChanged)
+// buildModeRail is the strip on the far left that chooses what the reader is doing: reading the
+// files, or reviewing the changes. Two places, always in sight, one key each.
+func (application *App) buildModeRail(context *ui.Context) {
+	theme := context.Theme
+	context.Box(ui.Layout{Direction: ui.Vertical, Width: ui.Fixed(48), Height: ui.Grow(), Padding: ui.PadXY(0, 10), Gap: 6, AlignX: ui.Center}, func() {
+		for _, place := range []struct {
+			mode       sidebarMode
+			icon, name string
+		}{
+			{filesMode, "folder-tree", "Files (1): read any file, the changes marked beside the lines"},
+			{reviewMode, "git-pull-request", "Review (2): only the changed files, as diffs, marked as viewed one by one"},
+		} {
+			chosen := application.sidebar.mode == place.mode
+			ink, normal := theme.InkQuiet, ui.Look{Radius: 8}
+			if chosen {
+				ink, normal = theme.Ink, ui.Look{Fill: application.look.chosen, Radius: 8}
+			}
+			hovered := normal
+			if !chosen {
+				hovered.Fill = application.look.hover
+			}
+			layout := ui.Layout{Width: ui.Fixed(36), Height: ui.Fixed(36), AlignX: ui.Center, AlignY: ui.Center}
+			if context.Clickable(place.name, layout, ui.Looks{Normal: normal, Hovered: hovered, Pressed: hovered}, func() {
+				context.IconSized(place.icon, 20, ink)
+			}) {
+				application.setMode(place.mode)
+			}
+			context.Tooltip(place.name)
 		}
-		context.Tooltip("h: hide the projects the development did not change, in the sidebar and the finder")
-		if context.FlatIconButton("search", "Find file") {
+		context.Spacer()
+		if toolButton(context, "Keys (?)", "keyboard", false) {
+			application.helpOpen = true
+		}
+	})
+}
+
+// buildTitleBar is the top of the window: the workspace on the left, a search field in the middle
+// that opens the finder, and the comparison's settings on the right, as icons.
+func (application *App) buildTitleBar(context *ui.Context) {
+	theme := context.Theme
+	context.Box(ui.Layout{Width: ui.Grow(), Height: ui.Fixed(44), Padding: ui.PadXY(14, 0), Gap: 8, AlignY: ui.Center}, func() {
+		context.Box(ui.Layout{Width: ui.Grow(), Gap: 8, AlignY: ui.Center}, func() {
+			context.Text(application.title(), ui.TextStyle{Weight: draw2d.Medium})
+			if base := application.settings.Base; base != "" {
+				context.Text("against "+base, ui.TextStyle{Size: theme.SmallTextSize, Color: theme.InkQuiet})
+			}
+		})
+		normal := ui.Look{Fill: theme.Surface, Radius: 6, Border: theme.Line, BorderWidth: 1}
+		hovered := normal
+		hovered.Fill = application.look.hover
+		search := ui.Layout{Width: ui.Fixed(380), Height: ui.Fixed(30), Padding: ui.PadXY(10, 0), Gap: 8, AlignY: ui.Center}
+		if context.Clickable("search files", search, ui.Looks{Normal: normal, Hovered: hovered, Pressed: hovered}, func() {
+			context.IconSized("search", 14, theme.InkQuiet)
+			context.Text("Search files", ui.TextStyle{Color: theme.InkQuiet})
+			context.Spacer()
+			context.Text("⌘P", ui.TextStyle{Size: theme.SmallTextSize, Color: theme.InkQuiet})
+		}) {
 			application.finder.show()
 		}
-		context.Tooltip("⌘P")
-		if context.FlatIconButton("git-branch", "Base") {
-			application.openBaseDialog()
-		}
-		context.Tooltip("b: compare against another branch, tag or commit")
-		if toggleIcon(context, "square-check", "square", "Uncommitted", application.settings.WorkingTree) {
-			application.settings.WorkingTree = !application.settings.WorkingTree
-			application.clearDocuments()
-			application.reloadAll()
-		}
-		context.Tooltip("w: count the changes not committed yet")
-		if context.FlatIconButton("refresh-cw", "") {
-			application.reloadAll()
-		}
-		context.Tooltip("r: read the projects again")
-		context.MenuButton("ellipsis", "", func() {
-			if context.MenuItem("folder-open", "Open folder…", "o") {
-				application.pickerOpen = true
+		context.Box(ui.Layout{Width: ui.Grow(), Gap: 4, AlignY: ui.Center}, func() {
+			context.Spacer()
+			if toolButton(context, "Only the projects with changes (h)", "list-filter", application.onlyChanged) {
+				application.setOnlyChanged(!application.onlyChanged)
 			}
-			if context.MenuItem("sun-moon", "Light or dark", "t") {
-				application.dark = !application.dark
-				application.applyTheme(context)
+			if toolButton(context, "Count the changes not committed yet (w)", "file-pen-line", application.settings.WorkingTree) {
+				application.settings.WorkingTree = !application.settings.WorkingTree
+				application.clearDocuments()
+				application.reloadAll()
+				application.toast = workingTreeNote(application.settings.WorkingTree)
 			}
-			if context.MenuItem("keyboard", "Keys", "?") {
-				application.helpOpen = true
+			if toolButton(context, "Compare against another branch, tag or commit (b)", "git-branch", false) {
+				application.openBaseDialog()
 			}
-			context.Separator()
-			if context.MenuItem("x", "Close all projects", "") {
-				application.closeAll()
+			if toolButton(context, "Read the projects again (r)", "refresh-cw", false) {
+				application.reloadAll()
 			}
+			context.MenuButton("ellipsis", "", func() {
+				if context.MenuItem("folder-open", "Open folder…", "o") {
+					application.pickerOpen = true
+				}
+				if context.MenuItem("sun-moon", "Light or dark", "t") {
+					application.dark = !application.dark
+					application.applyTheme(context)
+				}
+				if context.MenuItem("keyboard", "Keys", "?") {
+					application.helpOpen = true
+				}
+				context.Separator()
+				if context.MenuItem("x", "Close all projects", "") {
+					application.closeAll()
+				}
+			})
 		})
 	})
 }
@@ -219,14 +273,35 @@ func (application *App) title() string {
 	return fmt.Sprintf("%s and %d more", baseName(application.folders[0]), len(application.folders)-1)
 }
 
+// buildStatusBar says where the development stands: its projects and changed files, how much of
+// it has been viewed, and where the open file's branch stands against its base.
 func (application *App) buildStatusBar(context *ui.Context) {
-	context.Box(ui.Layout{Width: ui.Grow(), Height: ui.Fixed(26), Padding: ui.PadXY(12, 0), Gap: 14, AlignY: ui.Center}, func() {
-		changedFiles := len(application.changedOrder)
-		context.Caption(fmt.Sprintf("%d projects · %d with changes · %d changed files",
-			len(application.projects), application.projectsWithChanges(), changedFiles))
-		if application.loading > 0 {
-			context.Caption(fmt.Sprintf("reading %d…", application.loading))
+	theme := context.Theme
+	small := ui.TextStyle{Size: theme.SmallTextSize, Color: theme.InkSoft}
+	context.Box(ui.Layout{Width: ui.Grow(), Height: ui.Fixed(28), Padding: ui.PadXY(14, 0), Gap: 16, AlignY: ui.Center}, func() {
+		context.Text(fmt.Sprintf("%d projects · %d with changes · %d changed files",
+			len(application.projects), application.projectsWithChanges(), len(application.changedOrder)), small)
+		if viewed, total := application.reviewProgress(); total > 0 {
+			context.Box(ui.Layout{Gap: 6, AlignY: ui.Center}, func() {
+				colour := theme.InkQuiet
+				if viewed == total {
+					colour = theme.Positive
+				}
+				context.Paint(ui.Layout{Width: ui.Fixed(56), Height: ui.Fixed(4)}, func(area draw2d.Rectangle, drawing *draw2d.List) {
+					drawing.Rectangle(area, 2, application.look.hover.Mix(theme.Ink, 0.12), draw2d.Color{}, 0)
+					if viewed > 0 {
+						done := area
+						done.Width = area.Width * float32(viewed) / float32(total)
+						drawing.Rectangle(done, 2, colour, draw2d.Color{}, 0)
+					}
+				})
+				context.Text(fmt.Sprintf("%d of %d viewed", viewed, total), small)
+			})
 		}
+		if application.loading > 0 {
+			context.Text(fmt.Sprintf("reading %d…", application.loading), small)
+		}
+		context.Spacer()
 		if application.editor.isOpen() {
 			project := application.editor.project
 			for _, current := range application.projects {
@@ -235,11 +310,13 @@ func (application *App) buildStatusBar(context *ui.Context) {
 				}
 			}
 			if project.Base != "" {
-				context.Caption(fmt.Sprintf("%s ← %s · %d commits", project.Branch, project.Base, project.Ahead))
+				context.IconSized("git-branch", 12, theme.InkQuiet)
+				context.Text(fmt.Sprintf("%s ← %s · %d commits", project.Branch, project.Base, project.Ahead), small)
 			}
 		}
-		context.Spacer()
-		context.Caption("⌘P find · n/m next/previous change · [ ] hunks · d diff/file · Tab pane · ? keys")
+		if !application.settings.WorkingTree {
+			context.Text("commits only", ui.TextStyle{Size: theme.SmallTextSize, Color: theme.Warning})
+		}
 	})
 }
 
@@ -320,13 +397,14 @@ var helpKeys = [][2]string{
 	{"⌘P  or  Shift+P", "Find a file in any project"},
 	{"n  /  m", "Next / previous changed file, across every project"},
 	{"]  /  [", "Next / previous change in the file"},
+	{"1  /  2  ·  c", "Files mode (read any file) / Review mode (the changes, as diffs)"},
+	{"v", "Mark the file as viewed and open the next one not viewed"},
 	{"d", "Diff or the whole file"},
 	{"f", "Fold the unchanged lines, or show them all"},
 	{"Enter", "Open a fold (editor) · open a file or folder (sidebar)"},
 	{"Tab", "Move between the sidebar and the editor"},
 	{"↑ ↓ ← →  PgUp PgDn  Home End", "Move in the sidebar or scroll the file"},
 	{"j  /  k  ·  Space", "Scroll a line · a page"},
-	{"c", "Sidebar: changes only, or every file"},
 	{"h", "Only the projects with changes, or every project (sidebar and finder)"},
 	{"b", "Compare against another branch, tag or commit"},
 	{"w", "Count the changes not committed yet, or only commits"},

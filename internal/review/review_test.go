@@ -5,6 +5,7 @@ import (
 
 	"github.com/akrck02/code-review/internal/git"
 	"github.com/akrck02/code-review/internal/highlight"
+	"github.com/alecthomas/chroma/v2"
 )
 
 func context(count int) []git.DiffLine {
@@ -81,5 +82,60 @@ func TestHighlightedLinesKeepTheTextAndExpandTabs(test *testing.T) {
 func TestLatinOneTextIsRead(test *testing.T) {
 	if text := asText([]byte{'c', 0xe1, 'f'}); text != "cáf" {
 		test.Errorf("read %q", text)
+	}
+}
+
+func TestTheChangedWordsOfAReplacedLineAreFound(test *testing.T) {
+	rows := []Row{
+		{Line: git.DiffLine{Kind: git.Removal, OldNumber: 1}},
+		{Line: git.DiffLine{Kind: git.Insertion, NewNumber: 1}},
+		{Line: git.DiffLine{Kind: git.Removal, OldNumber: 2}},
+		{Line: git.DiffLine{Kind: git.Insertion, NewNumber: 2}},
+	}
+	texts := map[git.DiffLine]string{
+		rows[0].Line: `version = "1.5.26"`, rows[1].Line: `version = "1.5.27"`,
+		rows[2].Line: `alpha`, rows[3].Line: `something else entirely`,
+	}
+	spans := InlineChanges(rows, func(line git.DiffLine) []rune { return []rune(texts[line]) })
+	if spans[0] != (Span{16, 17}) || spans[1] != (Span{16, 17}) {
+		test.Errorf("the version's changed digit is at %+v and %+v, want 16–17", spans[0], spans[1])
+	}
+	if _, marked := spans[3]; marked {
+		test.Errorf("a line replaced wholly has a changed part marked: %+v", spans[3])
+	}
+}
+
+func TestTheGutterMarksAddedChangedAndRemovedLines(test *testing.T) {
+	diff := []git.DiffLine{
+		{Kind: git.Context, OldNumber: 1, NewNumber: 1},
+		{Kind: git.Removal, OldNumber: 2},
+		{Kind: git.Insertion, NewNumber: 2},
+		{Kind: git.Insertion, NewNumber: 3},
+		{Kind: git.Context, OldNumber: 3, NewNumber: 4},
+		{Kind: git.Removal, OldNumber: 4},
+		{Kind: git.Context, OldNumber: 5, NewNumber: 5},
+		{Kind: git.Insertion, NewNumber: 6},
+		{Kind: git.Removal, OldNumber: 6},
+	}
+	marks := LineMarks(diff)
+	want := map[int]Mark{2: ModifiedMark, 3: ModifiedMark, 5: RemovedAbove, 6: AddedMark}
+	for number, mark := range want {
+		if marks[number] != mark {
+			test.Errorf("line %d is marked %d, want %d", number, marks[number], mark)
+		}
+	}
+}
+
+func TestTokensTakeTheRoleTheyAreColouredBy(test *testing.T) {
+	cases := map[chroma.TokenType]highlight.Role{
+		chroma.Keyword: highlight.Keyword, chroma.LiteralStringDouble: highlight.String,
+		chroma.LiteralNumberInteger: highlight.Number, chroma.CommentSingle: highlight.Comment,
+		chroma.NameFunction: highlight.Function, chroma.NameDecorator: highlight.Attribute,
+		chroma.Name: highlight.Plain,
+	}
+	for kind, want := range cases {
+		if role := highlight.RoleOf(kind); role != want {
+			test.Errorf("%v takes %s, want %s", kind, role, want)
+		}
 	}
 }

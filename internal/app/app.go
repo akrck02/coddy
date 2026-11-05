@@ -8,7 +8,6 @@ import (
 	"sync/atomic"
 
 	"github.com/akrck02/code-review/internal/git"
-	"github.com/akrck02/code-review/internal/highlight"
 	"github.com/akrck02/code-review/internal/review"
 	"github.com/akrck02/go-ui/uidrive"
 	"github.com/akrck02/go-ui/window"
@@ -24,6 +23,11 @@ type Settings struct {
 	OnlyChanged bool
 	// Open names a file to open at the start, as "project/path/in/it".
 	Open string
+	// Review starts in the review mode (the changed files, as diffs) instead of reading the files.
+	Review bool
+	// ReviewedPath is the file the files marked as viewed are kept in; empty keeps them only while
+	// the reader runs.
+	ReviewedPath string
 	// Synchronous reads everything before the first frame instead of in the background: for
 	// capturing a frame to a picture, where there is only one frame.
 	Synchronous bool
@@ -62,12 +66,14 @@ type App struct {
 	dark       bool
 	// onlyChanged hides the projects with no changes, in the sidebar and the finder
 	onlyChanged bool
-	palette     *highlight.Palette
-	designs     designs
-	tap         *inputTap
-	keys        keys
-	toast       string
-	themeSet    bool
+	// reviewed keeps the changed files marked as viewed
+	reviewed *review.Reviewed
+	look     look
+	designs  designs
+	tap      *inputTap
+	keys     keys
+	toast    string
+	themeSet bool
 }
 
 // fileReference names a file of a project.
@@ -88,10 +94,14 @@ func New(settings Settings) *App {
 		onlyChanged:   settings.OnlyChanged,
 		focus:         sidebarPane,
 		designs:       newDesigns(),
+		reviewed:      review.OpenReviewed(settings.ReviewedPath),
 	}
 	application.sidebar = newSidebar()
+	if settings.Review {
+		application.sidebar.mode = reviewMode
+	}
 	application.editor = newEditor()
-	application.setPalette()
+	application.setLook()
 	application.openFolders(settings.Folders)
 	if settings.Open != "" {
 		application.openByLabel(settings.Open)
@@ -105,11 +115,12 @@ func (application *App) Driver() uidrive.Driver { return application.tap }
 // Folders are the folders opened, to remember them for the next time.
 func (application *App) Folders() []string { return application.folders }
 
-func (application *App) setPalette() {
+// setLook picks the light or the dark look.
+func (application *App) setLook() {
 	if application.dark {
-		application.palette = highlight.NewPalette("github-dark")
+		application.look = application.designs.dark
 	} else {
-		application.palette = highlight.NewPalette("github")
+		application.look = application.designs.light
 	}
 }
 
@@ -290,7 +301,7 @@ func (application *App) openFile(reference fileReference) {
 	project := application.projects[reference.project]
 	application.editor.start(reference, project)
 	if document, cached := application.documentCache[reference]; cached {
-		application.editor.show(document)
+		application.editor.show(document, application.sidebar.mode == reviewMode)
 		return
 	}
 	workingTree := application.settings.WorkingTree
@@ -303,7 +314,7 @@ func (application *App) openFile(reference fileReference) {
 			}
 			application.documentCache[reference] = document
 			if application.editor.request == request {
-				application.editor.show(document)
+				application.editor.show(document, application.sidebar.mode == reviewMode)
 			}
 		}
 	})

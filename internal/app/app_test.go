@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/akrck02/code-review/internal/review"
 	"github.com/akrck02/go-renderer/input"
 	"github.com/akrck02/go-ui/uitest"
 )
@@ -61,7 +62,7 @@ func newWindow(test *testing.T, application *App) *uitest.Window {
 }
 
 func TestAWorkspaceListsTheChangedFilesOfItsRepositories(test *testing.T) {
-	application := New(Settings{Folders: []string{makeRepository(test)}, WorkingTree: true, Synchronous: true})
+	application := New(Settings{Folders: []string{makeRepository(test)}, WorkingTree: true, Synchronous: true, Review: true})
 	newWindow(test, application)
 	if len(application.projects) != 1 {
 		test.Fatalf("found %d projects, want 1", len(application.projects))
@@ -81,7 +82,7 @@ func TestAWorkspaceListsTheChangedFilesOfItsRepositories(test *testing.T) {
 		}
 	}
 	if strings.Contains(shown, "keeper.go") {
-		test.Errorf("the sidebar lists an unchanged file in the changes mode: %s", shown)
+		test.Errorf("the sidebar lists an unchanged file in the review mode: %s", shown)
 	}
 }
 
@@ -109,7 +110,7 @@ func TestNOpensTheChangedFilesOneAfterTheOther(test *testing.T) {
 
 func TestTheDiffOfAChangedFileMarksItsLines(test *testing.T) {
 	application := New(Settings{Folders: []string{makeRepository(test)}, WorkingTree: true, Synchronous: true,
-		Open: "lighthouse/src/lamp.go"})
+		Open: "lighthouse/src/lamp.go", Review: true})
 	newWindow(test, application)
 	if application.editor.mode != diffView {
 		test.Fatalf("a changed file opened in the file view")
@@ -127,7 +128,7 @@ func TestTheDiffOfAChangedFileMarksItsLines(test *testing.T) {
 }
 
 func TestTheFinderOpensAnUnchangedFileByPartOfItsName(test *testing.T) {
-	application := New(Settings{Folders: []string{makeRepository(test)}, WorkingTree: true, Synchronous: true})
+	application := New(Settings{Folders: []string{makeRepository(test)}, WorkingTree: true, Synchronous: true, Review: true})
 	window := newWindow(test, application)
 	window.HoldKey(input.KeySuper)
 	window.PressKey(input.KeyP)
@@ -199,7 +200,7 @@ func TestOnlyTheProjectsWithChangesAreShownInBothModesAndTheFinder(test *testing
 	if len(application.projects) != 2 {
 		test.Fatalf("found %d projects, want 2", len(application.projects))
 	}
-	for _, mode := range []sidebarMode{changesMode, filesMode} {
+	for _, mode := range []sidebarMode{reviewMode, filesMode} {
 		application.sidebar.mode = mode
 		if sidebarShows(application, "harbour") || !sidebarShows(application, "lighthouse") {
 			test.Errorf("in mode %d the sidebar does not show only the changed project", mode)
@@ -212,5 +213,51 @@ func TestOnlyTheProjectsWithChangesAreShownInBothModesAndTheFinder(test *testing
 	window.Frames(2)
 	if application.onlyChanged || !sidebarShows(application, "harbour") || !finderFinds(application, "harbour") {
 		test.Error("h did not show every project")
+	}
+}
+
+func TestTheFilesModeShowsAChangedFileWholeWithItsChangesMarked(test *testing.T) {
+	application := New(Settings{Folders: []string{makeRepository(test)}, WorkingTree: true, Synchronous: true,
+		Open: "lighthouse/src/lamp.go"})
+	window := newWindow(test, application)
+	if application.sidebar.mode != filesMode {
+		test.Fatal("the reader did not start in the files mode")
+	}
+	editor := &application.editor
+	if editor.mode != fileView || editor.rowCount() != 5 {
+		test.Fatalf("lamp.go opened in mode %d with %d rows, want the whole file of 5 lines", editor.mode, editor.rowCount())
+	}
+	if editor.marks[4] != review.ModifiedMark {
+		test.Errorf("the changed line 4 is marked %d, want modified", editor.marks[4])
+	}
+	if len(editor.hunks) != 1 || editor.hunks[0] != 3 {
+		test.Errorf("the runs of marked lines are %v, want [3]", editor.hunks)
+	}
+	window.PressKey(input.Key2)
+	window.Frames(2)
+	if application.sidebar.mode != reviewMode || editor.mode != diffView {
+		test.Errorf("2 did not move to the review mode with the file as its diff")
+	}
+	if span, found := editor.inline[editor.hunks[0]]; !found || span.Start != 11 {
+		test.Errorf("the changed word of the replaced line is %+v (found %v), want it from column 11, after the indent and \"return \"", span, found)
+	}
+}
+
+func TestMarkingAFileViewedOpensTheNextOneNotViewed(test *testing.T) {
+	application := New(Settings{Folders: []string{makeRepository(test)}, WorkingTree: true, Synchronous: true,
+		Open: "lighthouse/src/lamp.go", Review: true})
+	window := newWindow(test, application)
+	window.PressKey(input.KeyTab)
+	window.Frames(1)
+	window.PressKey(input.KeyV)
+	window.Frames(2)
+	if !application.isViewed(fileReference{0, "src/lamp.go"}) {
+		test.Fatal("v did not mark lamp.go as viewed")
+	}
+	if document := application.editor.document; document == nil || document.Path != "notes.txt" {
+		test.Fatalf("v did not open the next file not viewed, notes.txt")
+	}
+	if viewed, total := application.reviewProgress(); viewed != 1 || total != 3 {
+		test.Errorf("the progress is %d of %d, want 1 of 3", viewed, total)
 	}
 }

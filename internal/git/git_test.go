@@ -50,3 +50,16 @@ func TestABinaryDiffIsMarked(test *testing.T) {
 		test.Error("a binary diff was not marked")
 	}
 }
+
+func TestNumStatReadsRenamesAndBinaries(test *testing.T) {
+	counts := parseNumStat([]string{"3\t1\ta.go", "0\t0\t", "old/b.go", "new/b.go", "-\t-\tlogo.png"})
+	if counts["a.go"] != (LineCounts{Added: 3, Removed: 1}) {
+		test.Errorf("a.go counted as %+v", counts["a.go"])
+	}
+	if _, found := counts["new/b.go"]; !found {
+		test.Errorf("the rename is not counted by its new path: %+v", counts)
+	}
+	if !counts["logo.png"].Binary {
+		test.Errorf("the picture is not marked binary")
+	}
+}

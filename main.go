@@ -16,6 +16,7 @@ import (
 	"strings"
 
 	"github.com/akrck02/code-review/internal/app"
+	"github.com/akrck02/code-review/internal/review"
 	"github.com/akrck02/go-renderer/opengl/overlay"
 	ui "github.com/akrck02/go-ui"
 	"github.com/akrck02/go-ui/window"
@@ -34,6 +35,7 @@ func main() {
 	committed := flag.Bool("committed", false, "compare the last commit only, leaving out changes not committed yet")
 	light := flag.Bool("light", false, "start in the light theme")
 	open := flag.String("open", "", "open this file at the start, as project/path/in/it")
+	reviewing := flag.Bool("review", false, "start in the review mode: the changed files, as diffs")
 	allProjects := flag.Bool("all", false, "show every project, not only those with changes (the choice is remembered otherwise)")
 	flag.Usage = func() {
 		fmt.Fprintln(flag.CommandLine.Output(), "usage: code-review [flags] [repository or folder of repositories …]")
@@ -57,7 +59,10 @@ func main() {
 		Dark:        options.Dark || !*light,
 		OnlyChanged: onlyChanged(*allProjects),
 		Open:        *open,
-		Synchronous: options.CapturePath != "",
+		Review:      *reviewing,
+		// the files marked as viewed are kept in the reader's own folder, never in the repositories
+		ReviewedPath: review.DefaultReviewedPath(),
+		Synchronous:  options.CapturePath != "",
 	})
 	options.Driver = reader.Driver()
 	options.Hidden = func() {

@@ -15,8 +15,8 @@ import (
 type sidebarMode int
 
 const (
-	changesMode sidebarMode = iota // only what the development changed
-	filesMode                      // every file
+	filesMode  sidebarMode = iota // every file, to read the code: the default
+	reviewMode                    // only what the development changed, to review it file by file
 )
 
 type rowKind int
@@ -44,7 +44,7 @@ type treeRow struct {
 type sidebarState struct {
 	mode sidebarMode
 	// expanded keeps the folders and projects opened or closed by hand, by key; the others follow
-	// the mode's default (everything open in the changes mode, closed in the files mode).
+	// the mode's default (everything open in the review mode, closed in the files mode).
 	expanded map[string]bool
 	trees    map[treeKey]*review.Folder
 	rows     []treeRow
@@ -60,7 +60,7 @@ type treeKey struct {
 }
 
 func newSidebar() sidebarState {
-	return sidebarState{expanded: map[string]bool{}, trees: map[treeKey]*review.Folder{}, stale: true, width: 320, list: scroller{rowHeight: sidebarRowHeight}}
+	return sidebarState{expanded: map[string]bool{}, trees: map[treeKey]*review.Folder{}, stale: true, width: 380, list: scroller{rowHeight: sidebarRowHeight}}
 }
 
 func (sidebar *sidebarState) invalidate() {
@@ -76,7 +76,7 @@ func (sidebar *sidebarState) isExpanded(application *App, project int, path stri
 	if open, chosen := sidebar.expanded[sidebar.expandedKey(project, path)]; chosen {
 		return open
 	}
-	if sidebar.mode == changesMode {
+	if sidebar.mode == reviewMode {
 		return true
 	}
 	return isProject && len(application.projects) == 1
@@ -90,7 +90,7 @@ func (sidebar *sidebarState) tree(application *App, project int) *review.Folder 
 	model := application.projects[project]
 	isChanged := func(path string) bool { _, changed := model.ChangeOf(path); return changed }
 	var tree *review.Folder
-	if sidebar.mode == changesMode {
+	if sidebar.mode == reviewMode {
 		tree = review.BuildTree(changedPaths(model), isChanged)
 	} else {
 		tree = review.BuildTree(model.Files, isChanged)
@@ -177,7 +177,7 @@ func (sidebar *sidebarState) setExpanded(row treeRow, open bool) {
 func (sidebar *sidebarState) revealFile(application *App, reference fileReference) {
 	project := application.projects[reference.project]
 	_, changed := project.ChangeOf(reference.path)
-	if sidebar.mode == changesMode && !changed {
+	if sidebar.mode == reviewMode && !changed {
 		sidebar.mode = filesMode
 	}
 	sidebar.expanded[sidebar.expandedKey(reference.project, "")] = true
@@ -301,28 +301,38 @@ func (sidebar *sidebarState) collapseOrLeave() {
 	}
 }
 
-const sidebarRowHeight float32 = 24
+// sidebarRowHeight leaves air around each name: a tree of hundreds of files is read for long.
+const sidebarRowHeight float32 = 28
 
-// build adds the sidebar: a header with the mode, and the rows.
+const (
+	indentWidth   float32 = 14
+	treeIconSize  float32 = 15
+	sidebarMargin float32 = 10
+)
+
+// build adds the sidebar: a header naming the mode, and the rows.
 func (sidebar *sidebarState) build(context *ui.Context, application *App) {
 	if sidebar.stale {
 		sidebar.rebuild(application)
 	}
 	theme := context.Theme
 	context.Frame(ui.Layout{Direction: ui.Vertical, Width: ui.Grow(), Height: ui.Grow()}, ui.Look{Fill: theme.Surface}, func() {
-		context.Box(ui.Layout{Width: ui.Grow(), Padding: ui.PadXY(8, 6), Gap: 6, AlignY: ui.Center}, func() {
-			mode := int(sidebar.mode)
-			if iconSwitch(context, "sidebar mode", &mode, []iconChoice{
-				{"git-compare", "Changes only (c)"}, {"folder-tree", "Every file (c)"},
-			}) {
-				sidebar.mode = sidebarMode(mode)
-				sidebar.stale = true
+		context.Box(ui.Layout{Width: ui.Grow(), Height: ui.Fixed(40), Padding: ui.PadXY(14, 0), Gap: 8, AlignY: ui.Center}, func() {
+			title := "Files"
+			if sidebar.mode == reviewMode {
+				title = "Review"
+			}
+			context.Text(title, ui.TextStyle{Weight: draw2d.Medium, Color: theme.InkSoft})
+			if sidebar.mode == reviewMode {
+				viewed, total := application.reviewProgress()
+				if total > 0 {
+					context.Text(fmt.Sprintf("%d of %d viewed", viewed, total), ui.TextStyle{Size: theme.SmallTextSize, Color: theme.InkQuiet})
+				}
 			}
 			context.Spacer()
-			if context.FlatIconButton("chevrons-down-up", "") {
+			if toolButton(context, "Collapse all", "chevrons-down-up", false) {
 				sidebar.collapseAll(application)
 			}
-			context.Tooltip("Collapse all")
 		})
 		sidebar.list.rowHeight = sidebarRowHeight
 		sidebar.list.count = len(sidebar.rows)
@@ -332,7 +342,11 @@ func (sidebar *sidebarState) build(context *ui.Context, application *App) {
 			if index := sidebar.list.rowAt(x, y); index >= 0 && !onBar && application.keys.clicked() {
 				sidebar.selected = index
 				application.focus = sidebarPane
-				sidebar.activate(application, index)
+				if sidebar.onCheck(index, x) {
+					application.toggleViewed(fileReference{sidebar.rows[index].project, sidebar.rows[index].path}, false)
+				} else {
+					sidebar.activate(application, index)
+				}
 			}
 		}
 		context.Paint(ui.Layout{Width: ui.Grow(), Height: ui.Grow()}, func(area draw2d.Rectangle, drawing *draw2d.List) {
@@ -340,6 +354,21 @@ func (sidebar *sidebarState) build(context *ui.Context, application *App) {
 			sidebar.paint(context, application, drawing)
 		})
 	})
+}
+
+// onCheck tells whether a click at x on a row fell on its viewed mark, in the review mode.
+func (sidebar *sidebarState) onCheck(index int, x float32) bool {
+	row := sidebar.rows[index]
+	if sidebar.mode != reviewMode || row.kind != fileRow {
+		return false
+	}
+	left := sidebar.rowLeft(row) + treeIconSize + 4
+	return x >= left-4 && x <= left+treeIconSize+4
+}
+
+// rowLeft is where a row's chevron (or the room for it) starts.
+func (sidebar *sidebarState) rowLeft(row treeRow) float32 {
+	return sidebar.list.area.X + sidebarMargin + float32(row.depth)*indentWidth
 }
 
 func (sidebar *sidebarState) collapseAll(application *App) {
@@ -351,29 +380,36 @@ func (sidebar *sidebarState) collapseAll(application *App) {
 
 func (sidebar *sidebarState) paint(context *ui.Context, application *App, drawing *draw2d.List) {
 	theme := context.Theme
+	look := application.look
 	area := sidebar.list.area
 	measurer := context.Measurer()
 	size := theme.TextSize
+	small := theme.SmallTextSize
 	metrics := measurer.MeasureText("Ag", size, draw2d.Regular, 1)
+	pointerX, pointerY := context.Pointer()
+	hovered := -1
+	if !application.modalOpen() {
+		hovered = sidebar.list.rowAt(pointerX, pointerY)
+	}
 	drawing.PushClip(area)
 	first, last := sidebar.list.visible()
 	for index := first; index < last; index++ {
 		row := sidebar.rows[index]
 		top := sidebar.list.rowTop(index)
-		rowArea := draw2d.Rectangle{X: area.X, Y: top, Width: area.Width, Height: sidebarRowHeight}
+		rowArea := draw2d.Rectangle{X: area.X + 4, Y: top + 1, Width: area.Width - 8 - scrollBarWidth/2, Height: sidebarRowHeight - 2}
 		reference := fileReference{row.project, row.path}
+		isOpen := row.kind == fileRow && application.editor.isOpen() && application.editor.reference == reference
 		switch {
 		case index == sidebar.selected && application.focus == sidebarPane:
-			drawing.Rectangle(rowArea, 0, theme.PrimaryTint, theme.Primary.WithAlpha(0.6), 1)
-		case index == sidebar.selected:
-			drawing.Rectangle(rowArea, 0, theme.Sunken, draw2d.Color{}, 0)
-		case row.kind == fileRow && application.editor.isOpen() && application.editor.reference == reference:
-			drawing.Rectangle(rowArea, 0, theme.Sunken.WithAlpha(0.6), draw2d.Color{}, 0)
+			drawing.Rectangle(rowArea, 5, look.chosen, look.focusEdge, 1)
+		case index == sidebar.selected, isOpen:
+			drawing.Rectangle(rowArea, 5, look.chosen.WithAlpha(0.7), draw2d.Color{}, 0)
+		case index == hovered:
+			drawing.Rectangle(rowArea, 5, look.hover, draw2d.Color{}, 0)
 		}
 		baseline := top + (sidebarRowHeight+metrics.Ascent-metrics.Descent)/2
-		x := area.X + 8 + float32(row.depth)*14
-		iconSize := float32(14)
-		iconTop := top + (sidebarRowHeight-iconSize)/2
+		x := sidebar.rowLeft(row)
+		iconTop := top + (sidebarRowHeight-treeIconSize)/2
 		ink := theme.Ink
 		if row.quiet {
 			ink = theme.InkQuiet
@@ -385,39 +421,44 @@ func (sidebar *sidebarState) paint(context *ui.Context, application *App, drawin
 			if row.expanded {
 				chevron = "chevron-down"
 			}
-			drawing.Icon(chevron, x, iconTop, iconSize, theme.InkQuiet)
-			x += iconSize + 4
+			drawing.Icon(chevron, x, iconTop, treeIconSize, theme.InkQuiet)
+			x += treeIconSize + 4
 			icon := "folder"
 			if row.kind == projectRow {
 				icon, weight = "git-branch", draw2d.Medium
 			} else if row.expanded {
 				icon = "folder-open"
 			}
-			drawing.Icon(icon, x, iconTop, iconSize, theme.InkSoft)
-			x += iconSize + 6
+			drawing.Icon(icon, x, iconTop, treeIconSize, theme.InkQuiet)
+			x += treeIconSize + 7
 		case fileRow:
-			x += iconSize + 4
-			drawing.Icon("file", x, iconTop, iconSize, theme.InkSoft)
-			x += iconSize + 6
-			if row.status != git.Unchanged {
+			x += treeIconSize + 4
+			icon, iconInk := "file", theme.InkQuiet
+			if sidebar.mode == reviewMode {
+				icon = "circle"
+				if application.isViewed(reference) {
+					icon, iconInk, ink = "circle-check", theme.InkSoft, theme.InkQuiet
+				}
+			}
+			drawing.Icon(icon, x, iconTop, treeIconSize, iconInk)
+			x += treeIconSize + 7
+			// in the files mode the name says how the file changed, as Zed's project panel does;
+			// in the review mode every file changed, and the colour is kept for its counts
+			if row.status != git.Unchanged && sidebar.mode == filesMode {
 				ink = statusColour(theme, row.status)
 			}
 		case noteRow:
 			ink = theme.InkQuiet
 		}
-		badge, badgeColour := sidebar.badge(application, row, theme)
-		badgeWidth := float32(0)
-		if badge != "" {
-			badgeWidth = measurer.MeasureText(badge, theme.SmallTextSize, draw2d.Mono, 1).Width + 12
-			drawing.Text(badge, rowArea.Right()-badgeWidth-scrollBarWidth+4, baseline, theme.SmallTextSize, draw2d.Mono, badgeColour)
-		}
-		drawing.PushClip(draw2d.Rectangle{X: area.X, Y: top, Width: max(area.Width-badgeWidth-scrollBarWidth-4, 0), Height: sidebarRowHeight})
+		right := rowArea.Right() - 8
+		right = sidebar.paintRight(context, application, drawing, row, right, baseline, top)
+		drawing.PushClip(draw2d.Rectangle{X: area.X, Y: top, Width: max(right-area.X-8, 0), Height: sidebarRowHeight})
 		drawing.Text(row.label, x, baseline, size, weight, ink)
 		if row.kind == projectRow {
 			labelWidth := measurer.MeasureText(row.label, size, weight, 1).Width
 			project := application.projects[row.project]
 			if project.Branch != "" {
-				drawing.Text(project.Branch, x+labelWidth+8, baseline, theme.SmallTextSize, draw2d.Regular, theme.InkQuiet)
+				drawing.Text(project.Branch, x+labelWidth+8, baseline, small, draw2d.Regular, theme.InkQuiet)
 			}
 		}
 		drawing.PopClip()
@@ -427,32 +468,85 @@ func (sidebar *sidebarState) paint(context *ui.Context, application *App, drawin
 		if application.loading > 0 {
 			message = "Reading the projects…"
 		}
-		drawing.Text(message, area.X+12, area.Y+24, size, draw2d.Regular, theme.InkQuiet)
+		drawing.Text(message, area.X+16, area.Y+24, size, draw2d.Regular, theme.InkQuiet)
 	}
-	sidebar.list.paintBar(drawing, theme.InkQuiet.WithAlpha(0.4))
+	sidebar.list.paintBar(drawing, look.scrollThumb)
 	drawing.PopClip()
 }
 
-// badge is what a row shows on its right: a file's status, a folder's or project's count of
-// changed files.
-func (sidebar *sidebarState) badge(application *App, row treeRow, theme ui.Theme) (string, draw2d.Color) {
+// paintRight paints what a row shows on its right, from right to left, and returns where it ends:
+// a file's status letter and, in the review mode, the lines it adds and removes; a project's
+// changed files, or how many of them were viewed.
+func (sidebar *sidebarState) paintRight(context *ui.Context, application *App, drawing *draw2d.List, row treeRow, right, baseline, top float32) float32 {
+	theme := context.Theme
+	measurer := context.Measurer()
+	small := theme.SmallTextSize
+	text := func(words string, colour draw2d.Color) {
+		width := measurer.MeasureText(words, small, draw2d.Mono, 1).Width
+		right -= width
+		drawing.Text(words, right, baseline, small, draw2d.Mono, colour)
+		right -= 8
+	}
 	switch row.kind {
 	case fileRow:
-		return row.status.Letter(), statusColour(theme, row.status)
+		if row.status == git.Unchanged {
+			return right
+		}
+		text(row.status.Letter(), statusColour(theme, row.status))
+		if sidebar.mode == reviewMode {
+			project := application.projects[row.project]
+			counts := project.Counts[row.path]
+			if counts.Binary {
+				text("bin", theme.InkQuiet)
+				break
+			}
+			viewed := application.isViewed(fileReference{row.project, row.path})
+			removedInk, addedInk := theme.Danger, theme.Positive
+			if viewed {
+				removedInk, addedInk = theme.InkQuiet, theme.InkQuiet
+			}
+			if counts.Removed > 0 {
+				text(fmt.Sprintf("−%d", counts.Removed), removedInk)
+			}
+			if counts.Added > 0 {
+				text(fmt.Sprintf("+%d", counts.Added), addedInk)
+			}
+		}
 	case projectRow:
 		project := application.projects[row.project]
 		if !project.Loaded {
-			return "…", theme.InkQuiet
+			text("…", theme.InkQuiet)
+			break
 		}
-		if row.changed > 0 {
-			return fmt.Sprint(row.changed), theme.Warning
+		if row.changed == 0 {
+			break
 		}
+		if sidebar.mode == filesMode {
+			text(fmt.Sprint(row.changed), theme.Warning)
+			break
+		}
+		viewed, total := application.reviewed.Progress(project)
+		colour := theme.InkQuiet
+		if viewed == total {
+			colour = theme.Positive
+		}
+		text(fmt.Sprintf("%d/%d", viewed, total), colour)
+		bar := draw2d.Rectangle{X: right - 28, Y: top + sidebarRowHeight/2 - 1.5, Width: 28, Height: 3}
+		drawing.Rectangle(bar, 1.5, application.look.hover.Mix(theme.Ink, 0.12), draw2d.Color{}, 0)
+		if total > 0 && viewed > 0 {
+			done := bar
+			done.Width = bar.Width * float32(viewed) / float32(total)
+			drawing.Rectangle(done, 1.5, colour, draw2d.Color{}, 0)
+		}
+		right -= 36
 	case folderRow:
 		if row.changed > 0 && sidebar.mode == filesMode {
-			return "•", theme.Warning
+			dot := draw2d.Rectangle{X: right - 6, Y: top + sidebarRowHeight/2 - 3, Width: 6, Height: 6}
+			drawing.Rectangle(dot, 3, theme.Warning.WithAlpha(0.8), draw2d.Color{}, 0)
+			right -= 14
 		}
 	}
-	return "", draw2d.Color{}
+	return right
 }
 
 // statusColour is a status's colour: green for new, amber for changed, red for deleted.
@@ -462,8 +556,6 @@ func statusColour(theme ui.Theme, status git.Status) draw2d.Color {
 		return theme.Positive
 	case git.Deleted:
 		return theme.Danger
-	case git.Renamed, git.Copied:
-		return theme.Primary
 	case git.Unchanged:
 		return theme.Ink
 	}

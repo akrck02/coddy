@@ -18,6 +18,7 @@ var readOnlyCommands = map[string]bool{
 	"cat-file":     true,
 	"diff":         true,
 	"ls-files":     true,
+	"ls-tree":      true,
 	"merge-base":   true,
 	"rev-list":     true,
 	"rev-parse":    true,

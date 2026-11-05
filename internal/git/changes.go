@@ -239,3 +239,70 @@ func hunkStart(field, sign string) (int, error) {
 	}
 	return start, nil
 }
+
+// LineCounts is how many lines a change adds and removes; a binary file has none to count.
+type LineCounts struct {
+	Added, Removed int
+	Binary         bool
+}
+
+// CountLines counts the lines each changed file adds and removes, by its path now. New files git
+// does not know yet are not counted here: they are counted from their text.
+func CountLines(repository string, comparison Comparison) (map[string]LineCounts, error) {
+	arguments := []string{"diff", "--numstat", "-z", "-M", "--no-ext-diff", "--no-textconv", comparison.MergeBase}
+	if !comparison.WorkingTree {
+		arguments = append(arguments, "HEAD")
+	}
+	output, err := run(repository, append(arguments, "--")...)
+	if err != nil {
+		return nil, err
+	}
+	return parseNumStat(splitNull(output)), nil
+}
+
+// parseNumStat reads `git diff --numstat -z`: "added\tremoved\tpath", or for a rename
+// "added\tremoved\t" followed by where it was and where it is, as fields of their own.
+func parseNumStat(fields []string) map[string]LineCounts {
+	counts := map[string]LineCounts{}
+	for index := 0; index < len(fields); index++ {
+		parts := strings.SplitN(fields[index], "\t", 3)
+		if len(parts) < 3 {
+			continue
+		}
+		path := parts[2]
+		if path == "" { // a rename: the old path, then the new one
+			if index+2 >= len(fields) {
+				break
+			}
+			path = fields[index+2]
+			index += 2
+		}
+		if parts[0] == "-" {
+			counts[path] = LineCounts{Binary: true}
+			continue
+		}
+		added, _ := strconv.Atoi(parts[0])
+		removed, _ := strconv.Atoi(parts[1])
+		counts[path] = LineCounts{Added: added, Removed: removed}
+	}
+	return counts
+}
+
+// BlobsAt lists the content id of every file in a commit, by path: two files with the same id
+// have the same text.
+func BlobsAt(repository, revision string) (map[string]string, error) {
+	output, err := run(repository, "ls-tree", "-r", "-z", "--full-tree", "--end-of-options", revision)
+	if err != nil {
+		return nil, err
+	}
+	blobs := map[string]string{}
+	for _, entry := range splitNull(output) {
+		// "<mode> blob <id>\t<path>"
+		meta, path, found := strings.Cut(entry, "\t")
+		fields := strings.Fields(meta)
+		if found && len(fields) == 3 {
+			blobs[path] = fields[2]
+		}
+	}
+	return blobs, nil
+}
