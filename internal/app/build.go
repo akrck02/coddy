@@ -237,15 +237,21 @@ func (application *App) buildTitleBar(context *ui.Context) {
 				context.Text("against "+base, ui.TextStyle{Size: theme.SmallTextSize, Color: theme.InkQuiet})
 			}
 		})
-		normal := ui.Look{Fill: theme.Surface, Radius: 6, Border: theme.Line, BorderWidth: 1}
+		// a pill, a shade off the bar with a hairline edge, lit towards the accent under the
+		// pointer; the shortcut sits in a key cap of its own
+		look := application.look
+		normal := ui.Look{Fill: look.hover.WithAlpha(0.7), Radius: 17, Border: look.chosen.WithAlpha(0.6), BorderWidth: 1}
 		hovered := normal
-		hovered.Fill = application.look.hover
-		search := ui.Layout{Width: ui.Fixed(380), Height: ui.Fixed(30), Padding: ui.PadXY(10, 0), Gap: 8, AlignY: ui.Center}
+		hovered.Fill, hovered.Border = look.hover, theme.Primary.WithAlpha(0.45)
+		search := ui.Layout{Width: ui.Fixed(400), Height: ui.Fixed(34), Padding: ui.Padding{Left: 14, Right: 6}, Gap: 10, AlignY: ui.Center}
 		if context.Clickable("search files", search, ui.Looks{Normal: normal, Hovered: hovered, Pressed: hovered}, func() {
-			context.IconSized("search", 14, theme.InkQuiet)
+			context.IconSized("search", 15, theme.InkSoft)
 			context.Text("Search files", ui.TextStyle{Color: theme.InkQuiet})
 			context.Spacer()
-			context.Text("⌘P", ui.TextStyle{Size: theme.SmallTextSize, Color: theme.InkQuiet})
+			keyCap := ui.Look{Fill: look.chosen.WithAlpha(0.55), Radius: 11}
+			context.Frame(ui.Layout{Height: ui.Fixed(22), Padding: ui.PadXY(9, 0), AlignY: ui.Center}, keyCap, func() {
+				context.Text("⌘P", ui.TextStyle{Size: theme.SmallTextSize, Color: theme.InkSoft, Weight: draw2d.Medium})
+			})
 		}) {
 			application.finder.show()
 		}
