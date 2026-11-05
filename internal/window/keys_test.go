@@ -155,38 +155,81 @@ func focusEditor(test *testing.T, application *Window, window *uitest.Window) {
 	application.focus = viewerPane
 }
 
+// pressing is a shortcut's press of a key, with modifiers held.
+func pressing(key input.Key, modifiers ...input.Key) func(window *uitest.Window) {
+	return func(window *uitest.Window) { press(window, key, modifiers...) }
+}
+
+// typing is a shortcut's press of the key that types a text.
+func typing(text string) func(window *uitest.Window) {
+	return func(window *uitest.Window) { typeText(window, text) }
+}
+
+// runShortcuts runs each shortcut as a test of its own.
+func runShortcuts(test *testing.T, shortcuts []shortcut) {
+	for _, key := range shortcuts {
+		test.Run(key.name, key.run)
+	}
+}
+
 func TestEveryWindowShortcutDoesItsJob(test *testing.T) {
-	shortcuts := []shortcut{
-		{name: "o opens the folder picker", press: func(window *uitest.Window) { press(window, input.KeyO) },
-			holds: func(application *Window) string { return unless(application.pickerOpen, "the picker is closed") }},
-		{name: "⌘O opens the folder picker", press: func(window *uitest.Window) { press(window, input.KeyO, input.KeySuper) },
-			holds: func(application *Window) string { return unless(application.pickerOpen, "the picker is closed") }},
-		{name: "r reads the projects again", prepare: addAFileUnseen,
-			press: func(window *uitest.Window) { press(window, input.KeyR) },
-			holds: func(application *Window) string {
-				return unless(len(application.projects[0].Changes) == 4, "the file added since the start is not among the changes")
-			}},
-		{name: "⌘R reads the projects again", prepare: addAFileUnseen,
-			press: func(window *uitest.Window) { press(window, input.KeyR, input.KeySuper) },
-			holds: func(application *Window) string {
-				return unless(len(application.projects[0].Changes) == 4, "the file added since the start is not among the changes")
-			}},
-		{name: "b opens the base dialog", press: func(window *uitest.Window) { press(window, input.KeyB) },
+	runShortcuts(test, append(append(openingShortcuts(), settingShortcuts()...), movingShortcuts()...))
+}
+
+// openingShortcuts open the window's dialogs and panels.
+func openingShortcuts() []shortcut {
+	pickerOpen := func(application *Window) string { return unless(application.pickerOpen, "the picker is closed") }
+	helpOpen := func(application *Window) string { return unless(application.helpOpen, "the help is closed") }
+	return []shortcut{
+		{name: "o opens the folder picker", press: pressing(input.KeyO), holds: pickerOpen},
+		{name: "⌘O opens the folder picker", press: pressing(input.KeyO, input.KeySuper), holds: pickerOpen},
+		{name: "b opens the base dialog", press: pressing(input.KeyB),
 			holds: func(application *Window) string { return unless(application.base.open, "the base dialog is closed") }},
-		{name: "Shift+P finds a file by name", press: func(window *uitest.Window) { press(window, input.KeyP, input.KeyShift) },
+		{name: "Shift+P finds a file by name", press: pressing(input.KeyP, input.KeyShift),
 			holds: func(application *Window) string {
 				return unless(application.finder.Open && application.finder.Scope == finder.NamesScope, "the finder is not open on names")
 			}},
-		{name: "/ finds a text in the files", press: func(window *uitest.Window) { typeText(window, "/") },
+		{name: "/ finds a text in the files", press: typing("/"),
 			holds: func(application *Window) string {
 				return unless(application.finder.Open && application.finder.Scope == finder.ContentScope, "the finder is not open on content")
 			}},
-		{name: "? opens the help", press: func(window *uitest.Window) { typeText(window, "?") },
-			holds: func(application *Window) string { return unless(application.helpOpen, "the help is closed") }},
-		{name: "F1 opens the help", press: func(window *uitest.Window) { press(window, input.KeyF1) },
-			holds: func(application *Window) string { return unless(application.helpOpen, "the help is closed") }},
+		{name: "? opens the help", press: typing("?"), holds: helpOpen},
+		{name: "F1 opens the help", press: pressing(input.KeyF1), holds: helpOpen},
+	}
+}
+
+// settingShortcuts read the projects again and change what the window compares and shows.
+func settingShortcuts() []shortcut {
+	readAgain := func(application *Window) string {
+		return unless(len(application.projects[0].Changes) == 4, "the file added since the start is not among the changes")
+	}
+	return []shortcut{
+		{name: "r reads the projects again", prepare: addAFileUnseen, press: pressing(input.KeyR), holds: readAgain},
+		{name: "⌘R reads the projects again", prepare: addAFileUnseen, press: pressing(input.KeyR, input.KeySuper), holds: readAgain},
+		{name: "c switches between the two modes", press: pressing(input.KeyC),
+			holds: func(application *Window) string {
+				return unless(application.mode.Name() == "Review", "the review mode is not on")
+			}},
+		{name: "1 goes to the files mode", review: true, press: pressing(input.Key1),
+			holds: func(application *Window) string {
+				return unless(application.mode.Name() == "Files", "the files mode is not on")
+			}},
+		{name: "w compares the last commit only", press: pressing(input.KeyW),
+			holds: func(application *Window) string {
+				return unless(!application.settings.WorkingTree, "the changes not committed are still counted")
+			}},
+		{name: "t switches the theme", press: pressing(input.KeyT),
+			holds: func(application *Window) string { return unless(application.dark, "the theme is still light") }},
+		{name: "y copies the path of the file open", open: "lighthouse/src/lamp.go", press: pressing(input.KeyY),
+			copies: "lighthouse/src/lamp.go"},
+	}
+}
+
+// movingShortcuts move between projects, panes, files and changes, and change how a file shows.
+func movingShortcuts() []shortcut {
+	return append([]shortcut{
 		{name: "e enters the project of the file open", open: "lighthouse/src/lamp.go", prepare: focusEditor,
-			press: func(window *uitest.Window) { press(window, input.KeyE) },
+			press: pressing(input.KeyE),
 			holds: func(application *Window) string {
 				return unless(application.sidebar.Entered != "", "no project was entered")
 			}},
@@ -195,13 +238,13 @@ func TestEveryWindowShortcutDoesItsJob(test *testing.T) {
 				focusEditor(test, application, window)
 				press(window, input.KeyE)
 			},
-			press: func(window *uitest.Window) { press(window, input.KeyBackspace) },
+			press: pressing(input.KeyBackspace),
 			holds: func(application *Window) string {
 				return unless(application.sidebar.Entered == "", "the project is still entered")
 			}},
 		{name: "Tab moves between the sidebar and the file open", open: "lighthouse/src/lamp.go",
 			prepare: func(test *testing.T, application *Window, window *uitest.Window) { application.focus = sidebarPane },
-			press:   func(window *uitest.Window) { press(window, input.KeyTab) },
+			press:   pressing(input.KeyTab),
 			holds: func(application *Window) string {
 				return unless(application.focus == viewerPane, "the focus stayed on the sidebar")
 			}},
@@ -210,12 +253,18 @@ func TestEveryWindowShortcutDoesItsJob(test *testing.T) {
 				press(window, input.KeyN)
 				press(window, input.KeyN)
 			},
-			press: func(window *uitest.Window) { press(window, input.KeyM) },
+			press: pressing(input.KeyM),
 			holds: func(application *Window) string {
 				return unless(openPath(application) == "lighthouse/src/beam.go", "m opened "+openPath(application)+", want lighthouse/src/beam.go")
 			}},
+	}, changeShortcuts()...)
+}
+
+// changeShortcuts move between a file's changes and change how it shows.
+func changeShortcuts() []shortcut {
+	return []shortcut{
 		{name: "] goes to the next run of changes", open: "tides/coast.txt", long: true, prepare: focusEditor,
-			press: func(window *uitest.Window) { press(window, input.KeyRightBracket) },
+			press: pressing(input.KeyRightBracket),
 			holds: func(application *Window) string {
 				return unless(application.viewer.List.Offset > 0, "the file did not move down to the second change")
 			}},
@@ -224,171 +273,161 @@ func TestEveryWindowShortcutDoesItsJob(test *testing.T) {
 				focusEditor(test, application, window)
 				press(window, input.KeyRightBracket)
 			},
-			press: func(window *uitest.Window) { press(window, input.KeyLeftBracket) },
+			press: pressing(input.KeyLeftBracket),
 			holds: func(application *Window) string {
 				return unless(application.viewer.List.Offset == 0, "the file did not move back up to the first change")
 			}},
-		{name: "d shows the file open as its diff", open: "lighthouse/src/lamp.go",
-			press: func(window *uitest.Window) { press(window, input.KeyD) },
+		{name: "d shows the file open as its diff", open: "lighthouse/src/lamp.go", press: pressing(input.KeyD),
 			holds: func(application *Window) string {
 				return unless(application.viewer.Mode == viewer.DiffView, "the file is not shown as a diff")
 			}},
 		{name: "f shows every unchanged line of a diff", open: "tides/coast.txt", long: true, review: true,
-			press: func(window *uitest.Window) { press(window, input.KeyF) },
+			press: pressing(input.KeyF),
 			holds: func(application *Window) string {
 				return unless(application.viewer.RowCount() == longFileLines+changedLines, fmt.Sprintf("the diff shows %d rows, want all %d lines and the %d old ones", application.viewer.RowCount(), longFileLines, changedLines))
 			}},
-		{name: "c switches between the two modes",
-			press: func(window *uitest.Window) { press(window, input.KeyC) },
-			holds: func(application *Window) string {
-				return unless(application.mode.Name() == "Review", "the review mode is not on")
-			}},
-		{name: "1 goes to the files mode", review: true,
-			press: func(window *uitest.Window) { press(window, input.Key1) },
-			holds: func(application *Window) string {
-				return unless(application.mode.Name() == "Files", "the files mode is not on")
-			}},
-		{name: "w compares the last commit only",
-			press: func(window *uitest.Window) { press(window, input.KeyW) },
-			holds: func(application *Window) string {
-				return unless(!application.settings.WorkingTree, "the changes not committed are still counted")
-			}},
-		{name: "t switches the theme",
-			press: func(window *uitest.Window) { press(window, input.KeyT) },
-			holds: func(application *Window) string { return unless(application.dark, "the theme is still light") }},
-		{name: "y copies the path of the file open", open: "lighthouse/src/lamp.go",
-			press:  func(window *uitest.Window) { press(window, input.KeyY) },
-			copies: "lighthouse/src/lamp.go"},
-	}
-	for _, key := range shortcuts {
-		test.Run(key.name, key.run)
 	}
 }
 
 func TestEverySidebarShortcutDoesItsJob(test *testing.T) {
-	selectTop := func(test *testing.T, application *Window, window *uitest.Window) {
-		selectRow(test, application, "lighthouse")
+	runShortcuts(test, sidebarShortcuts())
+}
+
+// selectTopRow selects the first project's row.
+func selectTopRow(test *testing.T, application *Window, window *uitest.Window) {
+	selectRow(test, application, "lighthouse")
+}
+
+// selectFolderRow selects the folder src.
+func selectFolderRow(test *testing.T, application *Window, window *uitest.Window) {
+	selectRow(test, application, "src")
+}
+
+// selectedLabel is the name on the row selected, if any.
+func selectedLabel(application *Window) string {
+	sidebar := &application.sidebar
+	if sidebar.Selected < 0 || sidebar.Selected >= len(sidebar.Rows) {
+		return ""
 	}
-	selectFolder := func(test *testing.T, application *Window, window *uitest.Window) { selectRow(test, application, "src") }
-	selected := func(application *Window) string {
-		sidebar := &application.sidebar
-		if sidebar.Selected < 0 || sidebar.Selected >= len(sidebar.Rows) {
-			return ""
+	return sidebar.Rows[sidebar.Selected].Label
+}
+
+// expanded tells whether the row of a name is open, as the sidebar lists it now.
+func expanded(application *Window, label string) bool {
+	application.sidebar.Rebuild(application)
+	for _, row := range application.sidebar.Rows {
+		if row.Label == label {
+			return row.Expanded
 		}
-		return sidebar.Rows[sidebar.Selected].Label
 	}
-	expanded := func(application *Window, label string) bool {
-		application.sidebar.Rebuild(application)
-		for _, row := range application.sidebar.Rows {
-			if row.Label == label {
-				return row.Expanded
-			}
-		}
-		return false
-	}
-	shortcuts := []shortcut{
-		{name: "Down selects the next row", prepare: selectTop,
-			press: func(window *uitest.Window) { press(window, input.KeyDown) },
+	return false
+}
+
+// sidebarShortcuts move the selection through the tree, and open folders and files.
+func sidebarShortcuts() []shortcut {
+	return append([]shortcut{
+		{name: "Down selects the next row", prepare: selectTopRow, press: pressing(input.KeyDown),
 			holds: func(application *Window) string {
 				return unless(application.sidebar.Selected == 1, "the selection did not move down")
 			}},
-		{name: "Up selects the row before", prepare: selectFolder,
-			press: func(window *uitest.Window) { press(window, input.KeyUp) },
+		{name: "Up selects the row before", prepare: selectFolderRow, press: pressing(input.KeyUp),
 			holds: func(application *Window) string {
-				return unless(selected(application) == "lighthouse", "selected "+selected(application))
+				return unless(selectedLabel(application) == "lighthouse", "selected "+selectedLabel(application))
 			}},
-		{name: "End selects the last row", prepare: selectTop,
-			press: func(window *uitest.Window) { press(window, input.KeyEnd) },
+		{name: "End selects the last row", prepare: selectTopRow, press: pressing(input.KeyEnd),
 			holds: func(application *Window) string {
 				return unless(application.sidebar.Selected == len(application.sidebar.Rows)-1, "the last row is not selected")
 			}},
-		{name: "Home selects the first row", prepare: selectFolder,
-			press: func(window *uitest.Window) { press(window, input.KeyHome) },
+		{name: "Home selects the first row", prepare: selectFolderRow, press: pressing(input.KeyHome),
 			holds: func(application *Window) string {
 				return unless(application.sidebar.Selected == 0, "the first row is not selected")
 			}},
-		{name: "Right opens a folder", prepare: selectFolder,
-			press: func(window *uitest.Window) { press(window, input.KeyRight) },
+	}, sidebarOpeningShortcuts()...)
+}
+
+// sidebarOpeningShortcuts open and close folders, and open files.
+func sidebarOpeningShortcuts() []shortcut {
+	selectNotes := func(test *testing.T, application *Window, window *uitest.Window) {
+		selectRow(test, application, "notes.txt")
+	}
+	return []shortcut{
+		{name: "Right opens a folder", prepare: selectFolderRow, press: pressing(input.KeyRight),
 			holds: func(application *Window) string { return unless(expanded(application, "src"), "src is closed") }},
 		{name: "Left closes a folder",
 			prepare: func(test *testing.T, application *Window, window *uitest.Window) {
-				selectFolder(test, application, window)
+				selectFolderRow(test, application, window)
 				press(window, input.KeyRight)
 			},
-			press: func(window *uitest.Window) { press(window, input.KeyLeft) },
+			press: pressing(input.KeyLeft),
 			holds: func(application *Window) string { return unless(!expanded(application, "src"), "src is still open") }},
-		{name: "Enter opens a file and moves to it",
-			prepare: func(test *testing.T, application *Window, window *uitest.Window) {
-				selectRow(test, application, "notes.txt")
-			},
-			press: func(window *uitest.Window) { press(window, input.KeyEnter) },
+		{name: "Enter opens a file and moves to it", prepare: selectNotes, press: pressing(input.KeyEnter),
 			holds: func(application *Window) string {
 				return unless(openPath(application) == "lighthouse/notes.txt" && application.focus == viewerPane, "notes.txt is not open with the focus on it")
 			}},
-		{name: "Space opens a file and stays in the sidebar",
-			prepare: func(test *testing.T, application *Window, window *uitest.Window) {
-				selectRow(test, application, "notes.txt")
-			},
-			press: func(window *uitest.Window) { press(window, input.KeySpace) },
+		{name: "Space opens a file and stays in the sidebar", prepare: selectNotes, press: pressing(input.KeySpace),
 			holds: func(application *Window) string {
 				return unless(openPath(application) == "lighthouse/notes.txt" && application.focus == sidebarPane, "notes.txt is not open with the focus left on the sidebar")
 			}},
 	}
-	for _, key := range shortcuts {
-		test.Run(key.name, key.run)
-	}
 }
 
 func TestEveryFileShortcutDoesItsJob(test *testing.T) {
-	offset := func(application *Window) float32 { return application.viewer.List.Offset }
-	scrolledDown := func(application *Window) string {
-		return unless(offset(application) > 0, "the file did not scroll down")
+	runShortcuts(test, append(scrollingShortcuts(), foldingShortcut()))
+}
+
+// offset is how far down the file open is scrolled.
+func offset(application *Window) float32 { return application.viewer.List.Offset }
+
+// scrolledDown says the file did not scroll down, if it did not.
+func scrolledDown(application *Window) string {
+	return unless(offset(application) > 0, "the file did not scroll down")
+}
+
+// scrolledUp says the file did not scroll up from its bottom, if it did not.
+func scrolledUp(application *Window) string {
+	return unless(offset(application) < application.viewer.List.ContentHeight()-application.viewer.List.Area.Height, "the file did not scroll up")
+}
+
+// scrollDownFirst puts the file open at its bottom, with the keyboard on it.
+func scrollDownFirst(test *testing.T, application *Window, window *uitest.Window) {
+	focusEditor(test, application, window)
+	press(window, input.KeyEnd)
+}
+
+// scrollingShortcuts scroll the file open by lines, by pages and to its ends.
+func scrollingShortcuts() []shortcut {
+	long := func(name string, prepare func(*testing.T, *Window, *uitest.Window), press func(*uitest.Window), holds func(*Window) string) shortcut {
+		return shortcut{name: name, open: "tides/coast.txt", long: true, prepare: prepare, press: press, holds: holds}
 	}
-	scrollDownFirst := func(test *testing.T, application *Window, window *uitest.Window) {
-		focusEditor(test, application, window)
-		press(window, input.KeyEnd)
+	return []shortcut{
+		long("j scrolls down a line", focusEditor, pressing(input.KeyJ), scrolledDown),
+		long("Down scrolls down a line", focusEditor, pressing(input.KeyDown), scrolledDown),
+		long("Space scrolls down a page", focusEditor, pressing(input.KeySpace), func(application *Window) string {
+			return unless(offset(application) > 10*application.viewer.List.RowHeight, "the file did not scroll a page")
+		}),
+		long("End goes to the bottom", focusEditor, pressing(input.KeyEnd), func(application *Window) string {
+			return unless(scrolledUp(application) != "", "the file is not at its bottom")
+		}),
+		long("k scrolls up a line", scrollDownFirst, pressing(input.KeyK), scrolledUp),
+		long("Shift+Space scrolls up a page", scrollDownFirst, pressing(input.KeySpace, input.KeyShift), scrolledUp),
+		long("Home goes to the top", scrollDownFirst, pressing(input.KeyHome), func(application *Window) string {
+			return unless(offset(application) == 0, "the file is not at its top")
+		}),
 	}
-	scrolledUp := func(application *Window) string {
-		return unless(offset(application) < application.viewer.List.ContentHeight()-application.viewer.List.Area.Height, "the file did not scroll up")
-	}
+}
+
+// foldingShortcut opens the fold in sight of a diff.
+func foldingShortcut() shortcut {
 	var rowsFolded int
-	shortcuts := []shortcut{
-		{name: "j scrolls down a line", open: "tides/coast.txt", long: true, prepare: focusEditor,
-			press: func(window *uitest.Window) { press(window, input.KeyJ) }, holds: scrolledDown},
-		{name: "Down scrolls down a line", open: "tides/coast.txt", long: true, prepare: focusEditor,
-			press: func(window *uitest.Window) { press(window, input.KeyDown) }, holds: scrolledDown},
-		{name: "Space scrolls down a page", open: "tides/coast.txt", long: true, prepare: focusEditor,
-			press: func(window *uitest.Window) { press(window, input.KeySpace) },
-			holds: func(application *Window) string {
-				return unless(offset(application) > 10*application.viewer.List.RowHeight, "the file did not scroll a page")
-			}},
-		{name: "End goes to the bottom", open: "tides/coast.txt", long: true, prepare: focusEditor,
-			press: func(window *uitest.Window) { press(window, input.KeyEnd) },
-			holds: func(application *Window) string {
-				return unless(scrolledUp(application) != "", "the file is not at its bottom")
-			}},
-		{name: "k scrolls up a line", open: "tides/coast.txt", long: true, prepare: scrollDownFirst,
-			press: func(window *uitest.Window) { press(window, input.KeyK) }, holds: scrolledUp},
-		{name: "Shift+Space scrolls up a page", open: "tides/coast.txt", long: true, prepare: scrollDownFirst,
-			press: func(window *uitest.Window) { press(window, input.KeySpace, input.KeyShift) }, holds: scrolledUp},
-		{name: "Home goes to the top", open: "tides/coast.txt", long: true, prepare: scrollDownFirst,
-			press: func(window *uitest.Window) { press(window, input.KeyHome) },
-			holds: func(application *Window) string {
-				return unless(offset(application) == 0, "the file is not at its top")
-			}},
-		{name: "Enter opens the fold in sight", open: "tides/coast.txt", long: true, review: true,
-			prepare: func(test *testing.T, application *Window, window *uitest.Window) {
-				focusEditor(test, application, window)
-				rowsFolded = application.viewer.RowCount()
-			},
-			press: func(window *uitest.Window) { press(window, input.KeyEnter) },
-			holds: func(application *Window) string {
-				return unless(application.viewer.RowCount() > rowsFolded, fmt.Sprintf("the diff still shows %d rows", rowsFolded))
-			}},
-	}
-	for _, key := range shortcuts {
-		test.Run(key.name, key.run)
-	}
+	return shortcut{name: "Enter opens the fold in sight", open: "tides/coast.txt", long: true, review: true,
+		prepare: func(test *testing.T, application *Window, window *uitest.Window) {
+			focusEditor(test, application, window)
+			rowsFolded = application.viewer.RowCount()
+		},
+		press: pressing(input.KeyEnter),
+		holds: func(application *Window) string {
+			return unless(application.viewer.RowCount() > rowsFolded, fmt.Sprintf("the diff still shows %d rows", rowsFolded))
+		}}
 }
 
 // unless gives the problem when a promise does not hold, and nothing when it does.
