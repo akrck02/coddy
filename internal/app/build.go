@@ -5,9 +5,7 @@ import (
 	"strings"
 
 	"github.com/akrck02/go-renderer/draw2d"
-	"github.com/akrck02/go-renderer/input"
 	ui "github.com/akrck02/go-ui"
-	"github.com/akrck02/go-ui/window"
 )
 
 // baseDialog chooses what the projects are compared against.
@@ -70,82 +68,6 @@ func (application *App) applyTheme(context *ui.Context) {
 
 func (application *App) modalOpen() bool {
 	return application.finder.open || application.base.open || application.helpOpen || application.pickerOpen
-}
-
-// handleKeys answers the shortcuts. While a dialog is open its own keys are read by the dialog.
-func (application *App) handleKeys(context *ui.Context) {
-	keys := application.keys
-	if keys.command() && keys.pressed(input.KeyQ) {
-		window.Quit()
-		return
-	}
-	if application.modalOpen() || context.WantsKeyboard() {
-		return
-	}
-	switch {
-	case keys.command() && keys.shift() && keys.pressed(input.KeyF), strings.Contains(keys.typedText(), "/"):
-		application.finder.show(contentScope)
-	case keys.command() && keys.pressed(input.KeyP), keys.plain(input.KeyP) && keys.shift():
-		application.finder.show(namesScope)
-	case keys.command() && keys.pressed(input.KeyO), keys.plain(input.KeyO):
-		application.pickerOpen = true
-	case keys.command() && keys.pressed(input.KeyR), keys.plain(input.KeyR):
-		application.reloadAll()
-		application.toast = "Reading the projects again"
-	case keys.plain(input.KeyB):
-		application.openBaseDialog()
-	case application.sidebar.entered != "" && (keys.pressed(input.KeyEscape) || keys.pressed(input.KeyBackspace)):
-		application.sidebar.leave(application)
-		application.focus = sidebarPane
-	case keys.plain(input.KeyG):
-		application.sidebar.toggleChangedFilter()
-	case keys.plain(input.KeyE):
-		application.enterCurrentProject()
-	case keys.pressed(input.KeyTab):
-		application.toggleFocus()
-	case keys.plain(input.KeyN):
-		application.stepChangedFile(1)
-	case keys.plain(input.KeyM):
-		application.stepChangedFile(-1)
-	case keys.pressed(input.KeyRightBracket):
-		application.editor.stepHunk(1)
-	case keys.pressed(input.KeyLeftBracket):
-		application.editor.stepHunk(-1)
-	case keys.plain(input.KeyD):
-		application.toggleView()
-	case keys.plain(input.KeyF):
-		if application.editor.mode == diffView {
-			application.editor.toggleContext()
-		}
-	case keys.plain(input.KeyC):
-		application.setMode(1 - application.sidebar.mode)
-	case keys.plain(input.Key1):
-		application.setMode(filesMode)
-	case keys.plain(input.Key2):
-		application.setMode(reviewMode)
-	case keys.plain(input.KeyV):
-		if reference, ok := application.markTarget(); ok {
-			application.toggleViewed(reference, application.focus == editorPane || application.editor.reference == reference)
-		}
-	case keys.plain(input.KeyH):
-		application.setOnlyChanged(!application.onlyChanged)
-	case keys.plain(input.KeyW):
-		application.settings.WorkingTree = !application.settings.WorkingTree
-		application.clearDocuments()
-		application.reloadAll()
-		application.toast = workingTreeNote(application.settings.WorkingTree)
-	case keys.plain(input.KeyT):
-		application.dark = !application.dark
-		application.applyTheme(context)
-	case keys.plain(input.KeyY):
-		application.copyPath(context)
-	case strings.Contains(keys.typedText(), "?") || keys.pressed(input.KeyF1):
-		application.helpOpen = true
-	case application.focus == sidebarPane:
-		application.sidebar.handleKeys(application, keys)
-	default:
-		application.editor.handleKeys(keys)
-	}
 }
 
 // enterCurrentProject takes the sidebar into the project of the selected row, or of the file open.
@@ -425,46 +347,19 @@ func (application *App) buildBaseDialog(context *ui.Context) {
 	application.projectsChanged()
 }
 
-var helpKeys = [][2]string{
-	{"⌘P  or  Shift+P", "Find a file by its name, in any project"},
-	{"⌘⇧F  or  /", "Find a text in the files of every project (Tab switches in the finder)"},
-	{"n  /  m", "Next / previous changed file, across every project"},
-	{"]  /  [", "Next / previous change in the file"},
-	{"1  /  2  ·  c", "Files mode (read any file) / Review mode (the changes, as diffs)"},
-	{"Enter (on a project)  ·  e", "Enter the project: the sidebar lists only its tree"},
-	{"g", "Files mode: only the changed files, or every file"},
-	{"Esc  ·  Backspace", "Back to every project"},
-	{"v", "Mark the file as viewed and open the next one not viewed"},
-	{"d", "Diff or the whole file"},
-	{"f", "Fold the unchanged lines, or show them all"},
-	{"Enter", "Open a fold (editor) · open a file or folder (sidebar)"},
-	{"Tab", "Move between the sidebar and the editor"},
-	{"↑ ↓ ← →  PgUp PgDn  Home End", "Move in the sidebar or scroll the file"},
-	{"j  /  k  ·  Space", "Scroll a line · a page"},
-	{"h", "Only the projects with changes, or every project (sidebar and finder)"},
-	{"b", "Compare against another branch, tag or commit"},
-	{"w", "Count the changes not committed yet, or only commits"},
-	{"r  or  ⌘R", "Read every project again"},
-	{"o  or  ⌘O", "Open a repository or a folder of repositories"},
-	{"y", "Copy the open file's path"},
-	{"t", "Light or dark"},
-	{"⌘Q", "Quit"},
-}
-
 func (application *App) buildHelp(context *ui.Context) {
 	if !application.helpOpen {
 		return
 	}
-	dismissed := context.Sheet("Keys", ui.SheetOptions{}, func() {
+	dismissed := context.Sheet("Keys", ui.SheetOptions{Width: ui.Fixed(helpSheetWidth)}, func() {
 		context.Caption("The reader never changes a repository: it only runs git commands that read.")
-		for _, entry := range helpKeys {
-			context.Box(ui.Layout{Width: ui.Grow(), Gap: 12}, func() {
-				context.Box(ui.Layout{Width: ui.Fixed(230)}, func() {
-					context.Text(entry[0], ui.TextStyle{Weight: draw2d.Mono, Color: context.Theme.Primary})
-				})
-				context.Label(entry[1])
+		context.Box(ui.Layout{Width: ui.Grow(), Gap: helpColumnGap}, func() {
+			application.buildHelpColumn(context, "Anywhere", helpRows(anywhere))
+			context.Box(ui.Layout{Direction: ui.Vertical, Gap: 16}, func() {
+				application.buildHelpColumn(context, "In the sidebar", helpRows(inSidebar))
+				application.buildHelpColumn(context, "In the file", helpRows(inEditor))
 			})
-		}
+		})
 		context.Row(func() {
 			context.Spacer()
 			if context.PrimaryButton("Close") {
@@ -476,6 +371,32 @@ func (application *App) buildHelp(context *ui.Context) {
 		application.helpOpen = false
 	}
 }
+
+// buildHelpColumn lists the keys of one place, under its name.
+func (application *App) buildHelpColumn(context *ui.Context, title string, rows []helpRow) {
+	context.Box(ui.Layout{Direction: ui.Vertical, Gap: 4}, func() {
+		context.Text(title, ui.TextStyle{Weight: draw2d.Bold})
+		for _, row := range rows {
+			context.Box(ui.Layout{Gap: 12}, func() {
+				context.Box(ui.Layout{Width: ui.Fixed(helpKeysWidth)}, func() {
+					context.Text(row.keys, ui.TextStyle{Weight: draw2d.Mono, Color: context.Theme.Primary})
+				})
+				context.Box(ui.Layout{Width: ui.Fixed(helpTextWidth)}, func() {
+					context.Label(row.description)
+				})
+			})
+		}
+	})
+}
+
+// helpKeysWidth and helpTextWidth are the help's columns of keys and of what they do, in points;
+// the help shows two of each side by side.
+const (
+	helpKeysWidth  = 150
+	helpTextWidth  = 250
+	helpColumnGap  = 32
+	helpSheetWidth = 2*(helpKeysWidth+12+helpTextWidth) + helpColumnGap + 48
+)
 
 func (application *App) buildPicker(context *ui.Context) {
 	if !application.pickerOpen {

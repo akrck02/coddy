@@ -8,7 +8,6 @@ import (
 	"github.com/akrck02/code-review/internal/java"
 	"github.com/akrck02/code-review/internal/workspace"
 	"github.com/akrck02/go-renderer/draw2d"
-	"github.com/akrck02/go-renderer/input"
 	ui "github.com/akrck02/go-ui"
 )
 
@@ -284,47 +283,54 @@ func (sidebar *sidebarState) activate(application *App, index int) {
 	}
 }
 
-// handleKeys moves through the rows while the sidebar has the keyboard.
-func (sidebar *sidebarState) handleKeys(application *App, keys keys) {
-	count := len(sidebar.rows)
-	if count == 0 {
-		return
-	}
-	moved := true
+// moveSelection moves the selected row by step rows; a pageStep is a page, an endStep the far end.
+func (sidebar *sidebarState) moveSelection(application *App, step int) {
 	switch {
-	case keys.typed(input.KeyDown):
-		sidebar.selected++
-	case keys.typed(input.KeyUp):
-		sidebar.selected--
-	case keys.typed(input.KeyPageDown):
-		sidebar.selected += sidebar.list.pageRows()
-	case keys.typed(input.KeyPageUp):
-		sidebar.selected -= sidebar.list.pageRows()
-	case keys.pressed(input.KeyHome):
+	case step >= endStep:
+		sidebar.selected = len(sidebar.rows) - 1
+	case step <= -endStep:
 		sidebar.selected = 0
-	case keys.pressed(input.KeyEnd):
-		sidebar.selected = count - 1
-	case keys.typed(input.KeyRight):
+	case step >= pageStep:
+		sidebar.selected += sidebar.list.pageRows()
+	case step <= -pageStep:
+		sidebar.selected -= sidebar.list.pageRows()
+	default:
+		sidebar.selected += step
+	}
+	sidebar.selectionMoved(application)
+}
+
+// openOrClose opens the selected folder, or goes into it, for a step forward; closes it, or goes
+// to its parent, for a step back.
+func (sidebar *sidebarState) openOrClose(application *App, step int) {
+	if step > 0 {
 		sidebar.expandOrEnter()
-	case keys.typed(input.KeyLeft):
+	} else {
 		sidebar.collapseOrLeave()
-	case keys.pressed(input.KeyEnter) && sidebar.rows[sidebar.selected].kind == projectRow:
+	}
+	sidebar.selectionMoved(application)
+}
+
+// openSelected opens the selected row: enters a project, opens a folder, or shows a file, moving
+// the keyboard to it when asked.
+func (sidebar *sidebarState) openSelected(application *App, moveToFile bool) {
+	if sidebar.rows[sidebar.selected].kind == projectRow && moveToFile {
 		sidebar.enter(application, sidebar.rows[sidebar.selected].project)
 		return
-	case keys.pressed(input.KeyEnter) || keys.pressed(input.KeySpace):
-		sidebar.activate(application, sidebar.selected)
-		if sidebar.selected < count && sidebar.rows[sidebar.selected].kind == fileRow && keys.pressed(input.KeyEnter) {
-			application.focus = editorPane
-		}
-	default:
-		moved = false
 	}
-	if moved {
-		sidebar.selected = min(max(sidebar.selected, 0), count-1)
-		sidebar.list.reveal(sidebar.selected)
-		if !sidebar.stale {
-			sidebar.previewSelected(application)
-		}
+	sidebar.activate(application, sidebar.selected)
+	if sidebar.selected < len(sidebar.rows) && sidebar.rows[sidebar.selected].kind == fileRow && moveToFile {
+		application.focus = editorPane
+	}
+	sidebar.selectionMoved(application)
+}
+
+// selectionMoved keeps the selection on a row, in sight, and shows the file it is on.
+func (sidebar *sidebarState) selectionMoved(application *App) {
+	sidebar.selected = min(max(sidebar.selected, 0), len(sidebar.rows)-1)
+	sidebar.list.reveal(sidebar.selected)
+	if !sidebar.stale {
+		sidebar.previewSelected(application)
 	}
 }
 

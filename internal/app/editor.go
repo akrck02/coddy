@@ -9,7 +9,6 @@ import (
 	"github.com/akrck02/code-review/internal/highlight"
 	"github.com/akrck02/code-review/internal/workspace"
 	"github.com/akrck02/go-renderer/draw2d"
-	"github.com/akrck02/go-renderer/input"
 	ui "github.com/akrck02/go-ui"
 )
 
@@ -250,32 +249,33 @@ func (editor *editorState) stepHunk(step int) {
 	}
 }
 
-// handleKeys scrolls while the editor has the keyboard.
-func (editor *editorState) handleKeys(keys keys) {
+// scrollLines scrolls by step lines; a pageStep is a page, an endStep the top or the bottom.
+func (editor *editorState) scrollLines(step int) {
 	list := &editor.list
-	step := list.rowHeight
+	page := list.area.Height - list.rowHeight*2
 	switch {
-	case keys.typed(input.KeyDown) || keys.plain(input.KeyJ):
-		list.offset += step
-	case keys.typed(input.KeyUp) || keys.plain(input.KeyK):
-		list.offset -= step
-	case keys.typed(input.KeyPageDown) || keys.typed(input.KeySpace) && !keys.shift():
-		list.offset += list.area.Height - step*2
-	case keys.typed(input.KeyPageUp) || keys.typed(input.KeySpace) && keys.shift():
-		list.offset -= list.area.Height - step*2
-	case keys.pressed(input.KeyHome):
-		list.offset = 0
-	case keys.pressed(input.KeyEnd):
+	case step >= endStep:
 		list.offset = list.contentHeight()
-	case keys.typed(input.KeyRight):
-		list.offsetX += editor.charWidth * 4
-	case keys.typed(input.KeyLeft):
-		list.offsetX -= editor.charWidth * 4
-	case keys.pressed(input.KeyEnter):
-		editor.openFoldInSight()
+	case step <= -endStep:
+		list.offset = 0
+	case step >= pageStep:
+		list.offset += page
+	case step <= -pageStep:
+		list.offset -= page
+	default:
+		list.offset += float32(step) * list.rowHeight
 	}
 	list.clamp()
 }
+
+// scrollSideways scrolls by step times four characters.
+func (editor *editorState) scrollSideways(step int) {
+	editor.list.offsetX += float32(step) * editor.charWidth * sidewaysCharacters
+	editor.list.clamp()
+}
+
+// sidewaysCharacters are how many characters one press of ← or → scrolls.
+const sidewaysCharacters = 4
 
 // openFoldInSight opens the first fold that can be seen.
 func (editor *editorState) openFoldInSight() {
