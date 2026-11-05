@@ -57,7 +57,7 @@ It has two modes, chosen on the rail at the far left (or with `1`, `2`, `c`):
   shows on its row under the pointer); `Esc` goes back to every project.
 - **Java and Kotlin projects shown as IntelliJ shows them**: Gradle and Maven modules marked,
   source roots blue (`src/main/java`, `kotlin`…), test roots green, resources apart, the packages
-  inside a root joined with dots (`app.coast.platform.dal`), and classes named without their
+  inside a root joined with dots (`com.example.lighthouse.lamp`), and classes named without their
   extension with a badge for their kind (C class, I interface, E enum, @ annotation, R record, O
   Kotlin object), read from the files as they come into sight.
 - **Icons by file type** in the tree and the finder, tinted with the code's own colours.

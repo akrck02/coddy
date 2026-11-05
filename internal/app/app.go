@@ -8,6 +8,7 @@ import (
 	"sync/atomic"
 
 	"github.com/akrck02/code-review/internal/git"
+	"github.com/akrck02/code-review/internal/java"
 	"github.com/akrck02/code-review/internal/review"
 	"github.com/akrck02/code-review/internal/workspace"
 	"github.com/akrck02/go-ui/uidrive"
@@ -75,7 +76,7 @@ type App struct {
 	designs  designs
 	// classKinds are what the Java and Kotlin files declare, read as they come into sight;
 	// kindsWanted are those asked for since the last frame
-	classKinds  map[fileReference]review.ClassKind
+	classKinds  map[fileReference]java.ClassKind
 	kindsWanted []fileReference
 	tap         *inputTap
 	keys        keys
@@ -102,7 +103,7 @@ func New(settings Settings) *App {
 		focus:         sidebarPane,
 		designs:       newDesigns(),
 		reviewed:      review.OpenReviewed(settings.ReviewedPath),
-		classKinds:    map[fileReference]review.ClassKind{},
+		classKinds:    map[fileReference]java.ClassKind{},
 	}
 	application.sidebar = newSidebar()
 	if settings.Review {

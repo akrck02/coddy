@@ -1,9 +1,13 @@
-package review
+// Package java knows how Java and Kotlin projects are laid out, as IntelliJ shows them: modules,
+// source and resource roots, packages joined with dots, and what each source file declares.
+package java
 
 import (
-	"github.com/akrck02/code-review/internal/workspace"
 	"regexp"
 	"strings"
+
+	"github.com/akrck02/code-review/internal/git"
+	"github.com/akrck02/code-review/internal/workspace"
 )
 
 // buildFiles mark a folder as a module.
@@ -15,8 +19,8 @@ var buildFiles = map[string]bool{
 // src/<source set>/<language or resources>.
 var sourceRoot = regexp.MustCompile(`(^|/)src/([A-Za-z0-9_-]+)/(java|kotlin|groovy|scala|resources|res|assets)$`)
 
-// IsJavaProject tells whether a project's files are laid out as Gradle or Maven lay them out.
-func IsJavaProject(paths []string) bool {
+// IsProject tells whether a project's files are laid out as Gradle or Maven lay them out.
+func IsProject(paths []string) bool {
 	for _, path := range paths {
 		if buildFiles[workspace.BaseName(path)] || strings.Contains(path, "src/main/java/") || strings.Contains(path, "src/main/kotlin/") {
 			return true
@@ -25,10 +29,10 @@ func IsJavaProject(paths []string) bool {
 	return false
 }
 
-// BuildJavaTree makes a project's tree as IntelliJ shows a Java or Kotlin project: modules and
+// BuildTree makes a project's tree as IntelliJ shows a Java or Kotlin project: modules and
 // source roots marked, folders outside the roots one by one, and inside a source root the
-// packages that hold only one package joined with dots ("app.coast.platform.dal").
-func BuildJavaTree(paths []string, isChanged func(path string) bool) *workspace.Folder {
+// packages that hold only one package joined with dots ("com.example.lighthouse.lamp").
+func BuildTree(paths []string, isChanged func(path string) bool) *workspace.Folder {
 	root := workspace.BuildFolders(paths, isChanged)
 	markRoles(root, workspace.PlainFolder)
 	return root
@@ -128,4 +132,32 @@ func KindOf(path string, content []byte) ClassKind {
 // IsClassFile tells whether a file is a Java or Kotlin source whose class can be read.
 func IsClassFile(path string) bool {
 	return strings.HasSuffix(path, ".java") || strings.HasSuffix(path, ".kt")
+}
+
+// headSize is how much of a source file is read to find what it declares: the package, the
+// imports and the declaration fit in it nearly always.
+const headSize = 24 * 1024
+
+// ReadKind reads what a file of a repository's working tree declares; NoClass when it cannot be
+// read.
+func ReadKind(repository, path string) ClassKind {
+	content, err := git.ReadWorkingFile(repository, path)
+	if err != nil {
+		return NoClass // a file gone or unreadable shows as a plain file
+	}
+	return KindOf(path, content[:min(len(content), headSize)])
+}
+
+// Letter is the letter IntelliJ marks a kind of class with; "" for a kind it does not mark.
+func (kind ClassKind) Letter() string {
+	return letters[kind]
+}
+
+var letters = map[ClassKind]string{
+	ClassDeclaration:      "C",
+	InterfaceDeclaration:  "I",
+	EnumDeclaration:       "E",
+	AnnotationDeclaration: "@",
+	RecordDeclaration:     "R",
+	ObjectDeclaration:     "O",
 }

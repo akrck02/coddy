@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/akrck02/code-review/internal/git"
-	"github.com/akrck02/code-review/internal/review"
+	"github.com/akrck02/code-review/internal/java"
 	"github.com/akrck02/code-review/internal/workspace"
 	"github.com/akrck02/go-renderer/draw2d"
 	"github.com/akrck02/go-renderer/input"
@@ -104,8 +104,8 @@ func (sidebar *sidebarState) tree(application *App, project int) *workspace.Fold
 	}
 	// a Gradle or Maven project is shown as IntelliJ shows it: modules, source roots, packages
 	build := workspace.BuildTree
-	if review.IsJavaProject(model.Files) {
-		build = review.BuildJavaTree
+	if java.IsProject(model.Files) {
+		build = java.BuildTree
 	}
 	tree := build(paths, isChanged)
 	sidebar.trees[key] = tree
@@ -611,7 +611,7 @@ func (sidebar *sidebarState) paint(context *ui.Context, application *App, drawin
 			x += treeIconSize + 4
 			// a Java or Kotlin class is named without its extension and drawn by its kind, as
 			// IntelliJ draws it, once the file has been read
-			if kind := application.classKind(reference); kind != review.UnknownKind && kind != review.NoClass {
+			if kind := application.classKind(reference); kind != java.UnknownKind && kind != java.NoClass {
 				paintClassBadge(drawing, look, kind, x, iconTop, treeIconSize, ink == theme.InkQuiet)
 				label = strings.TrimSuffix(strings.TrimSuffix(row.label, ".java"), ".kt")
 			} else {
