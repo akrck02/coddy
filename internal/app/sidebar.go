@@ -183,8 +183,8 @@ func (sidebar *sidebarState) enter(application *App, project int) {
 	sidebar.selected = 0
 	sidebar.list.Offset = 0
 	sidebar.rebuild(application)
-	if application.editor.isOpen() && application.editor.reference.Project == project {
-		sidebar.revealFile(application, application.editor.reference)
+	if application.editor.IsOpen() && application.editor.Reference.Project == project {
+		sidebar.revealFile(application, application.editor.Reference)
 	}
 }
 
@@ -285,16 +285,16 @@ func (sidebar *sidebarState) activate(application *App, index int) {
 	}
 }
 
-// moveSelection moves the selected row by step rows; a pageStep is a page, an endStep the far end.
+// moveSelection moves the selected row by step rows; a pane.PageStep is a page, a pane.EndStep the far end.
 func (sidebar *sidebarState) moveSelection(application *App, step int) {
 	switch {
-	case step >= endStep:
+	case step >= pane.EndStep:
 		sidebar.selected = len(sidebar.rows) - 1
-	case step <= -endStep:
+	case step <= -pane.EndStep:
 		sidebar.selected = 0
-	case step >= pageStep:
+	case step >= pane.PageStep:
 		sidebar.selected += sidebar.list.PageRows()
-	case step <= -pageStep:
+	case step <= -pane.PageStep:
 		sidebar.selected -= sidebar.list.PageRows()
 	default:
 		sidebar.selected += step
@@ -417,7 +417,7 @@ func (sidebar *sidebarState) build(context *ui.Context, application *App) {
 		})
 		sidebar.list.RowHeight = sidebarRowHeight
 		sidebar.list.Count = len(sidebar.rows)
-		if !application.modalOpen() {
+		if !application.ModalOpen() {
 			onBar := sidebar.list.Follow(context, application.keys, palette.ScrollStep)
 			x, y := context.Pointer()
 			if index := sidebar.list.RowAt(x, y); index >= 0 && !onBar && application.keys.Clicked() {
@@ -426,7 +426,7 @@ func (sidebar *sidebarState) build(context *ui.Context, application *App) {
 				if sidebar.onEnter(index, x) {
 					sidebar.enter(application, sidebar.rows[index].project)
 				} else if sidebar.onCheck(index, x) {
-					application.toggleViewed(workspace.FileReference{Project: sidebar.rows[index].project, Path: sidebar.rows[index].path}, false)
+					application.ToggleViewed(workspace.FileReference{Project: sidebar.rows[index].project, Path: sidebar.rows[index].path}, false)
 				} else {
 					sidebar.activate(application, index)
 				}
@@ -561,7 +561,7 @@ func (sidebar *sidebarState) paint(context *ui.Context, application *App, drawin
 	metrics := measurer.MeasureText("Ag", size, draw2d.Regular, 1)
 	pointerX, pointerY := context.Pointer()
 	hovered := -1
-	if !application.modalOpen() {
+	if !application.ModalOpen() {
 		hovered = sidebar.list.RowAt(pointerX, pointerY)
 	}
 	drawing.PushClip(area)
@@ -571,7 +571,7 @@ func (sidebar *sidebarState) paint(context *ui.Context, application *App, drawin
 		top := sidebar.list.RowTop(index)
 		rowArea := draw2d.Rectangle{X: area.X + 4, Y: top + 1, Width: area.Width - 8 - pane.ScrollBarWidth/2, Height: sidebarRowHeight - 2}
 		reference := workspace.FileReference{Project: row.project, Path: row.path}
-		isOpen := row.kind == fileRow && application.editor.isOpen() && application.editor.reference == reference
+		isOpen := row.kind == fileRow && application.editor.IsOpen() && application.editor.Reference == reference
 		switch {
 		case index == sidebar.selected && application.focus == sidebarPane:
 			drawing.Rectangle(rowArea, 5, look.Chosen, look.FocusEdge, 1)
@@ -611,7 +611,7 @@ func (sidebar *sidebarState) paint(context *ui.Context, application *App, drawin
 			// in the review mode the room a folder gives its chevron holds the viewed mark
 			if sidebar.mode == reviewMode {
 				check, checkInk := "circle", palette.InkQuiet
-				if application.isViewed(reference) {
+				if application.IsViewed(reference) {
 					check, checkInk, ink = "circle-check", palette.InkSoft, palette.InkQuiet
 				}
 				drawing.Icon(check, x, iconTop, treeIconSize, checkInk)
@@ -633,7 +633,7 @@ func (sidebar *sidebarState) paint(context *ui.Context, application *App, drawin
 			// in the files mode the name says how the file changed, as Zed's project panel does;
 			// in the review mode every file changed, and the colour is kept for its counts
 			if row.status != git.Unchanged && sidebar.mode == filesMode {
-				ink = statusColour(palette, row.status)
+				ink = theme.StatusColour(palette, row.status)
 			}
 		case noteRow:
 			ink = palette.InkQuiet
@@ -691,7 +691,7 @@ func (sidebar *sidebarState) paintRight(context *ui.Context, application *App, d
 		if row.status == git.Unchanged {
 			return right
 		}
-		text(row.status.Letter(), statusColour(palette, row.status))
+		text(row.status.Letter(), theme.StatusColour(palette, row.status))
 		if sidebar.mode == reviewMode {
 			project := application.projects[row.project]
 			counts := project.Counts[row.path]
@@ -699,7 +699,7 @@ func (sidebar *sidebarState) paintRight(context *ui.Context, application *App, d
 				text("bin", palette.InkQuiet)
 				break
 			}
-			viewed := application.isViewed(workspace.FileReference{Project: row.project, Path: row.path})
+			viewed := application.IsViewed(workspace.FileReference{Project: row.project, Path: row.path})
 			removedInk, addedInk := palette.Danger, palette.Positive
 			if viewed {
 				removedInk, addedInk = palette.InkQuiet, palette.InkQuiet
@@ -746,17 +746,4 @@ func (sidebar *sidebarState) paintRight(context *ui.Context, application *App, d
 		}
 	}
 	return right
-}
-
-// statusColour is a status's colour: green for new, amber for changed, red for deleted.
-func statusColour(palette ui.Theme, status git.Status) draw2d.Color {
-	switch status {
-	case git.Added:
-		return palette.Positive
-	case git.Deleted:
-		return palette.Danger
-	case git.Unchanged:
-		return palette.Ink
-	}
-	return palette.Warning
 }

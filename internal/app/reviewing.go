@@ -3,6 +3,7 @@ package app
 import (
 	"fmt"
 
+	"github.com/akrck02/code-review/internal/viewer"
 	"github.com/akrck02/code-review/internal/workspace"
 	"github.com/akrck02/go-renderer/draw2d"
 	ui "github.com/akrck02/go-ui"
@@ -17,17 +18,17 @@ func (application *App) setMode(mode sidebarMode) {
 	application.sidebar.mode = mode
 	application.sidebar.stale = true
 	if mode == reviewMode {
-		application.editor.setMode(diffView)
+		application.editor.SetMode(viewer.DiffView)
 	} else {
-		application.editor.setMode(fileView)
+		application.editor.SetMode(viewer.FileView)
 	}
-	if application.editor.isOpen() {
-		application.sidebar.revealFile(application, application.editor.reference)
+	if application.editor.IsOpen() {
+		application.sidebar.revealFile(application, application.editor.Reference)
 	}
 }
 
-// isViewed tells whether a changed file was marked as viewed as its text is now.
-func (application *App) isViewed(reference workspace.FileReference) bool {
+// IsViewed tells whether a changed file was marked as viewed as its text is now.
+func (application *App) IsViewed(reference workspace.FileReference) bool {
 	if reference.Project < 0 || reference.Project >= len(application.projects) {
 		return false
 	}
@@ -47,9 +48,9 @@ func (application *App) reviewProgress() (viewed, total int) {
 	return viewed, total
 }
 
-// toggleViewed marks a changed file as viewed, or not. Marking the file open as viewed moves on to
+// ToggleViewed marks a changed file as viewed, or not. Marking the file open as viewed moves on to
 // the next file not viewed yet, as a reviewer who is done with one wants the next.
-func (application *App) toggleViewed(reference workspace.FileReference, moveOn bool) {
+func (application *App) ToggleViewed(reference workspace.FileReference, moveOn bool) {
 	if reference.Project < 0 || reference.Project >= len(application.projects) {
 		return
 	}
@@ -58,7 +59,7 @@ func (application *App) toggleViewed(reference workspace.FileReference, moveOn b
 		application.toast = "Only changed files are reviewed"
 		return
 	}
-	viewed := !application.isViewed(reference)
+	viewed := !application.IsViewed(reference)
 	if err := application.reviewed.SetViewed(project, reference.Path, viewed); err != nil {
 		application.toast = "Could not keep the mark: " + err.Error()
 	}
@@ -83,7 +84,7 @@ func (application *App) openNextUnviewed(after workspace.FileReference) bool {
 	}
 	for step := range order {
 		reference := order[(start+step)%len(order)]
-		if application.inScope(reference) && !application.isViewed(reference) {
+		if application.inScope(reference) && !application.IsViewed(reference) {
 			application.openFile(reference)
 			application.sidebar.revealFile(application, reference)
 			return true
@@ -99,8 +100,8 @@ func (application *App) markTarget() (workspace.FileReference, bool) {
 			return workspace.FileReference{Project: row.project, Path: row.path}, true
 		}
 	}
-	if application.editor.isOpen() {
-		return application.editor.reference, true
+	if application.editor.IsOpen() {
+		return application.editor.Reference, true
 	}
 	return workspace.FileReference{}, false
 }
@@ -187,7 +188,7 @@ func (application *App) openFirstUnviewedOf(project int) {
 			chosen := reference
 			first = &chosen
 		}
-		if !application.isViewed(reference) {
+		if !application.IsViewed(reference) {
 			first = &reference
 			break
 		}

@@ -374,7 +374,7 @@ func (finder *finderState) paintName(context *ui.Context, application *App, draw
 	drawing.Icon(icon, row.X+12, row.Y+(row.Height-16)/2, 16, iconInk)
 	nameInk := palette.Ink
 	if changed {
-		nameInk = statusColour(palette, change.Status)
+		nameInk = theme.StatusColour(palette, change.Status)
 		letter := change.Status.Letter()
 		width := measurer.MeasureText(letter, palette.SmallTextSize, draw2d.Mono, 1).Width
 		drawing.Text(letter, row.Right()-14-width, baseline, palette.SmallTextSize, draw2d.Mono, nameInk)
@@ -420,7 +420,7 @@ func (finder *finderState) paintHit(context *ui.Context, application *App, drawi
 	where := fmt.Sprintf("%s/%s:%d", application.projects[hit.project].Name, hit.Path, hit.Line)
 	whereInk := palette.InkQuiet
 	if hit.changed {
-		whereInk = statusColour(palette, hit.status).WithAlpha(0.85)
+		whereInk = theme.StatusColour(palette, hit.status).WithAlpha(0.85)
 	}
 	drawing.Text(where, left, row.Bottom()-8-small.Descent, palette.SmallTextSize, draw2d.Regular, whereInk)
 	drawing.PopClip()

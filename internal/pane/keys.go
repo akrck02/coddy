@@ -54,3 +54,9 @@ func (keys Keys) TypedText() string {
 	}
 	return keys.state.TypedText()
 }
+
+// PageStep and EndStep stand for a page and for the far end, when a key moves a pane by them.
+const (
+	PageStep = 1 << 16
+	EndStep  = 1 << 20
+)

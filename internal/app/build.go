@@ -6,6 +6,7 @@ import (
 
 	"github.com/akrck02/code-review/internal/pane"
 	"github.com/akrck02/code-review/internal/theme"
+	"github.com/akrck02/code-review/internal/viewer"
 	"github.com/akrck02/go-renderer/draw2d"
 	ui "github.com/akrck02/go-ui"
 )
@@ -47,7 +48,7 @@ func (application *App) Build(context *ui.Context) {
 					application.sidebar.build(context, application)
 				})
 			context.Frame(ui.Layout{Width: ui.Fixed(1), Height: ui.Grow()}, ui.Look{Fill: context.Theme.Line}, nil)
-			application.editor.build(context, application)
+			application.editor.Build(context, application)
 		})
 		context.Frame(ui.Layout{Width: ui.Grow(), Height: ui.Fixed(1)}, ui.Look{Fill: context.Theme.Line}, nil)
 		application.buildStatusBar(context)
@@ -68,7 +69,7 @@ func (application *App) applyTheme(context *ui.Context) {
 	context.Theme = application.look.Theme
 }
 
-func (application *App) modalOpen() bool {
+func (application *App) ModalOpen() bool {
 	return application.finder.open || application.base.open || application.helpOpen || application.pickerOpen
 }
 
@@ -78,8 +79,8 @@ func (application *App) enterCurrentProject() {
 		application.sidebar.enter(application, row.project)
 		return
 	}
-	if application.editor.isOpen() {
-		application.sidebar.enter(application, application.editor.reference.Project)
+	if application.editor.IsOpen() {
+		application.sidebar.enter(application, application.editor.Reference.Project)
 	}
 }
 
@@ -91,7 +92,7 @@ func workingTreeNote(on bool) string {
 }
 
 func (application *App) toggleFocus() {
-	if application.focus == sidebarPane && application.editor.isOpen() {
+	if application.focus == sidebarPane && application.editor.IsOpen() {
 		application.focus = editorPane
 		return
 	}
@@ -100,19 +101,19 @@ func (application *App) toggleFocus() {
 
 func (application *App) toggleView() {
 	editor := &application.editor
-	if editor.mode == diffView {
-		editor.setMode(fileView)
+	if editor.Mode == viewer.DiffView {
+		editor.SetMode(viewer.FileView)
 	} else {
-		editor.setMode(diffView)
+		editor.SetMode(viewer.DiffView)
 	}
 }
 
 // copyPath puts the open file's path, from the project's top, on the clipboard.
 func (application *App) copyPath(context *ui.Context) {
-	if !application.editor.isOpen() {
+	if !application.editor.IsOpen() {
 		return
 	}
-	path := application.editor.project.Name + "/" + application.editor.reference.Path
+	path := application.editor.Project.Name + "/" + application.editor.Reference.Path
 	context.Copy(path)
 	application.toast = "Copied " + path
 }
@@ -258,8 +259,8 @@ func (application *App) buildStatusBar(context *ui.Context) {
 			context.Text(fmt.Sprintf("reading %d…", application.loading), small)
 		}
 		context.Spacer()
-		if application.editor.isOpen() {
-			project := application.editor.project
+		if application.editor.IsOpen() {
+			project := application.editor.Project
 			for _, current := range application.projects {
 				if current.Path == project.Path {
 					project = current
@@ -281,8 +282,8 @@ func (application *App) openBaseDialog() {
 	dialog.open = true
 	dialog.focusNext = true
 	dialog.forProject = ""
-	if application.editor.isOpen() {
-		dialog.forProject = application.editor.project.Path
+	if application.editor.IsOpen() {
+		dialog.forProject = application.editor.Project.Path
 	} else if row, ok := application.sidebar.selectedRow(); ok && row.project >= 0 {
 		dialog.forProject = application.projects[row.project].Path
 	}

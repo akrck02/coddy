@@ -11,6 +11,7 @@ import (
 	"github.com/akrck02/code-review/internal/pane"
 	"github.com/akrck02/code-review/internal/review"
 	"github.com/akrck02/code-review/internal/theme"
+	"github.com/akrck02/code-review/internal/viewer"
 	"github.com/akrck02/code-review/internal/workspace"
 	"github.com/akrck02/go-ui/uidrive"
 )
@@ -61,7 +62,7 @@ type App struct {
 	documentCache map[workspace.FileReference]*workspace.Document
 
 	sidebar sidebarState
-	editor  editorState
+	editor  viewer.Viewer
 	finder  finderState
 	base    baseDialog
 	focus   focusedPane
@@ -104,7 +105,7 @@ func New(settings Settings) *App {
 	if settings.Review {
 		application.sidebar.mode = reviewMode
 	}
-	application.editor = newEditor()
+	application.editor = viewer.New()
 	application.setLook()
 	application.openFolders(settings.Folders)
 	if settings.Open != "" {
@@ -156,7 +157,7 @@ func (application *App) openFolders(folders []string) {
 		return strings.ToLower(application.projects[first].Name) < strings.ToLower(application.projects[second].Name)
 	})
 	application.documentCache = map[workspace.FileReference]*workspace.Document{}
-	application.editor.close()
+	application.editor.Close()
 	application.reloadAll()
 }
 
@@ -165,7 +166,7 @@ func (application *App) closeAll() {
 	application.projects = nil
 	application.folders = nil
 	application.documentCache = map[workspace.FileReference]*workspace.Document{}
-	application.editor.close()
+	application.editor.Close()
 	application.projectsChanged()
 }
 
@@ -203,7 +204,7 @@ func (application *App) reload(index int) {
 				}
 			}
 			application.projectsChanged()
-			application.editor.projectReloaded(application, path)
+			application.editor.Reopen(path, application.openFile)
 		}
 	})
 }
@@ -264,13 +265,13 @@ func (application *App) openFile(reference workspace.FileReference) {
 		return
 	}
 	project := application.projects[reference.Project]
-	application.editor.start(reference, project)
+	application.editor.Start(reference, project)
 	if document, cached := application.documentCache[reference]; cached {
-		application.editor.show(document, application.sidebar.mode == reviewMode)
+		application.editor.Show(document, application.sidebar.mode == reviewMode)
 		return
 	}
 	workingTree := application.settings.WorkingTree
-	request := application.editor.request
+	request := application.editor.Request
 	application.work.run("", func(cancellation) func() {
 		document := workspace.OpenDocument(project, reference.Path, workingTree)
 		return func() {
@@ -278,8 +279,8 @@ func (application *App) openFile(reference workspace.FileReference) {
 				application.documentCache = map[workspace.FileReference]*workspace.Document{}
 			}
 			application.documentCache[reference] = document
-			if application.editor.request == request {
-				application.editor.show(document, application.sidebar.mode == reviewMode)
+			if application.editor.Request == request {
+				application.editor.Show(document, application.sidebar.mode == reviewMode)
 			}
 		}
 	})
@@ -287,11 +288,11 @@ func (application *App) openFile(reference workspace.FileReference) {
 
 // openFileAt opens a file and shows one of its lines, marked; 0 shows its top (or first change).
 func (application *App) openFileAt(reference workspace.FileReference, line int) {
-	application.editor.goTo = line
+	application.editor.GoTo = line
 	application.openFile(reference)
 	editor := &application.editor
-	if editor.goTo > 0 && editor.document != nil && editor.reference == reference {
-		editor.revealLine(editor.goTo)
+	if editor.GoTo > 0 && editor.Document != nil && editor.Reference == reference {
+		editor.RevealLine(editor.GoTo)
 	}
 }
 
@@ -308,7 +309,7 @@ func (application *App) stepChangedFile(step int) {
 	}
 	current := -1
 	for index, reference := range order {
-		if reference == application.editor.reference && application.editor.isOpen() {
+		if reference == application.editor.Reference && application.editor.IsOpen() {
 			current = index
 			break
 		}
