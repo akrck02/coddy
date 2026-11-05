@@ -24,7 +24,7 @@ const (
 // foldContext is how many unchanged lines are kept around a change before the rest is folded.
 const foldContext = 3
 
-// codeRowHeight is a line of code: 13 pixels of Go Mono on lines 1.7 times as tall, as roomy as
+// codeRowHeight is a line of code: 13 pixels of a monospaced face on lines 1.7 times as tall, as roomy as
 // Zed's buffer.
 const codeRowHeight float32 = 22
 
@@ -320,10 +320,31 @@ func (editor *editorState) buildHeader(context *ui.Context, application *App) {
 	context.Box(ui.Layout{Width: ui.Grow(), Height: ui.Fixed(40), Padding: ui.PadXY(16, 0), Gap: 6, AlignY: ui.Center}, func() {
 		document := editor.document
 		folder, name := splitPath(editor.reference.path)
-		context.Text(editor.project.Name, ui.TextStyle{Color: theme.InkQuiet})
-		context.IconSized("chevron-right", 12, theme.InkQuiet.WithAlpha(0.6))
-		if folder != "" {
-			context.Text(folder, ui.TextStyle{Color: theme.InkQuiet})
+		quiet := ui.TextStyle{Color: theme.InkQuiet}
+		// a narrow editor keeps the file's name and its buttons, and drops the project, the
+		// status's word and the language; the folder takes what is left, cut from its start
+		compact := editor.list.area.Width > 0 && editor.list.area.Width < 700
+		room := editor.list.area.Width - 32 - textWidth(context, name, ui.TextStyle{Weight: draw2d.Medium}) - 40
+		if !compact {
+			room -= textWidth(context, editor.project.Name, quiet) + 20
+		}
+		if document != nil {
+			if !compact {
+				room -= textWidth(context, document.Language, ui.TextStyle{Size: theme.SmallTextSize}) + 12
+			}
+			if document.Changed {
+				room -= 230 // the counts, the fold, view and viewed buttons
+				if !compact {
+					room -= 70 // the status's word
+				}
+			}
+		}
+		if !compact {
+			context.Text(editor.project.Name, quiet)
+			context.IconSized("chevron-right", 12, theme.InkQuiet.WithAlpha(0.6))
+		}
+		if folder = fitTextEnd(context, folder, quiet, room); len([]rune(folder)) > 3 {
+			context.Text(folder, quiet)
 			context.IconSized("chevron-right", 12, theme.InkQuiet.WithAlpha(0.6))
 		}
 		nameInk := theme.Ink
@@ -338,8 +359,10 @@ func (editor *editorState) buildHeader(context *ui.Context, application *App) {
 		if document.Changed {
 			change := document.Change
 			context.Box(ui.Layout{Width: ui.Fixed(4)}, nil)
-			context.Text(statusName(change.Status), ui.TextStyle{Size: theme.SmallTextSize, Color: statusColour(theme, change.Status)})
-			if change.OldPath != change.Path {
+			if !compact {
+				context.Text(statusName(change.Status), ui.TextStyle{Size: theme.SmallTextSize, Color: statusColour(theme, change.Status)})
+			}
+			if change.OldPath != change.Path && !compact {
 				context.Text("from "+change.OldPath, ui.TextStyle{Size: theme.SmallTextSize, Color: theme.InkQuiet})
 			}
 			if editor.added > 0 {
@@ -350,7 +373,9 @@ func (editor *editorState) buildHeader(context *ui.Context, application *App) {
 			}
 		}
 		context.Spacer()
-		context.Text(document.Language, ui.TextStyle{Size: theme.SmallTextSize, Color: theme.InkQuiet})
+		if !compact {
+			context.Text(document.Language, ui.TextStyle{Size: theme.SmallTextSize, Color: theme.InkQuiet})
+		}
 		if !document.Changed {
 			return
 		}

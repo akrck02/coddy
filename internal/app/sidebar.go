@@ -374,7 +374,7 @@ func (sidebar *sidebarState) build(context *ui.Context, application *App) {
 	}
 	theme := context.Theme
 	context.Frame(ui.Layout{Direction: ui.Vertical, Width: ui.Grow(), Height: ui.Grow()}, ui.Look{Fill: theme.Surface}, func() {
-		context.Box(ui.Layout{Width: ui.Grow(), Height: ui.Fixed(40), Padding: ui.PadXY(14, 0), Gap: 8, AlignY: ui.Center}, func() {
+		context.Box(ui.Layout{Width: ui.Grow(), Height: ui.Fixed(40), Padding: ui.PadXY(headerPadding, 0), Gap: headerGap, AlignY: ui.Center}, func() {
 			if sidebar.entered != "" {
 				sidebar.buildEnteredHeader(context, application)
 				return
@@ -383,11 +383,16 @@ func (sidebar *sidebarState) build(context *ui.Context, application *App) {
 			if sidebar.mode == reviewMode {
 				title = "Review"
 			}
-			context.Text(title, ui.TextStyle{Weight: draw2d.Medium, Color: theme.InkSoft})
+			titleStyle := ui.TextStyle{Weight: draw2d.Medium, Color: theme.InkSoft}
+			context.Text(title, titleStyle)
+			room := sidebar.headerRoom() - textWidth(context, title, titleStyle) - toolButtonWidth*2 - headerGap*3
 			if sidebar.mode == reviewMode {
 				viewed, total := application.reviewProgress()
+				progressStyle := ui.TextStyle{Size: theme.SmallTextSize, Color: theme.InkQuiet}
 				if total > 0 {
-					context.Text(fmt.Sprintf("%d of %d viewed", viewed, total), ui.TextStyle{Size: theme.SmallTextSize, Color: theme.InkQuiet})
+					if progress := fitText(context, fmt.Sprintf("%d of %d viewed", viewed, total), progressStyle, room); progress != "" {
+						context.Text(progress, progressStyle)
+					}
 				}
 			}
 			context.Spacer()
@@ -432,18 +437,46 @@ func (sidebar *sidebarState) buildEnteredHeader(context *ui.Context, application
 		sidebar.leave(application)
 		return
 	}
-	context.Text(project.Name, ui.TextStyle{Weight: draw2d.Medium})
-	if project.Branch != "" {
-		context.Text(project.Branch, ui.TextStyle{Size: theme.SmallTextSize, Color: theme.InkQuiet})
-	}
-	context.Spacer()
+	count, countStyle := "", ui.TextStyle{Size: theme.SmallTextSize, Weight: draw2d.Mono, Color: theme.Warning}
 	if sidebar.mode == reviewMode && len(project.Changes) > 0 {
 		viewed, total := application.reviewed.Progress(project)
-		context.Text(fmt.Sprintf("%d/%d", viewed, total), ui.TextStyle{Size: theme.SmallTextSize, Weight: draw2d.Mono, Color: theme.InkQuiet})
+		count, countStyle.Color = fmt.Sprintf("%d/%d", viewed, total), theme.InkQuiet
 	} else if len(project.Changes) > 0 {
-		context.Text(fmt.Sprint(len(project.Changes)), ui.TextStyle{Size: theme.SmallTextSize, Weight: draw2d.Mono, Color: theme.Warning})
+		count = fmt.Sprint(len(project.Changes))
+	}
+	// what is left for the name and the branch once the buttons and the count have their room
+	room := sidebar.headerRoom() - toolButtonWidth - headerGap
+	if count != "" {
+		room -= textWidth(context, count, countStyle) + headerGap
+	}
+	if sidebar.mode == filesMode {
+		room -= toolButtonWidth + headerGap
+	}
+	nameStyle := ui.TextStyle{Weight: draw2d.Medium}
+	name := fitText(context, project.Name, nameStyle, room)
+	context.Text(name, nameStyle)
+	room -= textWidth(context, name, nameStyle) + headerGap
+	branchStyle := ui.TextStyle{Size: theme.SmallTextSize, Color: theme.InkQuiet}
+	if branch := fitText(context, project.Branch, branchStyle, room); len([]rune(branch)) > 3 {
+		context.Text(branch, branchStyle)
+	}
+	context.Spacer()
+	if count != "" {
+		context.Text(count, countStyle)
 	}
 	sidebar.buildChangedFilter(context)
+}
+
+// The sidebar's header: its padding, the gap between its parts and an icon button's width.
+const (
+	headerPadding   float32 = 14
+	headerGap       float32 = 8
+	toolButtonWidth float32 = 30
+)
+
+// headerRoom is the width inside the sidebar's header, less a little for the pane's resize edge.
+func (sidebar *sidebarState) headerRoom() float32 {
+	return sidebar.width - 2*headerPadding - 4
 }
 
 // listsChangesOnly tells whether the tree lists only the changed files: always in the review mode,

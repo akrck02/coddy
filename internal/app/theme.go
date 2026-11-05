@@ -229,3 +229,58 @@ func toolButton(context *ui.Context, name, icon string, on bool) bool {
 	context.Tooltip(name)
 	return clicked
 }
+
+// fitText shortens a text with an ellipsis until it fits a width; it gives "" when not even its
+// first letter and the ellipsis fit, so a narrow pane drops what it cannot show instead of
+// pushing its buttons out.
+func fitText(context *ui.Context, text string, style ui.TextStyle, width float32) string {
+	size := style.Size
+	if size == 0 {
+		size = context.Theme.TextSize
+	}
+	measure := func(words string) float32 {
+		return context.Measurer().MeasureText(words, size, style.Weight, 1).Width
+	}
+	if width <= 0 {
+		return ""
+	}
+	if measure(text) <= width {
+		return text
+	}
+	runes := []rune(text)
+	for cut := len(runes) - 1; cut > 0; cut-- {
+		shortened := string(runes[:cut]) + "…"
+		if measure(shortened) <= width {
+			return shortened
+		}
+	}
+	return ""
+}
+
+// textWidth is how wide a text is drawn in a style.
+func textWidth(context *ui.Context, text string, style ui.TextStyle) float32 {
+	size := style.Size
+	if size == 0 {
+		size = context.Theme.TextSize
+	}
+	return context.Measurer().MeasureText(text, size, style.Weight, 1).Width
+}
+
+// fitTextEnd shortens a text from its start, keeping its end: a folder's path is told apart by its
+// last folders.
+func fitTextEnd(context *ui.Context, text string, style ui.TextStyle, width float32) string {
+	if width <= 0 {
+		return ""
+	}
+	if textWidth(context, text, style) <= width {
+		return text
+	}
+	runes := []rune(text)
+	for cut := 1; cut < len(runes); cut++ {
+		shortened := "…" + string(runes[cut:])
+		if textWidth(context, shortened, style) <= width {
+			return shortened
+		}
+	}
+	return ""
+}

@@ -81,6 +81,7 @@ go build -o bin/code-review .
 | `-committed` | Compare the last commit only, leaving out changes not committed yet |
 | `-open project/path` | Open a file at the start |
 | `-review` | Start in the review mode |
+| `-code-font file.ttf` | Read the code in this TrueType face (default SF Mono, from macOS; Go Mono where there is none) |
 | `-all` | Show every project, not only those with changes |
 | `-light` | Start in the light theme (dark by default) |
 | `-width`, `-height`, `-capture shot.png` | go-ui's window flags; `-capture` draws one frame to a picture |
@@ -154,4 +155,5 @@ are ready.
 - No search inside a file.
 - No side-by-side diff; the sides are interleaved.
 - Long lines are not wrapped: scroll sideways (Shift+wheel, ←/→ in the editor).
-- One typeface for code (Go Mono).
+- One typeface for code at a time: SF Mono by default, or the one `-code-font` names (a `.ttf`;
+  collections such as `Menlo.ttc` are not read).

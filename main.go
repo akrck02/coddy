@@ -36,6 +36,7 @@ func main() {
 	light := flag.Bool("light", false, "start in the light theme")
 	open := flag.String("open", "", "open this file at the start, as project/path/in/it")
 	reviewing := flag.Bool("review", false, "start in the review mode: the changed files, as diffs")
+	codeFont := flag.String("code-font", "", "a TrueType file to read the code in (default: SF Mono, else Go Mono)")
 	allProjects := flag.Bool("all", false, "show every project, not only those with changes (the choice is remembered otherwise)")
 	flag.Usage = func() {
 		fmt.Fprintln(flag.CommandLine.Output(), "usage: code-review [flags] [repository or folder of repositories …]")
@@ -49,8 +50,7 @@ func main() {
 			folders = existing(strings.Split(remembered, "\n"))
 		}
 	}
-	// the code is read in Go Mono's regular face; go-renderer's default monospaced face is bold
-	options.Fonts = overlay.Fonts{Mono: gomono.TTF}
+	options.Fonts = overlay.Fonts{Mono: monospaced(*codeFont)}
 
 	reader := app.New(app.Settings{
 		Folders:     folders,
@@ -83,6 +83,27 @@ func onlyChanged(allProjects bool) bool {
 	}
 	remembered, found := window.Preference(onlyChangedPreference)
 	return !found || remembered != "false"
+}
+
+// systemMono is the monospaced face macOS reads code in (Xcode's, Terminal's): clean, without the
+// serifs of Go Mono, and on every Mac.
+const systemMono = "/System/Library/Fonts/SFNSMono.ttf"
+
+// monospaced is the face the code is drawn in: the one asked for, else SF Mono, else Go Mono
+// (built in, so the reader works anywhere). go-renderer's own monospaced face is bold.
+func monospaced(asked string) []byte {
+	for _, path := range []string{asked, systemMono} {
+		if path == "" {
+			continue
+		}
+		if content, err := os.ReadFile(path); err == nil {
+			return content
+		}
+		if path == asked {
+			log.Printf("cannot read %s: the code is drawn in the default face", asked)
+		}
+	}
+	return gomono.TTF
 }
 
 // existing keeps the folders that are still there.

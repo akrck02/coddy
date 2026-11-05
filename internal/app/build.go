@@ -36,7 +36,12 @@ func (application *App) Build(context *ui.Context) {
 		context.Box(ui.Layout{Width: ui.Grow(), Height: ui.Grow()}, func() {
 			application.buildModeRail(context)
 			context.Frame(ui.Layout{Width: ui.Fixed(1), Height: ui.Grow()}, ui.Look{Fill: context.Theme.Line}, nil)
-			context.Resizable("sidebar", ui.RightSide, &application.sidebar.width, 220, 720,
+			// the sidebar never takes more than two fifths of the window, so the code keeps its room
+			// when the window is made narrow
+			windowWidth, _ := context.Size()
+			widest := min(max(windowWidth*0.4, 220), 720)
+			application.sidebar.width = min(application.sidebar.width, widest)
+			context.Resizable("sidebar", ui.RightSide, &application.sidebar.width, 220, widest,
 				ui.Layout{Direction: ui.Vertical, Height: ui.Grow()}, func() {
 					application.sidebar.build(context, application)
 				})
