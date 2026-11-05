@@ -3,6 +3,7 @@ package app
 import (
 	"strings"
 
+	"github.com/akrck02/code-review/internal/pane"
 	"github.com/akrck02/go-renderer/input"
 	ui "github.com/akrck02/go-ui"
 	"github.com/akrck02/go-ui/window"
@@ -46,18 +47,18 @@ type command struct {
 }
 
 // matches tells which of a command's keys the frame's input pressed.
-func (press keyPress) matches(keys keys) bool {
+func (press keyPress) matches(keys pane.Keys) bool {
 	switch {
 	case press.text != "":
-		return strings.Contains(keys.typedText(), press.text)
+		return strings.Contains(keys.TypedText(), press.text)
 	case press.command:
-		return keys.command() && keys.pressed(press.key) && (!press.shift || keys.shift())
-	case press.shift && !keys.shift():
+		return keys.Command() && keys.Pressed(press.key) && (!press.shift || keys.Shift())
+	case press.shift && !keys.Shift():
 		return false
 	case press.repeats:
-		return keys.typed(press.key) && !keys.command() && !keys.down(input.KeyAlt)
+		return keys.Typed(press.key) && !keys.Command() && !keys.Down(input.KeyAlt)
 	default:
-		return keys.plain(press.key)
+		return keys.Plain(press.key)
 	}
 }
 

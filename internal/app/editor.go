@@ -7,6 +7,7 @@ import (
 
 	"github.com/akrck02/code-review/internal/git"
 	"github.com/akrck02/code-review/internal/highlight"
+	"github.com/akrck02/code-review/internal/pane"
 	"github.com/akrck02/code-review/internal/theme"
 	"github.com/akrck02/code-review/internal/workspace"
 	"github.com/akrck02/go-renderer/draw2d"
@@ -29,7 +30,7 @@ const foldContext = 3
 const codeRowHeight float32 = 22
 
 type editorState struct {
-	reference fileReference
+	reference workspace.FileReference
 	project   *workspace.Project
 	document  *workspace.Document
 	request   int // counts the files asked for, so a slow read that was overtaken is dropped
@@ -53,7 +54,7 @@ type editorState struct {
 	// removed some, as Zed marks them in its gutter
 	marks map[int]workspace.Mark
 
-	list scroller
+	list pane.Scroller
 
 	codeSize    float32
 	rowHeight   float32
@@ -63,7 +64,7 @@ type editorState struct {
 }
 
 func newEditor() editorState {
-	return editorState{openedFolds: map[int]bool{}, codeSize: 13, rowHeight: codeRowHeight, list: scroller{rowHeight: codeRowHeight}}
+	return editorState{openedFolds: map[int]bool{}, codeSize: 13, rowHeight: codeRowHeight, list: pane.Scroller{RowHeight: codeRowHeight}}
 }
 
 func (editor *editorState) isOpen() bool { return editor.showing }
@@ -75,7 +76,7 @@ func (editor *editorState) close() {
 }
 
 // start begins showing a file, before its text has been read.
-func (editor *editorState) start(reference fileReference, project *workspace.Project) {
+func (editor *editorState) start(reference workspace.FileReference, project *workspace.Project) {
 	if editor.showing && editor.reference == reference && editor.document != nil {
 		return
 	}
@@ -86,7 +87,7 @@ func (editor *editorState) start(reference fileReference, project *workspace.Pro
 	editor.document = nil
 	editor.showing = true
 	editor.openedFolds = map[int]bool{}
-	editor.list.offset, editor.list.offsetX = 0, 0
+	editor.list.Offset, editor.list.OffsetX = 0, 0
 }
 
 // show puts a file's text in the editor once it has been read: as its diff when reviewing a
@@ -106,7 +107,7 @@ func (editor *editorState) show(document *workspace.Document, reviewing bool) {
 		return
 	}
 	if !keepPlace && editor.mode == diffView && len(editor.hunks) > 0 {
-		editor.list.revealNearTop(editor.hunks[0])
+		editor.list.RevealNearTop(editor.hunks[0])
 	}
 }
 
@@ -116,13 +117,13 @@ func (editor *editorState) revealLine(number int) {
 	editor.goTo = 0
 	editor.markedLine = number
 	if editor.mode != diffView || !editor.document.Changed {
-		editor.list.revealNearTop(max(min(number-1, editor.rowCount()-1), 0))
+		editor.list.RevealNearTop(max(min(number-1, editor.rowCount()-1), 0))
 		return
 	}
 	for attempt := 0; attempt < 2; attempt++ {
 		for index, row := range editor.rows {
 			if !row.IsFold() && row.Line.Kind != git.Removal && row.Line.NewNumber == number {
-				editor.list.revealNearTop(index)
+				editor.list.RevealNearTop(index)
 				return
 			}
 		}
@@ -144,10 +145,10 @@ func (editor *editorState) revealLine(number int) {
 // projectReloaded opens the file again when its project was read again, as it may have changed.
 func (editor *editorState) projectReloaded(application *App, path string) {
 	if editor.showing && editor.project != nil && editor.project.Path == path {
-		offset := editor.list.offset
+		offset := editor.list.Offset
 		editor.document = nil
 		application.openFile(editor.reference)
-		editor.list.offset = offset
+		editor.list.Offset = offset
 	}
 }
 
@@ -155,7 +156,7 @@ func (editor *editorState) projectReloaded(application *App, path string) {
 func (editor *editorState) layOut() {
 	document := editor.document
 	editor.rows, editor.hunks, editor.inline, editor.marks = nil, nil, nil, nil
-	defer func() { editor.list.count = editor.rowCount() }()
+	defer func() { editor.list.Count = editor.rowCount() }()
 	if document == nil {
 		return
 	}
@@ -211,16 +212,16 @@ func (editor *editorState) setMode(mode viewMode) {
 	}
 	editor.mode = mode
 	editor.layOut()
-	editor.list.offset = 0
+	editor.list.Offset = 0
 	if mode == diffView && len(editor.hunks) > 0 {
-		editor.list.revealNearTop(editor.hunks[0])
+		editor.list.RevealNearTop(editor.hunks[0])
 	}
 }
 
 func (editor *editorState) toggleContext() {
 	editor.fullContext = !editor.fullContext
 	editor.layOut()
-	editor.list.clamp()
+	editor.list.Clamp()
 }
 
 // stepHunk jumps to the next (or previous) run of changes.
@@ -228,7 +229,7 @@ func (editor *editorState) stepHunk(step int) {
 	if len(editor.hunks) == 0 {
 		return
 	}
-	marker := int((editor.list.offset + editor.list.area.Height/3) / editor.list.rowHeight)
+	marker := int((editor.list.Offset + editor.list.Area.Height/3) / editor.list.RowHeight)
 	target := -1
 	if step > 0 {
 		for _, start := range editor.hunks {
@@ -246,33 +247,33 @@ func (editor *editorState) stepHunk(step int) {
 		}
 	}
 	if target >= 0 {
-		editor.list.revealNearTop(target)
+		editor.list.RevealNearTop(target)
 	}
 }
 
 // scrollLines scrolls by step lines; a pageStep is a page, an endStep the top or the bottom.
 func (editor *editorState) scrollLines(step int) {
 	list := &editor.list
-	page := list.area.Height - list.rowHeight*2
+	page := list.Area.Height - list.RowHeight*2
 	switch {
 	case step >= endStep:
-		list.offset = list.contentHeight()
+		list.Offset = list.ContentHeight()
 	case step <= -endStep:
-		list.offset = 0
+		list.Offset = 0
 	case step >= pageStep:
-		list.offset += page
+		list.Offset += page
 	case step <= -pageStep:
-		list.offset -= page
+		list.Offset -= page
 	default:
-		list.offset += float32(step) * list.rowHeight
+		list.Offset += float32(step) * list.RowHeight
 	}
-	list.clamp()
+	list.Clamp()
 }
 
 // scrollSideways scrolls by step times four characters.
 func (editor *editorState) scrollSideways(step int) {
-	editor.list.offsetX += float32(step) * editor.charWidth * sidewaysCharacters
-	editor.list.clamp()
+	editor.list.OffsetX += float32(step) * editor.charWidth * sidewaysCharacters
+	editor.list.Clamp()
 }
 
 // sidewaysCharacters are how many characters one press of ← or → scrolls.
@@ -280,7 +281,7 @@ const sidewaysCharacters = 4
 
 // openFoldInSight opens the first fold that can be seen.
 func (editor *editorState) openFoldInSight() {
-	first, last := editor.list.visible()
+	first, last := editor.list.Visible()
 	for index := first; index < last && index < len(editor.rows); index++ {
 		if editor.rows[index].IsFold() {
 			editor.openFold(index)
@@ -309,21 +310,21 @@ func (editor *editorState) build(context *ui.Context, application *App) {
 		editor.buildHeader(context, application)
 		context.Frame(ui.Layout{Width: ui.Grow(), Height: ui.Fixed(1)}, ui.Look{Fill: look.Hover}, nil)
 		editor.measure(context)
-		editor.list.rowHeight = editor.rowHeight
-		editor.list.count = editor.rowCount()
+		editor.list.RowHeight = editor.rowHeight
+		editor.list.Count = editor.rowCount()
 		if !application.modalOpen() {
-			onBar := editor.list.follow(context, application.keys, context.Theme.ScrollStep)
+			onBar := editor.list.Follow(context, application.keys, context.Theme.ScrollStep)
 			x, y := context.Pointer()
-			if application.keys.clicked() && editor.list.area.Contains(x, y) {
+			if application.keys.Clicked() && editor.list.Area.Contains(x, y) {
 				application.focus = editorPane
-				index := editor.list.rowAt(x, y)
+				index := editor.list.RowAt(x, y)
 				if !onBar && index >= 0 && editor.mode == diffView && index < len(editor.rows) && editor.rows[index].IsFold() {
 					editor.openFold(index)
 				}
 			}
 		}
 		context.Paint(ui.Layout{Width: ui.Grow(), Height: ui.Grow()}, func(area draw2d.Rectangle, drawing *draw2d.List) {
-			editor.list.place(area)
+			editor.list.Place(area)
 			editor.paint(context, application, drawing)
 		})
 	})
@@ -360,12 +361,12 @@ func (editor *editorState) buildHeader(context *ui.Context, application *App) {
 	palette := context.Theme
 	context.Box(ui.Layout{Width: ui.Grow(), Height: ui.Fixed(40), Padding: ui.PadXY(16, 0), Gap: 6, AlignY: ui.Center}, func() {
 		document := editor.document
-		folder, name := splitPath(editor.reference.path)
+		folder, name := splitPath(editor.reference.Path)
 		quiet := ui.TextStyle{Color: palette.InkQuiet}
 		// a narrow editor keeps the file's name and its buttons, and drops the project, the
 		// status's word and the language; the folder takes what is left, cut from its start
-		compact := editor.list.area.Width > 0 && editor.list.area.Width < 700
-		room := editor.list.area.Width - 32 - theme.TextWidth(context, name, ui.TextStyle{Weight: draw2d.Medium}) - 40
+		compact := editor.list.Area.Width > 0 && editor.list.Area.Width < 700
+		room := editor.list.Area.Width - 32 - theme.TextWidth(context, name, ui.TextStyle{Weight: draw2d.Medium}) - 40
 		if !compact {
 			room -= theme.TextWidth(context, editor.project.Name, quiet) + 20
 		}
@@ -487,7 +488,7 @@ const gutterMarkWidth float32 = 3
 func (editor *editorState) paint(context *ui.Context, application *App, drawing *draw2d.List) {
 	palette := context.Theme
 	look := application.look
-	area := editor.list.area
+	area := editor.list.Area
 	document := editor.document
 	if document == nil {
 		return
@@ -508,12 +509,12 @@ func (editor *editorState) paint(context *ui.Context, application *App, drawing 
 		gutter = numberWidth*2 + editor.charWidth*2 + 6
 	}
 	codeLeft := area.X + gutter + 10
-	codeArea := draw2d.Rectangle{X: codeLeft, Y: area.Y, Width: max(area.Right()-codeLeft-scrollBarWidth, 0), Height: area.Height}
-	editor.list.width = 0
+	codeArea := draw2d.Rectangle{X: codeLeft, Y: area.Y, Width: max(area.Right()-codeLeft-pane.ScrollBarWidth, 0), Height: area.Height}
+	editor.list.Width = 0
 	drawing.PushClip(area)
-	first, last := editor.list.visible()
+	first, last := editor.list.Visible()
 	for index := first; index < last; index++ {
-		top := editor.list.rowTop(index)
+		top := editor.list.RowTop(index)
 		baseline := top + (editor.rowHeight+editor.codeAscent-editor.codeDescent)/2
 		if !diff {
 			number := index + 1
@@ -558,7 +559,7 @@ func (editor *editorState) paint(context *ui.Context, application *App, drawing 
 			drawing.Rectangle(rowArea, 0, lineWash, draw2d.Color{}, 0)
 			drawing.Rectangle(draw2d.Rectangle{X: area.X, Y: top, Width: gutterMarkWidth, Height: editor.rowHeight}, 0, edge, draw2d.Color{}, 0)
 			if span, found := editor.inline[index]; found && span.End > span.Start {
-				x := codeLeft + float32(span.Start)*editor.charWidth - editor.list.offsetX
+				x := codeLeft + float32(span.Start)*editor.charWidth - editor.list.OffsetX
 				word := draw2d.Rectangle{X: x, Y: top + 2, Width: float32(span.End-span.Start) * editor.charWidth, Height: editor.rowHeight - 4}
 				drawing.PushClip(codeArea)
 				drawing.Rectangle(word, 3, wordWash, draw2d.Color{}, 0)
@@ -580,7 +581,7 @@ func (editor *editorState) paint(context *ui.Context, application *App, drawing 
 		}
 		editor.paintCode(drawing, application, code, codeArea, baseline)
 	}
-	editor.list.paintBar(drawing, look.ScrollThumb)
+	editor.list.PaintBar(drawing, look.ScrollThumb)
 	editor.paintChangeMarks(drawing, look)
 	drawing.PopClip()
 }
@@ -602,7 +603,7 @@ func (editor *editorState) paintMark(drawing *draw2d.List, look theme.Look, mark
 
 // paintChangeMarks marks where the changes are along the scroll bar, as a map of the file.
 func (editor *editorState) paintChangeMarks(drawing *draw2d.List, look theme.Look) {
-	bar := editor.list.barArea()
+	bar := editor.list.BarArea()
 	mark := func(index, count int, colour draw2d.Color) {
 		y := bar.Y + float32(index)/float32(count)*bar.Height
 		drawing.Rectangle(draw2d.Rectangle{X: bar.X - 3, Y: y, Width: 3, Height: max(bar.Height/float32(count), 2)}, 0, colour, draw2d.Color{}, 0)
@@ -651,10 +652,10 @@ func (editor *editorState) paintNumber(drawing *draw2d.List, number int, left, w
 // paintCode paints a line's coloured pieces, shifted by the sideways scroll and cut at the area.
 func (editor *editorState) paintCode(drawing *draw2d.List, application *App, line highlight.Line, area draw2d.Rectangle, baseline float32) {
 	width := float32(line.Columns) * editor.charWidth
-	editor.list.width = max(editor.list.width, width)
+	editor.list.Width = max(editor.list.Width, width)
 	drawing.PushClip(area)
 	for _, span := range line.Spans {
-		x := area.X + float32(span.Column)*editor.charWidth - editor.list.offsetX
+		x := area.X + float32(span.Column)*editor.charWidth - editor.list.OffsetX
 		if x > area.Right() {
 			break
 		}

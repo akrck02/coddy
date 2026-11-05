@@ -8,6 +8,7 @@ import (
 
 	"github.com/akrck02/code-review/internal/git"
 	"github.com/akrck02/code-review/internal/java"
+	"github.com/akrck02/code-review/internal/pane"
 	"github.com/akrck02/code-review/internal/review"
 	"github.com/akrck02/code-review/internal/theme"
 	"github.com/akrck02/code-review/internal/workspace"
@@ -36,11 +37,11 @@ type Settings struct {
 	Synchronous bool
 }
 
-// pane is the part of the window the keyboard moves in.
-type pane int
+// focusedPane is the part of the window the keyboard moves in.
+type focusedPane int
 
 const (
-	sidebarPane pane = iota
+	sidebarPane focusedPane = iota
 	editorPane
 )
 
@@ -55,15 +56,15 @@ type App struct {
 	projectBases  map[string]string // a base chosen for one project, by its path
 	loading       int
 	candidates    []review.Candidate
-	changedOrder  []fileReference
+	changedOrder  []workspace.FileReference
 	work          *work
-	documentCache map[fileReference]*workspace.Document
+	documentCache map[workspace.FileReference]*workspace.Document
 
 	sidebar sidebarState
 	editor  editorState
 	finder  finderState
 	base    baseDialog
-	focus   pane
+	focus   focusedPane
 
 	helpOpen   bool
 	pickerOpen bool
@@ -76,18 +77,12 @@ type App struct {
 	designs  theme.Designs
 	// classKinds are what the Java and Kotlin files declare, read as they come into sight;
 	// kindsWanted are those asked for since the last frame
-	classKinds  map[fileReference]java.ClassKind
-	kindsWanted []fileReference
+	classKinds  map[workspace.FileReference]java.ClassKind
+	kindsWanted []workspace.FileReference
 	tap         *inputTap
-	keys        keys
+	keys        pane.Keys
 	toast       string
 	themeSet    bool
-}
-
-// fileReference names a file of a project.
-type fileReference struct {
-	project int
-	path    string
 }
 
 // New makes a reader for these settings; Driver must be given to the window it runs in.
@@ -96,14 +91,14 @@ func New(settings Settings) *App {
 		settings:      settings,
 		projectBases:  map[string]string{},
 		work:          newWork(settings.Synchronous),
-		documentCache: map[fileReference]*workspace.Document{},
+		documentCache: map[workspace.FileReference]*workspace.Document{},
 		tap:           &inputTap{},
 		dark:          settings.Dark,
 		onlyChanged:   settings.OnlyChanged,
 		focus:         sidebarPane,
 		designs:       theme.NewDesigns(),
 		reviewed:      review.OpenReviewed(settings.ReviewedPath),
-		classKinds:    map[fileReference]java.ClassKind{},
+		classKinds:    map[workspace.FileReference]java.ClassKind{},
 	}
 	application.sidebar = newSidebar()
 	if settings.Review {
@@ -160,7 +155,7 @@ func (application *App) openFolders(folders []string) {
 	sort.SliceStable(application.projects, func(first, second int) bool {
 		return strings.ToLower(application.projects[first].Name) < strings.ToLower(application.projects[second].Name)
 	})
-	application.documentCache = map[fileReference]*workspace.Document{}
+	application.documentCache = map[workspace.FileReference]*workspace.Document{}
 	application.editor.close()
 	application.reloadAll()
 }
@@ -169,7 +164,7 @@ func (application *App) openFolders(folders []string) {
 func (application *App) closeAll() {
 	application.projects = nil
 	application.folders = nil
-	application.documentCache = map[fileReference]*workspace.Document{}
+	application.documentCache = map[workspace.FileReference]*workspace.Document{}
 	application.editor.close()
 	application.projectsChanged()
 }
@@ -203,7 +198,7 @@ func (application *App) reload(index int) {
 				}
 			}
 			for reference := range application.documentCache {
-				if reference.project < len(application.projects) && application.projects[reference.project].Path == path {
+				if reference.Project < len(application.projects) && application.projects[reference.Project].Path == path {
 					delete(application.documentCache, reference)
 				}
 			}
@@ -238,7 +233,7 @@ func (application *App) projectsChanged() {
 		}
 		tree := workspace.BuildTree(changedPaths(project), nil)
 		walkFiles(tree, func(path string) {
-			application.changedOrder = append(application.changedOrder, fileReference{index, path})
+			application.changedOrder = append(application.changedOrder, workspace.FileReference{Project: index, Path: path})
 		})
 	}
 	application.finder.stale = true
@@ -264,11 +259,11 @@ func changedPaths(project *workspace.Project) []string {
 }
 
 // openFile opens a file of a project in the editor, reading it on another goroutine.
-func (application *App) openFile(reference fileReference) {
-	if reference.project < 0 || reference.project >= len(application.projects) {
+func (application *App) openFile(reference workspace.FileReference) {
+	if reference.Project < 0 || reference.Project >= len(application.projects) {
 		return
 	}
-	project := application.projects[reference.project]
+	project := application.projects[reference.Project]
 	application.editor.start(reference, project)
 	if document, cached := application.documentCache[reference]; cached {
 		application.editor.show(document, application.sidebar.mode == reviewMode)
@@ -277,10 +272,10 @@ func (application *App) openFile(reference fileReference) {
 	workingTree := application.settings.WorkingTree
 	request := application.editor.request
 	application.work.run("", func(cancellation) func() {
-		document := workspace.OpenDocument(project, reference.path, workingTree)
+		document := workspace.OpenDocument(project, reference.Path, workingTree)
 		return func() {
 			if len(application.documentCache) > 64 {
-				application.documentCache = map[fileReference]*workspace.Document{}
+				application.documentCache = map[workspace.FileReference]*workspace.Document{}
 			}
 			application.documentCache[reference] = document
 			if application.editor.request == request {
@@ -291,7 +286,7 @@ func (application *App) openFile(reference fileReference) {
 }
 
 // openFileAt opens a file and shows one of its lines, marked; 0 shows its top (or first change).
-func (application *App) openFileAt(reference fileReference, line int) {
+func (application *App) openFileAt(reference workspace.FileReference, line int) {
 	application.editor.goTo = line
 	application.openFile(reference)
 	editor := &application.editor
@@ -302,7 +297,7 @@ func (application *App) openFileAt(reference fileReference, line int) {
 
 // stepChangedFile opens the next (or previous) changed file of the whole development.
 func (application *App) stepChangedFile(step int) {
-	var order []fileReference
+	var order []workspace.FileReference
 	for _, reference := range application.changedOrder {
 		if application.inScope(reference) {
 			order = append(order, reference)
@@ -353,9 +348,9 @@ func (application *App) projectIndex(path string) int {
 
 // inScope tells whether a file is among those n, m and v go through: every project's, or only
 // those of the project the sidebar is in.
-func (application *App) inScope(reference fileReference) bool {
+func (application *App) inScope(reference workspace.FileReference) bool {
 	entered := application.sidebar.entered
-	return entered == "" || application.projects[reference.project].Path == entered
+	return entered == "" || application.projects[reference.Project].Path == entered
 }
 
 // projectsWithChanges counts the projects the development changed.
@@ -371,14 +366,14 @@ func (application *App) projectsWithChanges() int {
 
 // clearDocuments forgets the files read, so they are read again.
 func (application *App) clearDocuments() {
-	application.documentCache = map[fileReference]*workspace.Document{}
+	application.documentCache = map[workspace.FileReference]*workspace.Document{}
 }
 
 // openByLabel opens a file named as "project/path/in/it", once the projects have been read.
 func (application *App) openByLabel(label string) {
 	for _, candidate := range application.candidates {
 		if candidate.Label == label {
-			reference := fileReference{candidate.Project, candidate.Path}
+			reference := workspace.FileReference{Project: candidate.Project, Path: candidate.Path}
 			application.openFile(reference)
 			application.sidebar.revealFile(application, reference)
 			application.focus = editorPane

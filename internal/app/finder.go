@@ -10,8 +10,10 @@ import (
 
 	"github.com/akrck02/code-review/internal/git"
 	"github.com/akrck02/code-review/internal/highlight"
+	"github.com/akrck02/code-review/internal/pane"
 	"github.com/akrck02/code-review/internal/review"
 	"github.com/akrck02/code-review/internal/theme"
+	"github.com/akrck02/code-review/internal/workspace"
 	"github.com/akrck02/go-renderer/draw2d"
 	"github.com/akrck02/go-renderer/input"
 	ui "github.com/akrck02/go-ui"
@@ -36,7 +38,7 @@ type finderState struct {
 	stale     bool   // the projects changed since the matches were found
 	matches   []review.Match
 	selected  int
-	list      scroller
+	list      pane.Scroller
 
 	// the content search runs on other goroutines; search counts the searches asked for, so the
 	// answer to one overtaken by more typing is dropped
@@ -74,7 +76,7 @@ func (finder *finderState) show(scope finderScope) {
 	finder.query = ""
 	finder.stale = true
 	finder.selected = 0
-	finder.list.offset = 0
+	finder.list.Offset = 0
 	finder.hits, finder.searching = nil, false
 }
 
@@ -105,7 +107,7 @@ func (finder *finderState) refresh(application *App) {
 	finder.asked = finder.query
 	finder.stale = false
 	finder.selected = 0
-	finder.list.offset = 0
+	finder.list.Offset = 0
 	if finder.scope == namesScope {
 		finder.matches = review.FuzzyFind(application.candidates, finder.query, finderLimit)
 		return
@@ -127,7 +129,7 @@ func (finder *finderState) searchContent(application *App, text string) {
 	}
 	var projects []searched
 	for index, project := range application.projects {
-		if project.Loaded && !application.hidden(project) && application.inScope(fileReference{index, ""}) {
+		if project.Loaded && !application.hidden(project) && application.inScope(workspace.FileReference{Project: index, Path: ""}) {
 			projects = append(projects, searched{index, project.Path})
 		}
 	}
@@ -176,7 +178,7 @@ func (finder *finderState) searchContent(application *App, text string) {
 			}
 			finder.searching = false
 			finder.selected = 0
-			finder.list.offset = 0
+			finder.list.Offset = 0
 		}
 	})
 }
@@ -185,14 +187,14 @@ func (finder *finderState) choose(application *App) {
 	if finder.selected < 0 || finder.selected >= finder.count() {
 		return
 	}
-	var reference fileReference
+	var reference workspace.FileReference
 	line := 0
 	if finder.scope == contentScope {
 		hit := finder.hits[finder.selected]
-		reference, line = fileReference{hit.project, hit.Path}, hit.Line
+		reference, line = workspace.FileReference{Project: hit.project, Path: hit.Path}, hit.Line
 	} else {
 		candidate := finder.matches[finder.selected].Candidate
-		reference = fileReference{candidate.Project, candidate.Path}
+		reference = workspace.FileReference{Project: candidate.Project, Path: candidate.Path}
 	}
 	finder.open = false
 	application.openFileAt(reference, line)
@@ -206,15 +208,15 @@ func (finder *finderState) build(context *ui.Context, application *App) {
 	}
 	keys := application.keys
 	switch {
-	case keys.typed(input.KeyDown):
+	case keys.Typed(input.KeyDown):
 		finder.selected++
-	case keys.typed(input.KeyUp):
+	case keys.Typed(input.KeyUp):
 		finder.selected--
-	case keys.typed(input.KeyPageDown):
+	case keys.Typed(input.KeyPageDown):
 		finder.selected += finderRows
-	case keys.typed(input.KeyPageUp):
+	case keys.Typed(input.KeyPageUp):
 		finder.selected -= finderRows
-	case keys.pressed(input.KeyTab):
+	case keys.Pressed(input.KeyTab):
 		finder.setScope(1 - finder.scope)
 	}
 	palette := context.Theme
@@ -227,12 +229,12 @@ func (finder *finderState) build(context *ui.Context, application *App) {
 			finder.refresh(application)
 			count := finder.count()
 			finder.selected = min(max(finder.selected, 0), max(count-1, 0))
-			finder.list.rowHeight = finder.rowHeight()
-			finder.list.count = count
-			finder.list.reveal(finder.selected)
-			onBar := finder.list.follow(context, keys, palette.ScrollStep)
+			finder.list.RowHeight = finder.rowHeight()
+			finder.list.Count = count
+			finder.list.Reveal(finder.selected)
+			onBar := finder.list.Follow(context, keys, palette.ScrollStep)
 			x, y := context.Pointer()
-			if index := finder.list.rowAt(x, y); index >= 0 && !onBar && keys.clicked() {
+			if index := finder.list.RowAt(x, y); index >= 0 && !onBar && keys.Clicked() {
 				finder.selected = index
 				submitted = true
 			}
@@ -242,7 +244,7 @@ func (finder *finderState) build(context *ui.Context, application *App) {
 			}
 			height := float32(rows) * finder.rowHeight()
 			context.Paint(ui.Layout{Width: ui.Grow(), Height: ui.Fixed(height)}, func(area draw2d.Rectangle, drawing *draw2d.List) {
-				finder.list.place(area)
+				finder.list.Place(area)
 				finder.paint(context, application, drawing)
 			})
 			finder.buildFooter(context)
@@ -323,7 +325,7 @@ func keyCap(context *ui.Context, key string) {
 
 func (finder *finderState) paint(context *ui.Context, application *App, drawing *draw2d.List) {
 	palette := context.Theme
-	area := finder.list.area
+	area := finder.list.Area
 	drawing.PushClip(area)
 	if finder.count() == 0 {
 		message := "No file matches"
@@ -336,11 +338,11 @@ func (finder *finderState) paint(context *ui.Context, application *App, drawing 
 		drawing.Text(message, area.X+14, area.Y+24, palette.TextSize, draw2d.Regular, palette.InkQuiet)
 	}
 	pointerX, pointerY := context.Pointer()
-	hovered := finder.list.rowAt(pointerX, pointerY)
-	first, last := finder.list.visible()
+	hovered := finder.list.RowAt(pointerX, pointerY)
+	first, last := finder.list.Visible()
 	for index := first; index < last; index++ {
-		top := finder.list.rowTop(index)
-		rowArea := draw2d.Rectangle{X: area.X, Y: top + 1, Width: area.Width - scrollBarWidth - 2, Height: finder.rowHeight() - 2}
+		top := finder.list.RowTop(index)
+		rowArea := draw2d.Rectangle{X: area.X, Y: top + 1, Width: area.Width - pane.ScrollBarWidth - 2, Height: finder.rowHeight() - 2}
 		switch index {
 		case finder.selected:
 			drawing.Rectangle(rowArea, 8, application.look.Chosen, draw2d.Color{}, 0)
@@ -353,7 +355,7 @@ func (finder *finderState) paint(context *ui.Context, application *App, drawing 
 			finder.paintName(context, application, drawing, finder.matches[index], rowArea)
 		}
 	}
-	finder.list.paintBar(drawing, application.look.ScrollThumb)
+	finder.list.PaintBar(drawing, application.look.ScrollThumb)
 	drawing.PopClip()
 }
 

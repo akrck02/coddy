@@ -133,3 +133,10 @@ func asText(content []byte) string {
 	}
 	return string(runes)
 }
+
+// FileReference names a file of the workspace: its project, by its place in the list of projects under
+// review, and its path in that project.
+type FileReference struct {
+	Project int
+	Path    string
+}

@@ -11,19 +11,19 @@ import (
 
 // classKind is what a Java or Kotlin file declares under its own name, once read. A file not read
 // yet is asked for, to be read in the background with the others asked for in the same frame.
-func (application *App) classKind(reference fileReference) java.ClassKind {
-	project := application.projects[reference.project]
-	if !java.IsClassFile(reference.path) {
+func (application *App) classKind(reference workspace.FileReference) java.ClassKind {
+	project := application.projects[reference.Project]
+	if !java.IsClassFile(reference.Path) {
 		return java.UnknownKind
 	}
-	if change, changed := project.ChangeOf(reference.path); changed && change.Status == git.Deleted {
+	if change, changed := project.ChangeOf(reference.Path); changed && change.Status == git.Deleted {
 		return java.UnknownKind // not on disk to read
 	}
 	if kind, known := application.classKinds[reference]; known {
 		return kind
 	}
 	if application.settings.Synchronous { // one frame only: read it now
-		kind := java.ReadKind(project.Path, reference.path)
+		kind := java.ReadKind(project.Path, reference.Path)
 		application.classKinds[reference] = kind
 		return kind
 	}
@@ -41,16 +41,16 @@ func (application *App) readClassKinds() {
 	application.kindsWanted = nil
 	paths := make([]string, len(wanted))
 	for index, reference := range wanted {
-		paths[index] = application.projects[reference.project].Path
+		paths[index] = application.projects[reference.Project].Path
 	}
 	application.work.run("", func(cancellation) func() {
 		kinds := make([]java.ClassKind, len(wanted))
 		for index, reference := range wanted {
-			kinds[index] = java.ReadKind(paths[index], reference.path)
+			kinds[index] = java.ReadKind(paths[index], reference.Path)
 		}
 		return func() {
 			for index, reference := range wanted {
-				if reference.project < len(application.projects) && application.projects[reference.project].Path == paths[index] {
+				if reference.Project < len(application.projects) && application.projects[reference.Project].Path == paths[index] {
 					application.classKinds[reference] = kinds[index]
 				}
 			}
@@ -61,7 +61,7 @@ func (application *App) readClassKinds() {
 // forgetClassKinds forgets what a project's files declare, when it is read again.
 func (application *App) forgetClassKinds(path string) {
 	for reference := range application.classKinds {
-		if reference.project >= len(application.projects) || application.projects[reference.project].Path == path {
+		if reference.Project >= len(application.projects) || application.projects[reference.Project].Path == path {
 			delete(application.classKinds, reference)
 		}
 	}

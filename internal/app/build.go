@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/akrck02/code-review/internal/pane"
 	"github.com/akrck02/code-review/internal/theme"
 	"github.com/akrck02/go-renderer/draw2d"
 	ui "github.com/akrck02/go-ui"
@@ -24,7 +25,7 @@ func (application *App) Build(context *ui.Context) {
 		application.applyTheme(context)
 		application.themeSet = true
 	}
-	application.keys = keys{state: application.tap.state}
+	application.keys = pane.KeysOf(application.tap.state)
 	windowOpen.Store(true)
 	application.work.take()
 	application.readClassKinds()
@@ -78,7 +79,7 @@ func (application *App) enterCurrentProject() {
 		return
 	}
 	if application.editor.isOpen() {
-		application.sidebar.enter(application, application.editor.reference.project)
+		application.sidebar.enter(application, application.editor.reference.Project)
 	}
 }
 
@@ -111,7 +112,7 @@ func (application *App) copyPath(context *ui.Context) {
 	if !application.editor.isOpen() {
 		return
 	}
-	path := application.editor.project.Name + "/" + application.editor.reference.path
+	path := application.editor.project.Name + "/" + application.editor.reference.Path
 	context.Copy(path)
 	application.toast = "Copied " + path
 }

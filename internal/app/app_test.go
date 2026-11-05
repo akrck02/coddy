@@ -251,7 +251,7 @@ func TestMarkingAFileViewedOpensTheNextOneNotViewed(test *testing.T) {
 	window.Frames(1)
 	window.PressKey(input.KeyV)
 	window.Frames(2)
-	if !application.isViewed(fileReference{0, "src/lamp.go"}) {
+	if !application.isViewed(workspace.FileReference{Project: 0, Path: "src/lamp.go"}) {
 		test.Fatal("v did not mark lamp.go as viewed")
 	}
 	if document := application.editor.document; document == nil || document.Path != "notes.txt" {

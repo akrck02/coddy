@@ -6,6 +6,7 @@ import (
 
 	"github.com/akrck02/code-review/internal/git"
 	"github.com/akrck02/code-review/internal/java"
+	"github.com/akrck02/code-review/internal/pane"
 	"github.com/akrck02/code-review/internal/theme"
 	"github.com/akrck02/code-review/internal/workspace"
 	"github.com/akrck02/go-renderer/draw2d"
@@ -52,7 +53,7 @@ type sidebarState struct {
 	rows     []treeRow
 	stale    bool
 	selected int
-	list     scroller
+	list     pane.Scroller
 	width    float32
 	// entered is the project the sidebar was taken into, by its path: then only its tree is
 	// listed, from its top, as if it were the only project open. Empty lists every project.
@@ -69,7 +70,7 @@ type treeKey struct {
 }
 
 func newSidebar() sidebarState {
-	return sidebarState{expanded: map[string]bool{}, trees: map[treeKey]*workspace.Folder{}, stale: true, width: 380, list: scroller{rowHeight: sidebarRowHeight}}
+	return sidebarState{expanded: map[string]bool{}, trees: map[treeKey]*workspace.Folder{}, stale: true, width: 380, list: pane.Scroller{RowHeight: sidebarRowHeight}}
 }
 
 func (sidebar *sidebarState) invalidate() {
@@ -149,7 +150,7 @@ func (sidebar *sidebarState) rebuild(application *App) {
 			label: fmt.Sprintf("%d projects without changes hidden (h shows them)", hidden)})
 	}
 	sidebar.stale = false
-	sidebar.list.count = len(sidebar.rows)
+	sidebar.list.Count = len(sidebar.rows)
 	if hadSelection {
 		for index, row := range sidebar.rows {
 			if row.kind == previous.kind && row.project == previous.project && row.path == previous.path {
@@ -180,9 +181,9 @@ func (sidebar *sidebarState) enter(application *App, project int) {
 	}
 	sidebar.entered = application.projects[project].Path
 	sidebar.selected = 0
-	sidebar.list.offset = 0
+	sidebar.list.Offset = 0
 	sidebar.rebuild(application)
-	if application.editor.isOpen() && application.editor.reference.project == project {
+	if application.editor.isOpen() && application.editor.reference.Project == project {
 		sidebar.revealFile(application, application.editor.reference)
 	}
 }
@@ -195,7 +196,7 @@ func (sidebar *sidebarState) leave(application *App) {
 	for index, row := range sidebar.rows {
 		if row.kind == projectRow && row.project == left {
 			sidebar.selected = index
-			sidebar.list.reveal(index)
+			sidebar.list.Reveal(index)
 			return
 		}
 	}
@@ -228,24 +229,24 @@ func (sidebar *sidebarState) setExpanded(row treeRow, open bool) {
 }
 
 // revealFile opens the folders around a file and selects it.
-func (sidebar *sidebarState) revealFile(application *App, reference fileReference) {
-	project := application.projects[reference.project]
+func (sidebar *sidebarState) revealFile(application *App, reference workspace.FileReference) {
+	project := application.projects[reference.Project]
 	if sidebar.entered != "" && sidebar.entered != project.Path {
 		sidebar.entered = "" // a file of another project: back to every project to show it
 	}
-	_, changed := project.ChangeOf(reference.path)
+	_, changed := project.ChangeOf(reference.Path)
 	if !changed {
 		sidebar.onlyChanged = false
 	}
 	if sidebar.mode == reviewMode && !changed {
 		sidebar.mode = filesMode
 	}
-	sidebar.expanded[sidebar.expandedKey(reference.project, "")] = true
-	folder := sidebar.tree(application, reference.project)
+	sidebar.expanded[sidebar.expandedKey(reference.Project, "")] = true
+	folder := sidebar.tree(application, reference.Project)
 	for {
 		var inside *workspace.Folder
 		for _, child := range folder.Folders {
-			if strings.HasPrefix(reference.path, child.Path+"/") {
+			if strings.HasPrefix(reference.Path, child.Path+"/") {
 				inside = child
 				break
 			}
@@ -253,14 +254,14 @@ func (sidebar *sidebarState) revealFile(application *App, reference fileReferenc
 		if inside == nil {
 			break
 		}
-		sidebar.expanded[sidebar.expandedKey(reference.project, inside.Path)] = true
+		sidebar.expanded[sidebar.expandedKey(reference.Project, inside.Path)] = true
 		folder = inside
 	}
 	sidebar.rebuild(application)
 	for index, row := range sidebar.rows {
-		if row.kind == fileRow && row.project == reference.project && row.path == reference.path {
+		if row.kind == fileRow && row.project == reference.Project && row.path == reference.Path {
 			sidebar.selected = index
-			sidebar.list.reveal(index)
+			sidebar.list.Reveal(index)
 			return
 		}
 	}
@@ -274,7 +275,7 @@ func (sidebar *sidebarState) activate(application *App, index int) {
 	row := sidebar.rows[index]
 	switch row.kind {
 	case fileRow:
-		application.openFile(fileReference{row.project, row.path})
+		application.openFile(workspace.FileReference{Project: row.project, Path: row.path})
 	case projectRow, folderRow:
 		sidebar.setExpanded(row, !row.expanded)
 	case noteRow:
@@ -292,9 +293,9 @@ func (sidebar *sidebarState) moveSelection(application *App, step int) {
 	case step <= -endStep:
 		sidebar.selected = 0
 	case step >= pageStep:
-		sidebar.selected += sidebar.list.pageRows()
+		sidebar.selected += sidebar.list.PageRows()
 	case step <= -pageStep:
-		sidebar.selected -= sidebar.list.pageRows()
+		sidebar.selected -= sidebar.list.PageRows()
 	default:
 		sidebar.selected += step
 	}
@@ -329,7 +330,7 @@ func (sidebar *sidebarState) openSelected(application *App, moveToFile bool) {
 // selectionMoved keeps the selection on a row, in sight, and shows the file it is on.
 func (sidebar *sidebarState) selectionMoved(application *App) {
 	sidebar.selected = min(max(sidebar.selected, 0), len(sidebar.rows)-1)
-	sidebar.list.reveal(sidebar.selected)
+	sidebar.list.Reveal(sidebar.selected)
 	if !sidebar.stale {
 		sidebar.previewSelected(application)
 	}
@@ -339,7 +340,7 @@ func (sidebar *sidebarState) selectionMoved(application *App) {
 func (sidebar *sidebarState) previewSelected(application *App) {
 	row := sidebar.rows[sidebar.selected]
 	if row.kind == fileRow {
-		application.openFile(fileReference{row.project, row.path})
+		application.openFile(workspace.FileReference{Project: row.project, Path: row.path})
 	}
 }
 
@@ -414,25 +415,25 @@ func (sidebar *sidebarState) build(context *ui.Context, application *App) {
 				sidebar.collapseAll(application)
 			}
 		})
-		sidebar.list.rowHeight = sidebarRowHeight
-		sidebar.list.count = len(sidebar.rows)
+		sidebar.list.RowHeight = sidebarRowHeight
+		sidebar.list.Count = len(sidebar.rows)
 		if !application.modalOpen() {
-			onBar := sidebar.list.follow(context, application.keys, palette.ScrollStep)
+			onBar := sidebar.list.Follow(context, application.keys, palette.ScrollStep)
 			x, y := context.Pointer()
-			if index := sidebar.list.rowAt(x, y); index >= 0 && !onBar && application.keys.clicked() {
+			if index := sidebar.list.RowAt(x, y); index >= 0 && !onBar && application.keys.Clicked() {
 				sidebar.selected = index
 				application.focus = sidebarPane
 				if sidebar.onEnter(index, x) {
 					sidebar.enter(application, sidebar.rows[index].project)
 				} else if sidebar.onCheck(index, x) {
-					application.toggleViewed(fileReference{sidebar.rows[index].project, sidebar.rows[index].path}, false)
+					application.toggleViewed(workspace.FileReference{Project: sidebar.rows[index].project, Path: sidebar.rows[index].path}, false)
 				} else {
 					sidebar.activate(application, index)
 				}
 			}
 		}
 		context.Paint(ui.Layout{Width: ui.Grow(), Height: ui.Grow()}, func(area draw2d.Rectangle, drawing *draw2d.List) {
-			sidebar.list.place(area)
+			sidebar.list.Place(area)
 			sidebar.paint(context, application, drawing)
 		})
 	})
@@ -505,7 +506,7 @@ func (sidebar *sidebarState) toggleChangedFilter() {
 	}
 	sidebar.onlyChanged = !sidebar.onlyChanged
 	sidebar.stale = true
-	sidebar.list.offset = 0
+	sidebar.list.Offset = 0
 }
 
 // buildChangedFilter is the files mode's button that lists only the changed files.
@@ -524,7 +525,7 @@ const enterButtonWidth float32 = 26
 
 // onEnter tells whether a click at x on a row fell on the button that enters its project.
 func (sidebar *sidebarState) onEnter(index int, x float32) bool {
-	right := sidebar.list.area.Right() - 4 - scrollBarWidth/2 - 4
+	right := sidebar.list.Area.Right() - 4 - pane.ScrollBarWidth/2 - 4
 	return sidebar.rows[index].kind == projectRow && x >= right-enterButtonWidth && x <= right
 }
 
@@ -540,7 +541,7 @@ func (sidebar *sidebarState) onCheck(index int, x float32) bool {
 
 // rowLeft is where a row's chevron (or the room for it) starts.
 func (sidebar *sidebarState) rowLeft(row treeRow) float32 {
-	return sidebar.list.area.X + sidebarMargin + float32(row.depth)*indentWidth
+	return sidebar.list.Area.X + sidebarMargin + float32(row.depth)*indentWidth
 }
 
 func (sidebar *sidebarState) collapseAll(application *App) {
@@ -553,7 +554,7 @@ func (sidebar *sidebarState) collapseAll(application *App) {
 func (sidebar *sidebarState) paint(context *ui.Context, application *App, drawing *draw2d.List) {
 	palette := context.Theme
 	look := application.look
-	area := sidebar.list.area
+	area := sidebar.list.Area
 	measurer := context.Measurer()
 	size := palette.TextSize
 	small := palette.SmallTextSize
@@ -561,15 +562,15 @@ func (sidebar *sidebarState) paint(context *ui.Context, application *App, drawin
 	pointerX, pointerY := context.Pointer()
 	hovered := -1
 	if !application.modalOpen() {
-		hovered = sidebar.list.rowAt(pointerX, pointerY)
+		hovered = sidebar.list.RowAt(pointerX, pointerY)
 	}
 	drawing.PushClip(area)
-	first, last := sidebar.list.visible()
+	first, last := sidebar.list.Visible()
 	for index := first; index < last; index++ {
 		row := sidebar.rows[index]
-		top := sidebar.list.rowTop(index)
-		rowArea := draw2d.Rectangle{X: area.X + 4, Y: top + 1, Width: area.Width - 8 - scrollBarWidth/2, Height: sidebarRowHeight - 2}
-		reference := fileReference{row.project, row.path}
+		top := sidebar.list.RowTop(index)
+		rowArea := draw2d.Rectangle{X: area.X + 4, Y: top + 1, Width: area.Width - 8 - pane.ScrollBarWidth/2, Height: sidebarRowHeight - 2}
+		reference := workspace.FileReference{Project: row.project, Path: row.path}
 		isOpen := row.kind == fileRow && application.editor.isOpen() && application.editor.reference == reference
 		switch {
 		case index == sidebar.selected && application.focus == sidebarPane:
@@ -665,7 +666,7 @@ func (sidebar *sidebarState) paint(context *ui.Context, application *App, drawin
 		}
 		drawing.Text(message, area.X+16, area.Y+24, size, draw2d.Regular, palette.InkQuiet)
 	}
-	sidebar.list.paintBar(drawing, look.ScrollThumb)
+	sidebar.list.PaintBar(drawing, look.ScrollThumb)
 	drawing.PopClip()
 	if len(application.kindsWanted) > 0 {
 		context.RequestFrame(0) // the next frame starts reading the classes that came into sight
@@ -698,7 +699,7 @@ func (sidebar *sidebarState) paintRight(context *ui.Context, application *App, d
 				text("bin", palette.InkQuiet)
 				break
 			}
-			viewed := application.isViewed(fileReference{row.project, row.path})
+			viewed := application.isViewed(workspace.FileReference{Project: row.project, Path: row.path})
 			removedInk, addedInk := palette.Danger, palette.Positive
 			if viewed {
 				removedInk, addedInk = palette.InkQuiet, palette.InkQuiet
