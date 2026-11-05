@@ -297,3 +297,22 @@ func TestEnteringAProjectListsOnlyItsTree(test *testing.T) {
 		test.Error("Esc did not go back to every project")
 	}
 }
+
+func TestTheFilesModeCanListOnlyTheChangedFiles(test *testing.T) {
+	application := New(Settings{Folders: []string{makeRepository(test)}, WorkingTree: true, Synchronous: true})
+	window := newWindow(test, application)
+	if !sidebarShows(application, "src") {
+		test.Fatal("the project is not open in the files mode")
+	}
+	window.PressKey(input.KeyG)
+	window.Frames(2)
+	if !sidebarShows(application, "lamp.go") || sidebarShows(application, "keeper.go") {
+		test.Error("g did not list only the changed files")
+	}
+	window.PressKey(input.KeyG)
+	window.Frames(2)
+	application.sidebar.setExpanded(treeRow{project: 0, path: "src"}, true)
+	if !sidebarShows(application, "keeper.go") {
+		test.Error("g again did not list every file")
+	}
+}

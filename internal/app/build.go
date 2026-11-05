@@ -89,6 +89,8 @@ func (application *App) handleKeys(context *ui.Context) {
 	case application.sidebar.entered != "" && (keys.pressed(input.KeyEscape) || keys.pressed(input.KeyBackspace)):
 		application.sidebar.leave(application)
 		application.focus = sidebarPane
+	case keys.plain(input.KeyG):
+		application.sidebar.toggleChangedFilter()
 	case keys.plain(input.KeyE):
 		application.enterCurrentProject()
 	case keys.pressed(input.KeyTab):
@@ -415,6 +417,7 @@ var helpKeys = [][2]string{
 	{"]  /  [", "Next / previous change in the file"},
 	{"1  /  2  ·  c", "Files mode (read any file) / Review mode (the changes, as diffs)"},
 	{"Enter (on a project)  ·  e", "Enter the project: the sidebar lists only its tree"},
+	{"g", "Files mode: only the changed files, or every file"},
 	{"Esc  ·  Backspace", "Back to every project"},
 	{"v", "Mark the file as viewed and open the next one not viewed"},
 	{"d", "Diff or the whole file"},

@@ -55,11 +55,15 @@ type sidebarState struct {
 	// entered is the project the sidebar was taken into, by its path: then only its tree is
 	// listed, from its top, as if it were the only project open. Empty lists every project.
 	entered string
+	// onlyChanged lists, in the files mode, only the files the development changed, still opened
+	// whole with their changes marked: a lighter way in than the review mode.
+	onlyChanged bool
 }
 
 type treeKey struct {
 	project int
 	mode    sidebarMode
+	changed bool
 }
 
 func newSidebar() sidebarState {
@@ -72,28 +76,28 @@ func (sidebar *sidebarState) invalidate() {
 }
 
 func (sidebar *sidebarState) expandedKey(project int, path string) string {
-	return fmt.Sprintf("%d|%d|%s", sidebar.mode, project, path)
+	return fmt.Sprintf("%d|%t|%d|%s", sidebar.mode, sidebar.listsChangesOnly(), project, path)
 }
 
 func (sidebar *sidebarState) isExpanded(application *App, project int, path string, isProject bool) bool {
 	if open, chosen := sidebar.expanded[sidebar.expandedKey(project, path)]; chosen {
 		return open
 	}
-	if sidebar.mode == reviewMode {
+	if sidebar.listsChangesOnly() {
 		return true
 	}
 	return isProject && len(application.projects) == 1
 }
 
 func (sidebar *sidebarState) tree(application *App, project int) *review.Folder {
-	key := treeKey{project, sidebar.mode}
+	key := treeKey{project, sidebar.mode, sidebar.listsChangesOnly()}
 	if tree, built := sidebar.trees[key]; built {
 		return tree
 	}
 	model := application.projects[project]
 	isChanged := func(path string) bool { _, changed := model.ChangeOf(path); return changed }
 	var tree *review.Folder
-	if sidebar.mode == reviewMode {
+	if sidebar.listsChangesOnly() {
 		tree = review.BuildTree(changedPaths(model), isChanged)
 	} else {
 		tree = review.BuildTree(model.Files, isChanged)
@@ -224,6 +228,9 @@ func (sidebar *sidebarState) revealFile(application *App, reference fileReferenc
 		sidebar.entered = "" // a file of another project: back to every project to show it
 	}
 	_, changed := project.ChangeOf(reference.path)
+	if !changed {
+		sidebar.onlyChanged = false
+	}
 	if sidebar.mode == reviewMode && !changed {
 		sidebar.mode = filesMode
 	}
@@ -384,6 +391,7 @@ func (sidebar *sidebarState) build(context *ui.Context, application *App) {
 				}
 			}
 			context.Spacer()
+			sidebar.buildChangedFilter(context)
 			if toolButton(context, "Collapse all", "chevrons-down-up", false) {
 				sidebar.collapseAll(application)
 			}
@@ -434,6 +442,33 @@ func (sidebar *sidebarState) buildEnteredHeader(context *ui.Context, application
 		context.Text(fmt.Sprintf("%d/%d", viewed, total), ui.TextStyle{Size: theme.SmallTextSize, Weight: draw2d.Mono, Color: theme.InkQuiet})
 	} else if len(project.Changes) > 0 {
 		context.Text(fmt.Sprint(len(project.Changes)), ui.TextStyle{Size: theme.SmallTextSize, Weight: draw2d.Mono, Color: theme.Warning})
+	}
+	sidebar.buildChangedFilter(context)
+}
+
+// listsChangesOnly tells whether the tree lists only the changed files: always in the review mode,
+// and in the files mode when asked.
+func (sidebar *sidebarState) listsChangesOnly() bool {
+	return sidebar.mode == reviewMode || sidebar.onlyChanged
+}
+
+// toggleChangedFilter lists only the changed files in the files mode, or every file again.
+func (sidebar *sidebarState) toggleChangedFilter() {
+	if sidebar.mode != filesMode {
+		return
+	}
+	sidebar.onlyChanged = !sidebar.onlyChanged
+	sidebar.stale = true
+	sidebar.list.offset = 0
+}
+
+// buildChangedFilter is the files mode's button that lists only the changed files.
+func (sidebar *sidebarState) buildChangedFilter(context *ui.Context) {
+	if sidebar.mode != filesMode {
+		return
+	}
+	if toolButton(context, "Only the changed files (g)", "file-diff", sidebar.onlyChanged) {
+		sidebar.toggleChangedFilter()
 	}
 }
 

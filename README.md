@@ -99,6 +99,7 @@ go vet ./... && go test ./...     # the interface tests drive the window with no
 | `1` / `2` (`c` switches) | Files mode / Review mode |
 | `Enter` on a project, `e`, or its → button | Enter the project: the sidebar lists only its tree, and `n`/`m`/`v` stay in it |
 | `Esc` / `Backspace` | Back to every project |
+| `g` | Files mode: list only the changed files (they still open whole), or every file |
 | `v` | Mark the file as viewed (or not); marking it opens the next file not viewed |
 | `d` | Diff, or the whole file |
 | `f` | Fold the unchanged lines, or show them all |
