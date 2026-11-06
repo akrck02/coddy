@@ -128,3 +128,39 @@ func TestAMissingServerIsNamed(test *testing.T) {
 		test.Errorf("the status bar says %q", application.serverStatus())
 	}
 }
+
+// writingServer is the fake server for Go, for the whole window, writing .classpath in each project
+// as jdtls does.
+func writingServer(test *testing.T) []lsp.Server {
+	return []lsp.Server{{Name: "fakels", Command: fakeServer(test), Languages: []string{"go"}, OnePerWindow: true,
+		Environment: []string{"FAKE_LSP_WRITES=.classpath"}}}
+}
+
+func TestFilesWrittenByAServerAreNotChanges(test *testing.T) {
+	record, folder := filepath.Join(test.TempDir(), "wrote.json"), makeRepository(test)
+	application := newReader(Settings{Folders: []string{folder}, WorkingTree: true, Synchronous: true,
+		Open: "lighthouse/src/lamp.go", Servers: writingServer(test), ServersWrote: record})
+	test.Cleanup(application.stopServers)
+	window := newWindow(test, application)
+	application.focus = viewerPane
+	application.viewer.SetMode(viewer.FileView)
+	typeText(window, "// lit\n")
+	press(window, input.KeyS, input.KeySuper)
+	if saved, _ := os.ReadFile(filepath.Join(folder, "lighthouse", "src", "lamp.go")); !strings.HasPrefix(string(saved), "// lit") {
+		test.Fatalf("lamp.go was not saved: %q", saved)
+	}
+	application.reloadAll()
+	window.Frames(2)
+	project := application.projects[0]
+	if _, changed := project.ChangeOf(".classpath"); changed || len(project.ServerFiles) != 1 || project.ServerFiles[0].Server != "fakels" {
+		test.Fatalf("the server's .classpath is a change (%t); its files are %+v", changed, project.ServerFiles)
+	}
+	if _, changed := project.ChangeOf("src/lamp.go"); !changed || len(project.Changes) != 3 {
+		test.Errorf("the person's changes are %v, want the 3 of the branch, lamp.go saved among them", project.ChangedPaths())
+	}
+	again := newReader(Settings{Folders: []string{folder}, WorkingTree: true, Synchronous: true, ServersWrote: record})
+	newWindow(test, again)
+	if _, changed := again.projects[0].ChangeOf(".classpath"); changed {
+		test.Error("after a restart, the server's .classpath counts as a change")
+	}
+}

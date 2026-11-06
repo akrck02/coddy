@@ -2,11 +2,13 @@ package workspace
 
 import (
 	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/akrck02/go-renderer/failure"
 )
@@ -52,7 +54,29 @@ func Save(project *Project, path, content string, read Stamp) (Stamp, error) {
 	if err := writeWhole(full, []byte(content)); err != nil {
 		return Stamp{}, failure.Wrap(NotSaved, path, err)
 	}
-	return Stamp{Exists: true, Hash: sha256.Sum256([]byte(content))}, nil
+	hash := sha256.Sum256([]byte(content))
+	remember(filepath.Join(project.Path, filepath.FromSlash(path)), hash)
+	return Stamp{Exists: true, Hash: hash}, nil
+}
+
+// saved are the files the reader saved since it started, by path on disk, with their text's hash
+// as fingerprints write it: what the person wrote, never a server's.
+var saved = struct {
+	sync.Mutex
+	texts map[string]string
+}{texts: map[string]string{}}
+
+func remember(full string, hash [sha256.Size]byte) {
+	saved.Lock()
+	defer saved.Unlock()
+	saved.texts[full] = hex.EncodeToString(hash[:12])
+}
+
+// SavedHere tells whether the reader saved a file, as its text is now (a fingerprint's text).
+func SavedHere(full, text string) bool {
+	saved.Lock()
+	defer saved.Unlock()
+	return saved.texts[full] == text
 }
 
 // writeWhole writes a file through a temporary one in the same folder, renamed over it at the end.

@@ -41,6 +41,9 @@ type Settings struct {
 	ReadOnly bool
 	// Servers are the language servers to run; nil runs lsp.Servers, found on the PATH.
 	Servers []lsp.Server
+	// ServersWrote is the file that keeps what servers wrote in the repositories, in the reader's
+	// own folder; "" keeps it only in memory.
+	ServersWrote string
 }
 
 // focusedPane is the part of the window the keyboard moves in.
@@ -114,7 +117,7 @@ func New(settings Settings, modes ...mode.Mode) (*Window, error) {
 		onlyChanged:   settings.OnlyChanged,
 		focus:         sidebarPane,
 		designs:       theme.NewDesigns(),
-		servers:       newLanguageServers(settings.Servers),
+		servers:       newLanguageServers(settings.Servers, settings.ServersWrote),
 		classKinds:    map[workspace.FileReference]java.ClassKind{},
 	}
 	application.sidebar = sidebar.New()
@@ -212,16 +215,24 @@ func (application *Window) reloadAll() {
 func (application *Window) reload(index int) {
 	project := application.projects[index]
 	path := project.Path
-	options := workspace.LoadOptions{Base: application.baseFor(path), WorkingTree: application.settings.WorkingTree}
+	options := application.loadOptions(path)
 	application.projects[index] = &workspace.Project{Name: project.Name, Path: path}
 	application.loading++
 	settle := func() { application.loading-- } // also when a newer reading replaced this one
+	snapshot, written := application.servers.snapshots[path], application.servers.written
 	application.work.runSettling("project "+path, func(stop cancellation) func() {
 		var loaded *workspace.Project
-		if !application.work.read(stop, func() { loaded = workspace.LoadProject(path, options) }) {
+		var sorting error
+		if !application.work.read(stop, func() {
+			loaded = workspace.LoadProject(path, options)
+			sorting = written.SortOut(loaded, snapshot, options.WorkingTree)
+		}) {
 			return nil
 		}
 		return func() {
+			if sorting != nil {
+				application.toast = sorting.Error()
+			}
 			application.forgetClassKinds(path)
 			for position, current := range application.projects {
 				if current.Path == path {
@@ -237,6 +248,11 @@ func (application *Window) reload(index int) {
 			application.viewer.Reopen(path, application.openFile)
 		}
 	}, settle)
+}
+
+// loadOptions are how a project is read: against its base, with the changes not committed yet or not.
+func (application *Window) loadOptions(path string) workspace.LoadOptions {
+	return workspace.LoadOptions{Base: application.baseFor(path), WorkingTree: application.settings.WorkingTree}
 }
 
 // baseFor is the base a project is compared against: its own, the one for all, or its default.

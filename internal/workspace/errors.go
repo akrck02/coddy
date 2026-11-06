@@ -10,4 +10,7 @@ var (
 	NotSaved = failure.Define("workspace.not-saved", "the file could not be saved")
 	// OutsideTheProject is a path that leads out of its project, as "../other" does.
 	OutsideTheProject = failure.Define("workspace.outside-the-project", "the path leads outside its project")
+	// RecordNotKept is the record of the files language servers wrote, which could not be written
+	// in the reader's own folder; the details hold why.
+	RecordNotKept = failure.Define("workspace.record-not-kept", "what the language servers wrote could not be kept")
 )

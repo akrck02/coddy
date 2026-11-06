@@ -148,6 +148,13 @@ func (client *Client) AddFolder(folder string) error {
 	}})
 }
 
+// HasFolder tells whether a server already reads a workspace folder.
+func (client *Client) HasFolder(folder string) bool {
+	client.lock.Lock()
+	defer client.lock.Unlock()
+	return client.folders[folder]
+}
+
 // Definition is where the name at a place of a document is declared.
 func (client *Client) Definition(ctx context.Context, path string, at Position) ([]Location, error) {
 	return client.locations(ctx, "textDocument/definition", path, at, nil)

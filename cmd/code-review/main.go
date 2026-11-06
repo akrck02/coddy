@@ -16,8 +16,10 @@ import (
 	"strings"
 
 	"github.com/akrck02/code-review/internal/files"
+	"github.com/akrck02/code-review/internal/lsp"
 	"github.com/akrck02/code-review/internal/review"
 	"github.com/akrck02/code-review/internal/window"
+	"github.com/akrck02/code-review/internal/workspace"
 	"github.com/akrck02/go-renderer/opengl/overlay"
 	ui "github.com/akrck02/go-ui"
 	platform "github.com/akrck02/go-ui/window"
@@ -94,7 +96,19 @@ func settingsOf(asked commandLine, options platform.Options) window.Settings {
 		Mode:        startMode(*asked.reviewing),
 		Synchronous: options.CapturePath != "",
 		ReadOnly:    readOnly(*asked.readOnly),
+		Servers:     serversFor(options.CapturePath),
+		// what language servers wrote stays theirs after a restart
+		ServersWrote: workspace.DefaultWrittenPath(),
 	}
+}
+
+// serversFor are the language servers to run: none for a capture, which shows one frame and
+// should start no program; nil, every server found on the PATH, otherwise.
+func serversFor(capturePath string) []lsp.Server {
+	if capturePath != "" {
+		return []lsp.Server{}
+	}
+	return nil
 }
 
 // run shows the window until it is closed, and keeps the folders open and the projects shown for

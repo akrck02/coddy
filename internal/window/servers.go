@@ -23,17 +23,23 @@ type languageServers struct {
 	told     map[string]int  // the version of each file each server was told, by key and path
 	missing  map[string]bool // servers not installed, by name, said once
 	stopped  bool            // the window closed: a server that starts now stops at once
+	// snapshots are what each project held when a server started in it, by the project's folder;
+	// written is what servers wrote, kept across starts of the reader
+	snapshots map[string]*workspace.Snapshot
+	written   *workspace.Written
+	adding    map[string]bool // projects being added to a server for the whole window
 }
 
 // startWait is how long a server gets to start and answer initialize.
 const startWait = 2 * time.Minute
 
-func newLanguageServers(table []lsp.Server) languageServers {
+func newLanguageServers(table []lsp.Server, writtenPath string) languageServers {
 	if table == nil {
 		table = lsp.Servers
 	}
 	return languageServers{table: table, running: map[string]*lsp.Client{}, starting: map[string]bool{},
-		told: map[string]int{}, missing: map[string]bool{}}
+		told: map[string]int{}, missing: map[string]bool{}, snapshots: map[string]*workspace.Snapshot{},
+		written: workspace.OpenWritten(writtenPath), adding: map[string]bool{}}
 }
 
 // serverKey names a server running in a root ("" for one per window).
@@ -75,8 +81,8 @@ func (application *Window) serveOpenFile() {
 		}
 		return
 	}
-	if server.OnePerWindow {
-		_ = client.AddFolder(application.viewer.Project.Path)
+	if project := application.viewer.Project.Path; server.OnePerWindow && !servers.adding[project] && !client.HasFolder(project) {
+		application.addFolder(client, server.Name, project)
 	}
 	version := 1
 	if application.viewer.Edit != nil {
@@ -96,18 +102,71 @@ func (application *Window) serveOpenFile() {
 	})
 }
 
-// startServer starts a server in the background; once it answers, the next frame tells it the file.
+// startServer starts a server in the background, once what its projects hold is noted; once it
+// answers, the next frame tells it the file.
 func (application *Window) startServer(server lsp.Server, root, key string) {
 	servers := &application.servers
 	servers.starting[key] = true
 	folders := application.foldersFor(server)
+	projects := folders
+	if !server.OnePerWindow {
+		projects = []string{application.viewer.Project.Path}
+	}
 	data := dataFolder(server)
+	options := application.optionsOf(projects)
 	application.work.run("start "+key, func(cancellation) func() {
+		snapshots := takeSnapshots(server.Name, options)
 		ctx, cancel := context.WithTimeout(context.Background(), startWait)
 		defer cancel()
 		client, err := lsp.Start(ctx, server, root, folders, data)
-		return func() { application.serverStarted(server, key, client, err) }
+		return func() {
+			application.keepSnapshots(snapshots)
+			application.serverStarted(server, key, client, err)
+		}
 	})
+}
+
+// optionsOf are how each of some projects is read, worked out on the interface's goroutine for a job.
+func (application *Window) optionsOf(projects []string) map[string]workspace.LoadOptions {
+	options := map[string]workspace.LoadOptions{}
+	for _, path := range projects {
+		options[path] = application.loadOptions(path)
+	}
+	return options
+}
+
+// takeSnapshots reads projects afresh and notes what they hold, before a server starts in them.
+func takeSnapshots(server string, options map[string]workspace.LoadOptions) map[string]*workspace.Snapshot {
+	snapshots := map[string]*workspace.Snapshot{}
+	for path, asked := range options {
+		snapshot := workspace.TakeSnapshot(workspace.LoadProject(path, asked), server)
+		snapshots[path] = &snapshot
+	}
+	return snapshots
+}
+
+// addFolder tells a server for the whole window of one more project, once what it holds is noted.
+func (application *Window) addFolder(client *lsp.Client, server, project string) {
+	application.servers.adding[project] = true
+	options := application.optionsOf([]string{project})
+	application.work.run("add "+project, func(cancellation) func() {
+		snapshots := takeSnapshots(server, options)
+		_ = client.AddFolder(project)
+		return func() {
+			delete(application.servers.adding, project)
+			application.keepSnapshots(snapshots)
+		}
+	})
+}
+
+// keepSnapshots keeps the first snapshot of each project: a later one would take what a server
+// wrote already as the person's.
+func (application *Window) keepSnapshots(snapshots map[string]*workspace.Snapshot) {
+	for path, snapshot := range snapshots {
+		if _, taken := application.servers.snapshots[path]; !taken {
+			application.servers.snapshots[path] = snapshot
+		}
+	}
 }
 
 // serverStarted keeps a server that started, or says why it did not.

@@ -31,6 +31,8 @@ type Project struct {
 	// Fingerprints name each changed file's text as the development has it, so a file marked as
 	// reviewed is seen again when it changes.
 	Fingerprints map[string]string
+	// ServerFiles are the files language servers wrote, left out of Changes (SortOut)
+	ServerFiles []ServerFile
 
 	changeIndex map[string]int
 
