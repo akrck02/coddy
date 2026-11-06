@@ -158,6 +158,11 @@ var commands = []command{
 			application.reloadAll()
 			application.toast = workingTreeNote(application.settings.WorkingTree)
 		}},
+	{description: "Read-only: files are only read, or can be edited",
+		keys: []pane.Press{pane.Key(input.KeyL, "l"), pane.CommandShiftKey(input.KeyL, "⌘⇧L")},
+		do: func(application *Window, _ *ui.Context, _ int) {
+			application.setReadOnly(!application.settings.ReadOnly)
+		}},
 	{description: "Light or dark", keys: []pane.Press{pane.Key(input.KeyT, "t"), pane.CommandShiftKey(input.KeyT, "⌘⇧T")},
 		do: func(application *Window, context *ui.Context, _ int) {
 			application.dark = !application.dark

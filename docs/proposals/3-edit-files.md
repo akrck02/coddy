@@ -137,7 +137,7 @@ someone saves it, through `workspace.Save`, and git still only reads. The help g
 - [x] T4 — The place "editing", a second key for every command, and the help · serves R5 · test: `TestNoPlainKeyCommandWhileEditing`, `TestTheHelpListsEveryCommand`
 - [x] T5 — The caret in the viewer: drawing it and the selection, clicks, typing, colouring again · serves R1 · test: a window test typing into a file
 - [x] T6 — Saving from the window, the dot of a file not saved, asking before losing it, reading the changes again · serves R2, R6, R7 · test: `TestASavedFileShowsAsChanged`, `TestClosingAnEditedFileAsks`
-- [ ] T7 — The read-only mode: switch, key, flag, remembered · serves R3 · test: `TestReadOnlyModeTypesNothing`, `TestReadOnlyModeSavesNothing`
+- [x] T7 — The read-only mode: switch, key, flag, remembered · serves R3 · test: `TestReadOnlyModeTypesNothing`, `TestReadOnlyModeSavesNothing`
 - [ ] T8 — Documentation: the rule, the keys, the read-only mode · serves R8 · test: `TestOnlyReadOnlyCommandsRun` unchanged
 
 ## Result

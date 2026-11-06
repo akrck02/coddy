@@ -27,6 +27,7 @@ import (
 const (
 	foldersPreference     = "folders"
 	onlyChangedPreference = "only-changed"
+	readOnlyPreference    = "read-only"
 )
 
 func main() {
@@ -50,6 +51,7 @@ func main() {
 type commandLine struct {
 	base, open, find, codeFont               *string
 	committed, light, reviewing, allProjects *bool
+	readOnly                                 *bool
 }
 
 // registerFlags declares the reader's own flags, beside the platform's.
@@ -63,6 +65,7 @@ func registerFlags() commandLine {
 		reviewing:   flag.Bool("review", false, "start in the review mode: the changed files, as diffs"),
 		codeFont:    flag.String("code-font", "", "a TrueType file to read the code in (default: SF Mono, else Go Mono)"),
 		allProjects: flag.Bool("all", false, "show every project, not only those with changes (the choice is remembered otherwise)"),
+		readOnly:    flag.Bool("read-only", false, "start read-only: files are only read, not edited (the choice is remembered otherwise)"),
 	}
 	flag.Usage = func() {
 		fmt.Fprintln(flag.CommandLine.Output(), "usage: code-review [flags] [repository or folder of repositories …]")
@@ -90,6 +93,7 @@ func settingsOf(asked commandLine, options platform.Options) window.Settings {
 		Find:        *asked.find,
 		Mode:        startMode(*asked.reviewing),
 		Synchronous: options.CapturePath != "",
+		ReadOnly:    readOnly(*asked.readOnly),
 	}
 }
 
@@ -100,6 +104,7 @@ func run(options platform.Options, reader *window.Window) {
 	options.Hidden = func() {
 		reader.Closed()
 		_ = platform.KeepPreference(onlyChangedPreference, fmt.Sprint(reader.OnlyChanged()))
+		_ = platform.KeepPreference(readOnlyPreference, fmt.Sprint(reader.ReadOnly()))
 		_ = platform.KeepPreference(foldersPreference, strings.Join(reader.Folders(), "\n"))
 	}
 	if err := platform.Run(options, func(context *ui.Context) { reader.Build(context) }); err != nil {
@@ -115,6 +120,13 @@ func onlyChanged(allProjects bool) bool {
 	}
 	remembered, found := platform.Preference(onlyChangedPreference)
 	return !found || remembered != "false"
+}
+
+// readOnly tells whether to start read-only: when -read-only asks, or the person chose it last
+// time. Editing is on otherwise.
+func readOnly(asked bool) bool {
+	remembered, found := platform.Preference(readOnlyPreference)
+	return asked || (found && remembered == "true")
 }
 
 // systemMono is the monospaced face macOS reads code in (Xcode's, Terminal's): clean, without the

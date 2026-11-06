@@ -217,6 +217,13 @@ func (application *Window) buildSettingButtons(context *ui.Context) {
 	if theme.ToolButton(context, "Read the projects again (r)", "refresh-cw", false) {
 		application.reloadAll()
 	}
+	lock, tip := "lock-open", "Read-only: off, files can be edited (⌘⇧L)"
+	if application.settings.ReadOnly {
+		lock, tip = "lock", "Read-only: on, files are only read (⌘⇧L)"
+	}
+	if theme.ToolButton(context, tip, lock, application.settings.ReadOnly) {
+		application.setReadOnly(!application.settings.ReadOnly)
+	}
 }
 
 // buildMenu is the menu of what is done less often: opening a folder, the theme, the keys, closing.
@@ -272,6 +279,9 @@ func (application *Window) buildStatusBar(context *ui.Context) {
 		}
 		if !application.settings.WorkingTree {
 			context.Text("commits only", ui.TextStyle{Size: palette.SmallTextSize, Color: palette.Warning})
+		}
+		if application.settings.ReadOnly {
+			context.Text("read-only", small)
 		}
 	})
 }

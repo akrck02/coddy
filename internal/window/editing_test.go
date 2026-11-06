@@ -1,6 +1,7 @@
 package window
 
 import (
+	"os"
 	"strings"
 	"testing"
 
@@ -73,13 +74,33 @@ func TestAnEditedLineIsColouredAgain(test *testing.T) {
 	}
 }
 
-func TestAReadOnlyWindowTypesNothing(test *testing.T) {
+func TestReadOnlyModeTypesNothing(test *testing.T) {
 	application, window := editingAFile(test)
-	application.settings.ReadOnly = true
+	press(window, input.KeyL, input.KeySuper, input.KeyShift)
+	if !application.ReadOnly() || !strings.Contains(strings.Join(window.Texts(), " "), "read-only") {
+		test.Fatal("⌘⇧L did not turn the read-only mode on, said in the status bar")
+	}
 	before := application.viewer.Edit.Text()
 	typeText(window, "x")
 	press(window, input.KeyV, input.KeySuper)
 	if application.viewer.Edit.Text() != before {
 		test.Error("a read-only window typed")
+	}
+}
+
+func TestReadOnlyModeSavesNothing(test *testing.T) {
+	application, window, path := editingKeeper(test)
+	typeText(window, "x")
+	press(window, input.KeyL, input.KeySuper, input.KeyShift)
+	press(window, input.KeyS, input.KeySuper)
+	if application.save() {
+		test.Error("a read-only window saved")
+	}
+	if content, _ := os.ReadFile(path); strings.HasPrefix(string(content), "x") {
+		test.Error("a read-only window wrote the file")
+	}
+	press(window, input.KeyL) // in read-only mode nothing is edited, so the letter runs its command
+	if application.ReadOnly() {
+		test.Error("l did not turn the read-only mode off again")
 	}
 }

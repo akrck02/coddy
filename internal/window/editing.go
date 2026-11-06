@@ -11,6 +11,16 @@ func (application *Window) Editing() bool { return application.editing() }
 // ReadOnly tells whether editing is off for every file.
 func (application *Window) ReadOnly() bool { return application.settings.ReadOnly }
 
+// setReadOnly turns editing off for every file, or on again. Edits not saved stay, to save once
+// editing is on again.
+func (application *Window) setReadOnly(on bool) {
+	application.settings.ReadOnly = on
+	application.toast = "Editing on: type in a file opened whole"
+	if on {
+		application.toast = "Read-only: files are only read"
+	}
+}
+
 // The steps of the command that cuts, copies and pastes, one per key.
 const (
 	cutting = iota + 1
