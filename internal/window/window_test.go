@@ -9,6 +9,7 @@ import (
 
 	"github.com/akrck02/code-review/internal/files"
 	"github.com/akrck02/code-review/internal/finder"
+	"github.com/akrck02/code-review/internal/lsp"
 	"github.com/akrck02/code-review/internal/review"
 	"github.com/akrck02/code-review/internal/sidebar"
 	"github.com/akrck02/code-review/internal/viewer"
@@ -350,6 +351,9 @@ func TestTheFinderFindsATextAndOpensItsLine(test *testing.T) {
 
 // newReader makes a reader with the program's two modes, keeping the viewed marks only in memory.
 func newReader(settings Settings) *Window {
+	if settings.Servers == nil {
+		settings.Servers = []lsp.Server{} // no language server unless a test gives one
+	}
 	reader, err := New(settings, files.New(), review.New(""))
 	if err != nil {
 		panic(err) // the two modes are given: this cannot happen

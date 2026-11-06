@@ -107,7 +107,7 @@ than hidden.
 
 - [x] T1 — `internal/lsp`: messages, the JSON-RPC connection and its errors · serves R10 · test: requests, replies and notifications over a pipe; a broken message
 - [x] T2 — A fake server for the tests, a small Go program in `testdata` that answers from a table · serves R1–R3 · test: it is what T3–T5 use
-- [ ] T3 — Starting and stopping servers, the table of servers, a missing server · serves R5, R9 · test: `TestAServerStartsOnFirstUse`, `TestServersStopWithTheWindow`, `TestAMissingServerIsNamed`
+- [x] T3 — Starting and stopping servers, the table of servers, a missing server · serves R5, R9 · test: `TestAServerStartsOnFirstUse`, `TestServersStopWithTheWindow`, `TestAMissingServerIsNamed`
 - [ ] T4 — Definition and back · serves R1, R4 · test: `TestDefinitionOpensTheDeclaration`, `TestBackReturnsToThePlaceBefore`
 - [ ] T5 — References and hover · serves R2, R3 · test: `TestReferencesAreListed`, `TestHoverShowsTheServersText`
 - [ ] T6 — What servers write: the list before, the comparison, the record on disk · serves R6 · test: `TestFilesWrittenByAServerAreNotChanges`

@@ -9,6 +9,7 @@ import (
 	"github.com/akrck02/code-review/internal/finder"
 	"github.com/akrck02/code-review/internal/git"
 	"github.com/akrck02/code-review/internal/java"
+	"github.com/akrck02/code-review/internal/lsp"
 	"github.com/akrck02/code-review/internal/mode"
 	"github.com/akrck02/code-review/internal/pane"
 	"github.com/akrck02/code-review/internal/sidebar"
@@ -38,6 +39,8 @@ type Settings struct {
 	Synchronous bool
 	// ReadOnly stops editing: files are only read, as before editing came.
 	ReadOnly bool
+	// Servers are the language servers to run; nil runs lsp.Servers, found on the PATH.
+	Servers []lsp.Server
 }
 
 // focusedPane is the part of the window the keyboard moves in.
@@ -88,6 +91,7 @@ type Window struct {
 	toast       string
 	themeSet    bool
 	questions   questions
+	servers     languageServers
 }
 
 // New makes a reader for these settings, with its modes in the rail's order; Driver must be given
@@ -106,6 +110,7 @@ func New(settings Settings, modes ...mode.Mode) (*Window, error) {
 		onlyChanged:   settings.OnlyChanged,
 		focus:         sidebarPane,
 		designs:       theme.NewDesigns(),
+		servers:       newLanguageServers(settings.Servers),
 		classKinds:    map[workspace.FileReference]java.ClassKind{},
 	}
 	application.sidebar = sidebar.New()
@@ -141,8 +146,12 @@ func (application *Window) setLook() {
 	}
 }
 
-// Closed tells the reader its window has closed, so work still running does not wake it.
-func (application *Window) Closed() { windowOpen.Store(false) }
+// Closed tells the reader its window has closed, so work still running does not wake it, and
+// stops the language servers.
+func (application *Window) Closed() {
+	windowOpen.Store(false)
+	application.stopServers()
+}
 
 // openFolders adds repositories, or the repositories inside folders, and reads them.
 func (application *Window) openFolders(folders []string) {

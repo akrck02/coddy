@@ -1,0 +1,268 @@
+package lsp
+
+import (
+	"context"
+	"encoding/json"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/akrck02/go-renderer/failure"
+)
+
+// Client is one language server running, started and initialized, and what it was told.
+type Client struct {
+	Server  Server
+	Root    string // its root, or "" for one per window
+	conn    *Conn
+	command *exec.Cmd
+
+	lock     sync.Mutex
+	versions map[string]int // the documents opened, by URI, with the version last sent
+	folders  map[string]bool
+}
+
+// Start runs a server in a root (or, with folders, for those workspace folders) and initializes
+// it. dataFolder is where it may keep its index, for a server that asks for one.
+func Start(ctx context.Context, server Server, root string, folders []string, dataFolder string) (*Client, error) {
+	path, err := exec.LookPath(server.Command)
+	if err != nil {
+		return nil, failure.Wrap(ServerNotFound, server.Name, err)
+	}
+	arguments := append([]string(nil), server.Arguments...)
+	if server.DataFlag != "" && dataFolder != "" {
+		arguments = append(arguments, server.DataFlag, dataFolder)
+	}
+	command := exec.Command(path, arguments...)
+	command.Dir = firstOf(root, folders)
+	command.Env = append(os.Environ(), server.Environment...)
+	input, _ := command.StdinPipe()
+	output, _ := command.StdoutPipe()
+	if err := command.Start(); err != nil {
+		return nil, failure.Wrap(ServerNotFound, server.Name, err)
+	}
+	client := &Client{Server: server, Root: root, command: command, versions: map[string]int{}, folders: map[string]bool{}}
+	client.conn = NewConn(output, input, client.handle)
+	go func() { _ = command.Wait() }()
+	if err := client.initialize(ctx, root, folders); err != nil {
+		client.kill()
+		return nil, err
+	}
+	return client, nil
+}
+
+// firstOf is the root, or the first folder when there is no root.
+func firstOf(root string, folders []string) string {
+	if root == "" && len(folders) > 0 {
+		return folders[0]
+	}
+	return root
+}
+
+// initialize says who the reader is and what it can do, and waits for the server to be ready.
+func (client *Client) initialize(ctx context.Context, root string, folders []string) error {
+	if root != "" {
+		folders = []string{root}
+	}
+	workspaceFolders := make([]map[string]string, len(folders))
+	for index, folder := range folders {
+		workspaceFolders[index] = map[string]string{"uri": FileURI(folder), "name": filepath.Base(folder)}
+		client.folders[folder] = true
+	}
+	params := map[string]any{
+		"processId":        os.Getpid(),
+		"clientInfo":       map[string]string{"name": "code-review"},
+		"rootUri":          FileURI(firstOf(root, folders)),
+		"workspaceFolders": workspaceFolders,
+		"capabilities":     capabilities,
+	}
+	if err := client.conn.Call(ctx, "initialize", params, nil); err != nil {
+		return err
+	}
+	return client.conn.Notify("initialized", struct{}{})
+}
+
+// capabilities are what the reader asks of a server: definitions, references, hover as Markdown,
+// workspace folders that change, and progress to show while it reads.
+var capabilities = map[string]any{
+	"textDocument": map[string]any{
+		"synchronization": map[string]any{"didSave": false},
+		"definition":      map[string]any{"linkSupport": false},
+		"references":      map[string]any{},
+		"hover":           map[string]any{"contentFormat": []string{"markdown", "plaintext"}},
+	},
+	"workspace": map[string]any{"workspaceFolders": true, "configuration": true, "applyEdit": false},
+	"window":    map[string]any{"workDoneProgress": true},
+}
+
+// handle answers what the server asks on its own. It never applies an edit: the reader lets no
+// server change a file the person reads or edits.
+func (client *Client) handle(method string, params json.RawMessage) (any, error) {
+	switch method {
+	case "workspace/applyEdit":
+		return map[string]any{"applied": false, "failureReason": "code-review does not let a language server edit files"}, nil
+	case "workspace/configuration":
+		var asked struct {
+			Items []json.RawMessage `json:"items"`
+		}
+		_ = json.Unmarshal(params, &asked)
+		return make([]any, len(asked.Items)), nil // no settings: each server's defaults
+	}
+	return nil, nil // registrations, progress and messages need no more than a reply
+}
+
+// Open tells the server about a document, with its text as the reader has it, edits included; a
+// document already open gets its new text.
+func (client *Client) Open(path, text string) error {
+	uri := FileURI(path)
+	client.lock.Lock()
+	version, open := client.versions[uri]
+	client.versions[uri] = version + 1
+	client.lock.Unlock()
+	if open {
+		return client.conn.Notify("textDocument/didChange", map[string]any{
+			"textDocument":   map[string]any{"uri": uri, "version": version + 1},
+			"contentChanges": []map[string]string{{"text": text}},
+		})
+	}
+	return client.conn.Notify("textDocument/didOpen", map[string]any{"textDocument": map[string]any{
+		"uri": uri, "languageId": LanguageOf(path), "version": 1, "text": text,
+	}})
+}
+
+// AddFolder adds a workspace folder to a server that runs for the whole window.
+func (client *Client) AddFolder(folder string) error {
+	client.lock.Lock()
+	known := client.folders[folder]
+	client.folders[folder] = true
+	client.lock.Unlock()
+	if known {
+		return nil
+	}
+	return client.conn.Notify("workspace/didChangeWorkspaceFolders", map[string]any{"event": map[string]any{
+		"added":   []map[string]string{{"uri": FileURI(folder), "name": filepath.Base(folder)}},
+		"removed": []map[string]string{},
+	}})
+}
+
+// Definition is where the name at a place of a document is declared.
+func (client *Client) Definition(ctx context.Context, path string, at Position) ([]Location, error) {
+	return client.locations(ctx, "textDocument/definition", path, at, nil)
+}
+
+// References are every place the name at a place of a document is used, its declaration included.
+func (client *Client) References(ctx context.Context, path string, at Position) ([]Location, error) {
+	return client.locations(ctx, "textDocument/references", path, at, map[string]bool{"includeDeclaration": true})
+}
+
+// locations asks a request whose answer is a location, a list of them, or nothing.
+func (client *Client) locations(ctx context.Context, method, path string, at Position, context any) ([]Location, error) {
+	params := map[string]any{"textDocument": TextDocumentIdentifier{URI: FileURI(path)}, "position": at}
+	if context != nil {
+		params["context"] = context
+	}
+	var raw json.RawMessage
+	if err := client.conn.Call(ctx, method, params, &raw); err != nil {
+		return nil, err
+	}
+	return decodeLocations(raw)
+}
+
+// decodeLocations reads a Location, a list of them, or a list of LocationLinks.
+func decodeLocations(raw json.RawMessage) ([]Location, error) {
+	text := strings.TrimSpace(string(raw))
+	if text == "" || text == "null" {
+		return nil, nil
+	}
+	if strings.HasPrefix(text, "{") {
+		raw = json.RawMessage("[" + text + "]")
+	}
+	var items []struct {
+		Location
+		TargetURI   string `json:"targetUri"`
+		TargetRange Range  `json:"targetSelectionRange"`
+	}
+	if err := json.Unmarshal(raw, &items); err != nil {
+		return nil, failure.Wrap(BadMessage, "locations", err)
+	}
+	locations := make([]Location, len(items))
+	for index, item := range items {
+		locations[index] = item.Location
+		if item.TargetURI != "" {
+			locations[index] = Location{URI: item.TargetURI, Range: item.TargetRange}
+		}
+	}
+	return locations, nil
+}
+
+// Hover is the text the server shows for the name at a place: its type and documentation, as
+// Markdown; "" when it has none.
+func (client *Client) Hover(ctx context.Context, path string, at Position) (string, error) {
+	params := TextDocumentPositionParams{TextDocument: TextDocumentIdentifier{URI: FileURI(path)}, Position: at}
+	var answer struct {
+		Contents json.RawMessage `json:"contents"`
+	}
+	if err := client.conn.Call(ctx, "textDocument/hover", params, &answer); err != nil {
+		return "", err
+	}
+	return hoverText(answer.Contents), nil
+}
+
+// hoverText reads a hover's contents: MarkupContent, a MarkedString, or a list of them.
+func hoverText(raw json.RawMessage) string {
+	var plain string
+	if json.Unmarshal(raw, &plain) == nil {
+		return plain
+	}
+	var markup struct {
+		Language string `json:"language"`
+		Value    string `json:"value"`
+	}
+	if json.Unmarshal(raw, &markup) == nil && markup.Value != "" {
+		if markup.Language != "" {
+			return "```" + markup.Language + "\n" + markup.Value + "\n```"
+		}
+		return markup.Value
+	}
+	var list []json.RawMessage
+	if json.Unmarshal(raw, &list) != nil {
+		return ""
+	}
+	parts := make([]string, 0, len(list))
+	for _, item := range list {
+		if text := hoverText(item); text != "" {
+			parts = append(parts, text)
+		}
+	}
+	return strings.Join(parts, "\n\n")
+}
+
+// Done is closed once the server has stopped.
+func (client *Client) Done() <-chan struct{} { return client.conn.Done() }
+
+// Stop asks the server to shut down and exit, and ends it if it has not within a moment.
+func (client *Client) Stop() {
+	ctx, cancel := context.WithTimeout(context.Background(), stopWait)
+	defer cancel()
+	if client.conn.Call(ctx, "shutdown", nil, nil) == nil {
+		_ = client.conn.Notify("exit", nil)
+	}
+	select {
+	case <-client.conn.Done():
+	case <-ctx.Done():
+	}
+	client.kill()
+}
+
+// stopWait is how long a server gets to stop on its own.
+const stopWait = 2 * time.Second
+
+// kill ends the server's process, if it still runs.
+func (client *Client) kill() {
+	if client.command.Process != nil {
+		_ = client.command.Process.Kill()
+	}
+}

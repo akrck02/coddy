@@ -32,6 +32,7 @@ func (application *Window) Build(context *ui.Context) {
 	application.work.take()
 	application.readClassKinds()
 	application.typeInTheFile(context, application.handleKeys(context))
+	application.serveOpenFile()
 
 	context.Frame(ui.Layout{Direction: ui.Vertical, Width: ui.Grow(), Height: ui.Grow()}, ui.Look{Fill: context.Theme.Background}, func() {
 		application.buildTitleBar(context)
@@ -276,6 +277,9 @@ func (application *Window) buildStatusBar(context *ui.Context) {
 		}
 		if !application.settings.WorkingTree {
 			context.Text("commits only", ui.TextStyle{Size: palette.SmallTextSize, Color: palette.Warning})
+		}
+		if status := application.serverStatus(); status != "" {
+			context.Text(status, small)
 		}
 		if application.settings.ReadOnly {
 			context.Text("read-only", small)
