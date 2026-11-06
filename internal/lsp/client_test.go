@@ -24,8 +24,7 @@ func TestAClientFollowsANameAcrossFolders(test *testing.T) {
 		test.Fatal(err)
 	}
 	defer client.Stop()
-	client.AddFolder(lamp)
-	time.Sleep(50 * time.Millisecond) // the folder is a notification: let the server read it
+	client.AddFolder(lamp) // a notification, handled before the requests that follow it
 	use := filepath.Join(keeper, "keep.go")
 	declared, err := client.Definition(within(test), use, Position{Line: 2, Character: 9})
 	if err != nil || len(declared) != 1 || PathOf(declared[0].URI) != filepath.Join(lamp, "lamp.go") {
@@ -69,4 +68,22 @@ func TestAServersRootIsTheFolderOfItsMarker(test *testing.T) {
 	if root := server.RootOf(folder, filepath.Join(folder, "top.go")); root != folder {
 		test.Errorf("top.go's root is %s, want the project", root)
 	}
+}
+
+func TestApplyEditIsRefused(test *testing.T) {
+	folder := project(test, map[string]string{"go.mod": "module lamp\n", "lamp.go": "package lamp\n"})
+	server, log := fake(test, false, "FAKE_LSP_APPLY_EDIT=1")
+	client, err := Start(within(test), server, folder, nil, "")
+	if err != nil {
+		test.Fatal(err)
+	}
+	defer client.Stop()
+	for deadline := time.Now().Add(5 * time.Second); time.Now().Before(deadline); time.Sleep(20 * time.Millisecond) {
+		heard, _ := os.ReadFile(log)
+		if strings.Contains(string(heard), "applyEdit applied=false error=false") {
+			return
+		}
+	}
+	heard, _ := os.ReadFile(log)
+	test.Fatalf("the server's edit was not answered \"not applied\":\n%s", heard)
 }
