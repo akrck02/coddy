@@ -36,6 +36,7 @@ internal/theme        Zed's One colours, file icons, the reader's own controls
 internal/java         the IntelliJ-style tree and the kinds of class
 internal/workspace    projects, changes, a file's two sides and its diff, the tree
 internal/text         a file being edited: lines, caret, selection, undo
+internal/lsp          language servers: JSON-RPC over their input and output
 internal/highlight    Chroma's tokens, cut into lines of coloured pieces
 internal/git          the read-only git commands
 ```
@@ -44,7 +45,7 @@ Three tests in `cmd/code-review/rules_test.go` keep the arrows pointing down:
 
 | Test | It checks |
 |---|---|
-| `TestTheDomainImportsNoInterface` | `workspace` and `text` import no go-ui, pane, window or mode |
+| `TestTheDomainImportsNoInterface` | `workspace`, `text` and `lsp` import no go-ui, pane, window or mode |
 | `TestNoPaneImportsTheWindow` | `theme`, `pane`, `viewer`, `sidebar` and `finder` don't import `window` |
 | `TestTheWindowImportsNoMode` | `window` imports neither `files` nor `review` |
 

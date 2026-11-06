@@ -1,0 +1,121 @@
+package lsp
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"io"
+	"testing"
+	"time"
+)
+
+// pair is two connections facing each other over pipes, each answering with its own handler.
+func pair(first, second Handler) (*Conn, *Conn) {
+	firstReads, secondWrites := io.Pipe()
+	secondReads, firstWrites := io.Pipe()
+	return NewConn(firstReads, firstWrites, first), NewConn(secondReads, secondWrites, second)
+}
+
+// within is a context that gives up after a second, so a broken test fails instead of hanging.
+func within(test *testing.T) context.Context {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	test.Cleanup(cancel)
+	return ctx
+}
+
+func echo(method string, params json.RawMessage) (any, error) {
+	if method == "fail" {
+		return nil, errors.New("no such method") // the peer's own error, as a server's would be
+	}
+	return params, nil
+}
+
+func TestARequestGetsItsReply(test *testing.T) {
+	client, _ := pair(nil, echo)
+	var got map[string]int
+	if err := client.Call(within(test), "echo", map[string]int{"line": 4}, &got); err != nil {
+		test.Fatal(err)
+	}
+	if got["line"] != 4 {
+		test.Errorf("the reply was %v", got)
+	}
+}
+
+func TestTheServersOwnRequestsAreAnswered(test *testing.T) {
+	asked := make(chan string, 1)
+	client, server := pair(func(method string, _ json.RawMessage) (any, error) {
+		asked <- method
+		return []string{"setting"}, nil
+	}, nil)
+	_ = client
+	var got []string
+	if err := server.Call(within(test), "workspace/configuration", nil, &got); err != nil {
+		test.Fatal(err)
+	}
+	if <-asked != "workspace/configuration" || len(got) != 1 {
+		test.Errorf("the client answered %v", got)
+	}
+}
+
+func TestANotificationReachesTheHandler(test *testing.T) {
+	heard := make(chan string, 1)
+	client, _ := pair(nil, func(method string, _ json.RawMessage) (any, error) {
+		heard <- method
+		return nil, nil
+	})
+	if err := client.Notify("initialized", struct{}{}); err != nil {
+		test.Fatal(err)
+	}
+	select {
+	case method := <-heard:
+		if method != "initialized" {
+			test.Errorf("heard %q", method)
+		}
+	case <-time.After(time.Second):
+		test.Fatal("the notification never arrived")
+	}
+}
+
+func TestAnErrorReplyIsARequestFailed(test *testing.T) {
+	client, _ := pair(nil, echo)
+	if err := client.Call(within(test), "fail", nil, nil); !errors.Is(err, RequestFailed) {
+		test.Errorf("an error reply gave %v", err)
+	}
+}
+
+func TestABrokenMessageEndsTheConnection(test *testing.T) {
+	reader, writer := io.Pipe()
+	client := NewConn(reader, io.Discard, nil)
+	go io.WriteString(writer, "Content-Length: 5\r\n\r\n{oops")
+	select {
+	case <-client.Done():
+	case <-time.After(time.Second):
+		test.Fatal("the connection kept going after a broken message")
+	}
+	if !errors.Is(client.Err(), BadMessage) {
+		test.Errorf("it ended with %v", client.Err())
+	}
+	if err := client.Call(within(test), "echo", nil, nil); !errors.Is(err, ServerStopped) {
+		test.Errorf("a request after the end gave %v", err)
+	}
+}
+
+func TestColumnsCountUTF16UnitsBothWays(test *testing.T) {
+	line := "a😀b"
+	if units := UTF16Column(line, 2); units != 3 {
+		test.Errorf("two characters are %d units, want 3", units)
+	}
+	if characters := CharacterColumn(line, 3); characters != 2 {
+		test.Errorf("three units are %d characters, want 2", characters)
+	}
+}
+
+func TestAFileURIRoundTrips(test *testing.T) {
+	path := "/work/my repo/Main.java"
+	if back := PathOf(FileURI(path)); back != path {
+		test.Errorf("%q came back as %q", path, back)
+	}
+	if PathOf("jdt://contents/rt.jar/java.lang/String.class") != "" {
+		test.Error("a jar's URI was taken for a file")
+	}
+}

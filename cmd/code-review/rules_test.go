@@ -106,7 +106,7 @@ func TestTheDomainImportsNoInterface(test *testing.T) {
 		"github.com/akrck02/code-review/internal/files",
 		"github.com/akrck02/code-review/internal/review",
 	}
-	for _, domain := range []string{"workspace", "text"} {
+	for _, domain := range []string{"workspace", "text", "lsp"} {
 		if found := importsAny(test, domain, interfaces...); found != "" {
 			test.Errorf("%s imports %s", domain, found)
 		}
