@@ -156,6 +156,12 @@ var commands = []command{
 		do: func(application *Window, _ *ui.Context, _ int) {
 			application.keepingEdits(application.toggleWorkingTree)
 		}},
+	{description: "Go to the declaration of the name at the caret, or ⌘-click it", keys: []pane.Press{pane.Key(input.KeyF12, "F12")},
+		applies: func(application *Window) bool { return application.viewer.IsOpen() },
+		do:      func(application *Window, _ *ui.Context, _ int) { application.definitionAtCaret() }},
+	{description: "Back / forward, after following a name",
+		keys: []pane.Press{{Key: input.KeyMinus, Command: true, Label: "⌃-", Step: -1}, {Key: input.KeyMinus, Command: true, Shift: true, Label: "⌃⇧-", Step: 1}},
+		do:   func(application *Window, _ *ui.Context, step int) { application.stepTrail(step) }},
 	{description: "Read-only: files are only read, or can be edited",
 		keys: []pane.Press{pane.Key(input.KeyL, "l"), pane.CommandShiftKey(input.KeyL, "⌘⇧L")},
 		do: func(application *Window, _ *ui.Context, _ int) {

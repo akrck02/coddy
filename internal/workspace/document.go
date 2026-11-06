@@ -3,6 +3,8 @@ package workspace
 import (
 	"bytes"
 	"crypto/sha256"
+	"os"
+	"strings"
 	"unicode/utf8"
 
 	"github.com/akrck02/code-review/internal/git"
@@ -162,4 +164,17 @@ func asText(content []byte) string {
 type FileReference struct {
 	Project int
 	Path    string
+}
+
+// LineOfFile is a line of a file on disk, from 0; "" when there is no such line.
+func LineOfFile(path string, line int) string {
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	lines := strings.Split(string(content), "\n")
+	if line < 0 || line >= len(lines) {
+		return ""
+	}
+	return strings.TrimSuffix(lines[line], "\r")
 }

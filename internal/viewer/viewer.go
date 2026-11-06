@@ -52,6 +52,8 @@ type Window interface {
 	ReadOnly() bool
 	// Run starts background work under a key, replacing the work under that key still running.
 	Run(key string, do func(stop context.Context) func())
+	// GoToDefinition opens where the name at a place of the file open is declared.
+	GoToDefinition(place Place)
 }
 
 // Button is a button of the header a mode adds, such as Viewed: its icon, its tooltip, and
@@ -85,6 +87,7 @@ type Viewer struct {
 	// goTo is a line to show once the file is read, from the finder; markedLine is the line shown
 	// that way, painted as the line the reader is on
 	GoTo       int
+	GoToColumn int // the character of the line GoTo to put the caret at, from 0
 	MarkedLine int
 	// marks say, in the file view, which lines the development added or changed and where it
 	// removed some, as Zed marks them in its gutter
@@ -180,6 +183,10 @@ func (view *Viewer) Show(document *workspace.Document, showChanges bool) {
 func (view *Viewer) RevealLine(number int) {
 	view.GoTo = 0
 	view.MarkedLine = number
+	if view.Edit != nil { // the caret goes there too, at the column asked for
+		view.Edit.Place(text.Position{Line: number - 1, Column: view.GoToColumn}, false)
+	}
+	view.GoToColumn = 0
 	if view.Mode != DiffView || !view.Document.Changed {
 		view.List.RevealNearTop(max(min(number-1, view.RowCount()-1), 0))
 		return
@@ -382,25 +389,39 @@ func (view *Viewer) Build(context *ui.Context, window Window) {
 		view.List.RowHeight = view.rowHeight
 		view.List.Count = view.RowCount()
 		if !window.ModalOpen() {
-			onBar := view.List.Follow(context, window.Keys(), context.Theme.ScrollStep)
-			x, y := context.Pointer()
-			clicked := window.Keys().Clicked() && view.List.Area.Contains(x, y)
-			if clicked {
-				window.FocusViewer()
-				index := view.List.RowAt(x, y)
-				if !onBar && index >= 0 && view.Mode == DiffView && index < len(view.rows) && view.rows[index].IsFold() {
-					view.openFold(index)
-				}
-			}
-			if view.Editable() && !window.ReadOnly() && !onBar {
-				view.followPointer(window.Keys(), x, y, clicked)
-			}
+			view.followInput(context, window)
 		}
 		context.Paint(ui.Layout{Width: ui.Grow(), Height: ui.Grow()}, func(area draw2d.Rectangle, drawing *draw2d.List) {
 			view.List.Place(area)
 			view.paint(context, window, drawing)
 		})
 	})
+}
+
+// followInput scrolls, opens a fold clicked, follows a name ⌘-clicked to its declaration, and
+// places the caret where the file being edited is clicked.
+func (view *Viewer) followInput(context *ui.Context, window Window) {
+	keys := window.Keys()
+	onBar := view.List.Follow(context, keys, context.Theme.ScrollStep)
+	x, y := context.Pointer()
+	inside := keys.Clicked() && view.List.Area.Contains(x, y)
+	if inside {
+		window.FocusViewer()
+	}
+	clicked := inside && !onBar
+	if clicked {
+		index := view.List.RowAt(x, y)
+		if index >= 0 && view.Mode == DiffView && index < len(view.rows) && view.rows[index].IsFold() {
+			view.openFold(index)
+		}
+	}
+	if place, found := view.PlaceAt(x, y); clicked && keys.Command() && found {
+		window.GoToDefinition(place)
+		return
+	}
+	if view.Editable() && !window.ReadOnly() && !onBar {
+		view.followPointer(keys, x, y, clicked)
+	}
 }
 
 func (view *Viewer) buildEmpty(context *ui.Context, window Window) {

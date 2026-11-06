@@ -92,6 +92,7 @@ type Window struct {
 	themeSet    bool
 	questions   questions
 	servers     languageServers
+	trail       trail
 }
 
 // New makes a reader for these settings, with its modes in the rail's order; Driver must be given
