@@ -1,6 +1,6 @@
 # 4. Language servers: definition, references and hover
 
-> Status: proposed · Author's approval: proposal ☐ plan ☐ · Needs proposal 3 built first
+> Status: building · Author's approval: proposal ☑ plan ☑
 
 ## Why
 
