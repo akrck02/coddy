@@ -75,8 +75,9 @@ func importsAny(test *testing.T, name string, forbidden ...string) string {
 	return ""
 }
 
-// The domain knows nothing of the window: what the reader opens can be read without one.
-func TestTheWorkspaceImportsNoInterface(test *testing.T) {
+// The domain knows nothing of the window: what the reader opens, and the text being edited, can be
+// read and changed without one.
+func TestTheDomainImportsNoInterface(test *testing.T) {
 	interfaces := []string{
 		"github.com/akrck02/go-ui",
 		"github.com/akrck02/code-review/internal/theme",
@@ -86,8 +87,10 @@ func TestTheWorkspaceImportsNoInterface(test *testing.T) {
 		"github.com/akrck02/code-review/internal/files",
 		"github.com/akrck02/code-review/internal/review",
 	}
-	if found := importsAny(test, "workspace", interfaces...); found != "" {
-		test.Errorf("workspace imports %s", found)
+	for _, domain := range []string{"workspace", "text"} {
+		if found := importsAny(test, domain, interfaces...); found != "" {
+			test.Errorf("%s imports %s", domain, found)
+		}
 	}
 }
 

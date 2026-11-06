@@ -131,8 +131,8 @@ someone saves it, through `workspace.Save`, and git still only reads. The help g
 
 ## Tasks
 
-- [ ] T1 — `internal/text`: lines, caret, selection, movement · serves R1 · test: positions and movement, words, an empty file, a file without a final newline
-- [ ] T2 — `internal/text`: edits and undo · serves R1 · test: typing, deleting, a selection replaced, undo and redo grouped by word
+- [x] T1 — `internal/text`: lines, caret, selection, movement · serves R1 · test: positions and movement, words, an empty file, a file without a final newline
+- [x] T2 — `internal/text`: edits and undo · serves R1 · test: typing, deleting, a selection replaced, undo and redo grouped by word
 - [ ] T3 — `workspace.Save`, its errors, and the rule that only it writes · serves R2, R4 · test: `TestSavingWritesTheWholeFileAtOnce`, `TestSavingRefusesAFileChangedOnDisk`, `TestOnlyTheSaveWritesInARepository`
 - [ ] T4 — The place "editing", a second key for every command, and the help · serves R5 · test: `TestNoPlainKeyCommandWhileEditing`, `TestTheHelpListsEveryCommand`
 - [ ] T5 — The caret in the viewer: drawing it and the selection, clicks, typing, colouring again · serves R1 · test: a window test typing into a file
