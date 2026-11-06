@@ -10,8 +10,12 @@ Code Review writes a file of a repository only when someone saves it, and git on
 - `workspace.Save` is the one function that writes inside a repository: the whole file at once,
   through a file beside it renamed over it, and never over a change made on disk since it was read
   (`workspace.changed-on-disk`). `TestOnlyTheSaveWritesInARepository` fails on a file write
-  anywhere else; the marks of the files viewed, kept in the reader's own folder, are the one
-  other place allowed.
+  anywhere else; the marks of the files viewed and the record of what language servers wrote,
+  both kept in the reader's own folder, are the only other places allowed.
+- Language servers are other programs and may write in a repository (`jdtls` does). What they
+  write is never the person's change: `workspace.Written.SortOut` takes it out of the review, and
+  the sidebar lists it. A server never edits a file the person reads: the client answers every
+  `workspace/applyEdit` with "not applied".
 - Every git command goes through `internal/git`, which runs only the commands on its read-only
   list and refuses the rest (`git.command-not-read-only`): no commit, no push, no checkout.
 - While a file is edited, plain keys type: every command keeps a key with Command, an F-key or

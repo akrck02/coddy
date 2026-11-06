@@ -27,7 +27,8 @@ type languageServers struct {
 	// written is what servers wrote, kept across starts of the reader
 	snapshots map[string]*workspace.Snapshot
 	written   *workspace.Written
-	adding    map[string]bool // projects being added to a server for the whole window
+	adding    map[string]bool   // projects being added to a server for the whole window
+	roots     map[string]string // the root of each file asked, as finding it reads the disk
 }
 
 // startWait is how long a server gets to start and answer initialize.
@@ -39,7 +40,7 @@ func newLanguageServers(table []lsp.Server, writtenPath string) languageServers 
 	}
 	return languageServers{table: table, running: map[string]*lsp.Client{}, starting: map[string]bool{},
 		told: map[string]int{}, missing: map[string]bool{}, snapshots: map[string]*workspace.Snapshot{},
-		written: workspace.OpenWritten(writtenPath), adding: map[string]bool{}}
+		written: workspace.OpenWritten(writtenPath), adding: map[string]bool{}, roots: map[string]string{}}
 }
 
 // serverKey names a server running in a root ("" for one per window).
@@ -62,7 +63,12 @@ func (application *Window) serverOfOpenFile() (server lsp.Server, root, path str
 	if !found {
 		return lsp.Server{}, "", "", false
 	}
-	return server, server.RootOf(view.Project.Path, path), path, true
+	root, known := application.servers.roots[path]
+	if !known {
+		root = server.RootOf(view.Project.Path, path)
+		application.servers.roots[path] = root
+	}
+	return server, root, path, true
 }
 
 // serveOpenFile starts the server of the file open if it is not running, and tells it the file's

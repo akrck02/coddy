@@ -70,9 +70,22 @@ It has two modes, chosen on the rail at the far left (or with `1`, `2`, `c`):
   asks whether to keep yours or take theirs. A dot after the name marks edits not saved, and
   opening another file or quitting asks first. A saved file shows as changed at once. The diff
   stays for reading.
+- **Follows names with language servers**: `gopls` for Go, `jdtls` for Java and Kotlin, found on
+  the `PATH` and started the first time a file of their language opens. `F12` or `⌘`-click goes
+  to where a name is declared, even in another project, and `⌃-` comes back; `⇧F12` lists every
+  use in the finder's panel, where typing narrows them; resting the pointer on a name shows its
+  type and documentation. A server not installed is named, with the command that installs it.
+  One `jdtls` reads every Java project of the window, so names cross repositories.
+- **What a server writes is not your change**: `jdtls` writes `.project`, `.classpath` and
+  `.settings/`. The reader notes what each project held before a server started in it, and a file
+  that appears or changes afterwards, which you did not save in the reader, leaves the review, the
+  counts and the progress. A dashed badge on the project, `jdtls · 4`, lists those files to open
+  them, and the reader remembers them after a restart. Edits a server asks to make
+  (`workspace/applyEdit`) are refused.
 - **A read-only mode**: the lock in the title bar, `⌘⇧L` or `-read-only` turn editing off, and
   the choice is remembered.
-- **Writes a file only when you save it; git only reads.** It only runs `git cat-file`, `diff`,
+- **Writes a file only when you save it; git only reads.** Language servers may write their own
+  files, shown apart as above. It only runs `git cat-file`, `diff`,
   `ls-files`, `merge-base`, `rev-list`, `rev-parse` and `symbolic-ref` (any other command is
   refused by `internal/git/run.go`), without the optional locks, the file system monitor or
   external diff programs: no commit, no push, no checkout. It never fetches, so a remote branch is
@@ -137,6 +150,9 @@ below, an F-key or `Esc`. `Esc` gives the keyboard back to the sidebar, where th
 | `y` (`⌘⇧C`) | Copy the open file's path |
 | `t` (`⌘⇧T`) | Light or dark |
 | `l` (`⌘⇧L`) | Read-only, or editing |
+| `F12`, or `⌘`-click | Go to where the name at the caret (or clicked) is declared |
+| `⇧F12` | Every use of the name at the caret (or clicked) |
+| `⌃-` / `⌃⇧-` | Back to where you were before following a name, and forward again |
 | `?` (`F1`) | These keys |
 
 Editing a file:
@@ -176,7 +192,9 @@ The interface follows what review tools have settled on, and keeps colour for me
 | `cmd/code-review` | The program: flags and wiring |
 | `internal/git` | The read-only git commands, and reading their output |
 | `internal/highlight` | Chroma's tokens, cut into lines of coloured pieces |
-| `internal/workspace` | Projects, changes, a file's two sides and its diff, folding, the tree |
+| `internal/workspace` | Projects, changes, a file's two sides and its diff, folding, the tree, what servers wrote |
+| `internal/text` | A file being edited: lines, caret, selection, undo |
+| `internal/lsp` | Language servers: JSON-RPC over their input and output, the table of servers |
 | `internal/java` | The IntelliJ-style tree and the kinds of class |
 | `internal/theme` | Zed's One colours, file icons and the reader's own controls |
 | `internal/pane` | What every pane shares: the keys and a scrolling list |
@@ -201,3 +219,5 @@ are ready.
 - Long lines are not wrapped: scroll sideways (Shift+wheel, ←/→ in the editor).
 - One typeface for code at a time: SF Mono by default, or the one `-code-font` names (a `.ttf`;
   collections such as `Menlo.ttc` are not read).
+- Language servers only follow names: no rename, formatting, completion or diagnostics yet, and
+  not on the old side of a diff, which is not on disk.
