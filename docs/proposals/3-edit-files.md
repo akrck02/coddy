@@ -1,6 +1,6 @@
 # 3. Edit files, with an optional read-only mode
 
-> Status: proposed · Author's approval: proposal ☐ plan ☐
+> Status: building · Author's approval: proposal ☑ plan ☑
 
 ## Why
 
@@ -123,12 +123,11 @@ New codes in `text/errors.go` and `workspace/errors.go`, each with its test: `wo
 `docs/8-contributing.md` and the README change "the one rule": the reader writes a file only when
 someone saves it, through `workspace.Save`, and git still only reads. The help gains the keys.
 
-### Open questions for the author
+### Decided with the author
 
-1. **Which mode on start?** This proposal starts editing, with read-only remembered once chosen.
-   The other way round is one line.
-2. **The second key of each command**: the ones above are a first proposal. Some may clash with
-   macOS (⌘H hides the window, so "only the projects with changes" would be ⌘⇧H).
+1. **The mode on start** is editing; read-only is remembered once chosen.
+2. **The second key of each command** is as above, with ⌘⇧ where ⌘ alone belongs to macOS (⌘H
+   hides the window, so "only the projects with changes" is ⌘⇧H).
 
 ## Tasks
 
