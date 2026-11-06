@@ -3,13 +3,16 @@
 package viewer
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/akrck02/code-review/internal/git"
 	"github.com/akrck02/code-review/internal/highlight"
 	"github.com/akrck02/code-review/internal/pane"
+	"github.com/akrck02/code-review/internal/text"
 	"github.com/akrck02/code-review/internal/theme"
 	"github.com/akrck02/code-review/internal/workspace"
 	"github.com/akrck02/go-renderer/draw2d"
@@ -43,6 +46,12 @@ type Window interface {
 	// BuildInsteadOfAFile builds what the window shows while no file is open, and tells whether it
 	// had anything; if not, the view shows how to start.
 	BuildInsteadOfAFile(context *ui.Context) bool
+	// Editing tells whether the keyboard is in the file being edited; ReadOnly whether editing is
+	// off for every file.
+	Editing() bool
+	ReadOnly() bool
+	// Run starts background work under a key, replacing the work under that key still running.
+	Run(key string, do func(stop context.Context) func())
 }
 
 // Button is a button of the header a mode adds, such as Viewed: its icon, its tooltip, and
@@ -83,6 +92,18 @@ type Viewer struct {
 
 	List pane.Scroller
 
+	// Edit is the file being edited, when it can be (see Editable); nil otherwise
+	Edit *text.Buffer
+	// coloured are the buffer's lines as last coloured, for its version colouredVersion
+	coloured        []highlight.Line
+	colouredVersion int
+	indent          string // what Tab types: a tab, or spaces, as the file indents
+	selecting       bool   // a press in the code is dragging a selection
+	// ColourPause is how long typing must stop before the file is coloured again
+	ColourPause time.Duration
+	// codeLeft and codeWidth are where the code was painted last, to find what a click is on
+	codeLeft, codeWidth float32
+
 	codeSize    float32
 	rowHeight   float32
 	charWidth   float32
@@ -92,7 +113,8 @@ type Viewer struct {
 
 // New makes a view with no file open.
 func New() Viewer {
-	return Viewer{openedFolds: map[int]bool{}, codeSize: 13, rowHeight: codeRowHeight, List: pane.Scroller{RowHeight: codeRowHeight}}
+	return Viewer{openedFolds: map[int]bool{}, codeSize: 13, rowHeight: codeRowHeight, List: pane.Scroller{RowHeight: codeRowHeight},
+		ColourPause: colourPause}
 }
 
 // IsOpen tells whether a file is shown.
@@ -102,6 +124,7 @@ func (view *Viewer) IsOpen() bool { return view.showing }
 func (view *Viewer) Close() {
 	view.showing = false
 	view.Document = nil
+	view.Edit = nil
 	view.Request++
 }
 
@@ -115,6 +138,7 @@ func (view *Viewer) Start(reference workspace.FileReference, project *workspace.
 	view.Project = project
 	view.MarkedLine = 0
 	view.Document = nil
+	view.Edit, view.selecting = nil, false
 	view.showing = true
 	view.openedFolds = map[int]bool{}
 	view.List.Offset, view.List.OffsetX = 0, 0
@@ -125,6 +149,9 @@ func (view *Viewer) Start(reference workspace.FileReference, project *workspace.
 func (view *Viewer) Show(document *workspace.Document, showChanges bool) {
 	keepPlace := view.Document != nil && view.Document.Path == document.Path
 	view.Document = document
+	if !keepPlace || view.Edit == nil || !view.Edit.Modified() {
+		view.startEditing()
+	}
 	if !keepPlace {
 		view.Mode = FileView
 		if document.Changed && showChanges {
@@ -235,7 +262,7 @@ func (view *Viewer) RowCount() int {
 	if view.Mode == DiffView && view.Document.Changed {
 		return len(view.rows)
 	}
-	return len(view.lines())
+	return view.fileLineCount()
 }
 
 // SetMode shows the file as its changes or whole; only a changed file has changes to show.
@@ -349,12 +376,16 @@ func (view *Viewer) Build(context *ui.Context, window Window) {
 		if !window.ModalOpen() {
 			onBar := view.List.Follow(context, window.Keys(), context.Theme.ScrollStep)
 			x, y := context.Pointer()
-			if window.Keys().Clicked() && view.List.Area.Contains(x, y) {
+			clicked := window.Keys().Clicked() && view.List.Area.Contains(x, y)
+			if clicked {
 				window.FocusViewer()
 				index := view.List.RowAt(x, y)
 				if !onBar && index >= 0 && view.Mode == DiffView && index < len(view.rows) && view.rows[index].IsFold() {
 					view.openFold(index)
 				}
+			}
+			if view.Editable() && !window.ReadOnly() && !onBar {
+				view.followPointer(window.Keys(), x, y, clicked)
 			}
 		}
 		context.Paint(ui.Layout{Width: ui.Grow(), Height: ui.Grow()}, func(area draw2d.Rectangle, drawing *draw2d.List) {
@@ -600,6 +631,7 @@ func (view *Viewer) startPainting(context *ui.Context, window Window, drawing *d
 		gutter = numberWidth*2 + view.charWidth*2 + 6
 	}
 	codeLeft := area.X + gutter + 10
+	view.codeLeft, view.codeWidth = codeLeft, max(area.Right()-codeLeft-pane.ScrollBarWidth, 0)
 	return painting{
 		context: context, window: window, drawing: drawing, look: window.Look(), diff: diff, area: area,
 		codeArea:    draw2d.Rectangle{X: codeLeft, Y: area.Y, Width: max(area.Right()-codeLeft-pane.ScrollBarWidth, 0), Height: area.Height},
@@ -611,16 +643,21 @@ func (view *Viewer) startPainting(context *ui.Context, window Window, drawing *d
 func (view *Viewer) paintFileLine(painter painting, index int, top, baseline float32) {
 	look, area, drawing := painter.look, painter.area, painter.drawing
 	number := index + 1
-	if number == view.MarkedLine {
-		drawing.Rectangle(draw2d.Rectangle{X: area.X, Y: top, Width: area.Width, Height: view.rowHeight}, 0, look.Hover, draw2d.Color{}, 0)
-	}
+	editing := view.Edit != nil && painter.window.Editing()
 	numberInk := look.LineNumber
-	if number == view.MarkedLine {
+	if number == view.MarkedLine || (editing && index == view.Edit.Caret().Line) {
+		drawing.Rectangle(draw2d.Rectangle{X: area.X, Y: top, Width: area.Width, Height: view.rowHeight}, 0, look.Hover, draw2d.Color{}, 0)
 		numberInk = look.ActiveLineNumber
 	}
 	view.paintNumber(drawing, number, area.X, painter.numberWidth, baseline, numberInk)
 	view.paintMark(drawing, look, view.Marks[number], area.X+painter.numberWidth+4, top)
-	view.paintCode(drawing, painter.window, view.lines()[index], painter.codeArea, baseline)
+	if view.Edit != nil {
+		view.paintSelection(painter, index, top)
+	}
+	view.paintCode(drawing, painter.window, view.fileLine(index), painter.codeArea, baseline)
+	if editing {
+		view.paintCaret(painter, index, top)
+	}
 }
 
 // paintFold paints the row that stands for unchanged lines folded away.

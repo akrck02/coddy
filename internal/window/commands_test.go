@@ -50,7 +50,11 @@ func TestNoTwoCommandsShareAKeyInOneMode(test *testing.T) {
 
 func TestTheHelpListsEveryCommand(test *testing.T) {
 	application := newReader(Settings{Folders: []string{makeRepository(test)}, WorkingTree: true, Synchronous: true})
-	window := newWindow(test, application)
+	// tall enough for the whole help, which scrolls in a shorter window
+	window, err := uitest.New(application.Build, uitest.Driver(application.Driver()), uitest.Size(1200, 1600))
+	if err != nil {
+		test.Fatal(err)
+	}
 	press(window, input.KeyF1)
 	shown := strings.Join(strings.Fields(strings.Join(window.Texts(), " ")), " ")
 	for _, command := range application.allCommands() {
@@ -89,7 +93,6 @@ func editingAFile(test *testing.T) (*Window, *uitest.Window) {
 	addLongRepository(test, folder)
 	application := newReader(Settings{Folders: []string{folder}, WorkingTree: true, Synchronous: true, Open: "tides/coast.txt"})
 	window := newWindow(test, application)
-	application.editable = true
 	application.focus = viewerPane
 	application.viewer.SetMode(viewer.FileView)
 	if !application.editing() {

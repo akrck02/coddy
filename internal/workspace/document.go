@@ -2,6 +2,7 @@ package workspace
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"unicode/utf8"
 
 	"github.com/akrck02/code-review/internal/git"
@@ -26,6 +27,12 @@ type Document struct {
 
 	Binary bool
 	Error  string
+
+	// Editable tells whether the file can be edited: read from disk, as UTF-8 text. Text is then
+	// the file as read, and Stamp what it was, so saving can tell whether it changed since.
+	Editable bool
+	Text     string
+	Stamp    Stamp
 }
 
 // OpenDocument reads a file of a project: as it is now, and, if the development changed it, as it
@@ -42,14 +49,7 @@ func OpenDocument(project *Project, path string, workingTree bool) *Document {
 	if newError != nil {
 		document.Error = newError.Error()
 	}
-	var oldContent []byte
-	if document.Changed && change.Status != git.Added {
-		var err error
-		oldContent, err = git.ReadAtRevision(project.Path, project.MergeBase, change.OldPath)
-		if err != nil && document.Error == "" {
-			document.Error = err.Error()
-		}
-	}
+	oldContent := document.readBase(project)
 	if isBinary(newContent) || isBinary(oldContent) {
 		document.Binary = true
 		return document
@@ -62,6 +62,7 @@ func OpenDocument(project *Project, path string, workingTree bool) *Document {
 	if len(sample) == 0 {
 		sample = oldContent
 	}
+	document.keepForEditing(newContent, newError == nil && (workingTree || change.Untracked))
 	document.Language = highlight.Language(path, asText(sample))
 	document.NewLines = highlight.Lines(path, asText(newContent))
 	document.OldLines = highlight.Lines(change.OldPath, asText(oldContent))
@@ -69,6 +70,28 @@ func OpenDocument(project *Project, path string, workingTree bool) *Document {
 		document.Diff = document.diffLines(project, workingTree)
 	}
 	return document
+}
+
+// readBase reads the file as it was at the base, when the development changed it and it was there.
+func (document *Document) readBase(project *Project) []byte {
+	if !document.Changed || document.Change.Status == git.Added {
+		return nil
+	}
+	content, err := git.ReadAtRevision(project.Path, project.MergeBase, document.Change.OldPath)
+	if err != nil && document.Error == "" {
+		document.Error = err.Error()
+	}
+	return content
+}
+
+// keepForEditing keeps the text read to edit it, when it was read from disk and is UTF-8.
+func (document *Document) keepForEditing(content []byte, fromDisk bool) {
+	deleted := document.Changed && document.Change.Status == git.Deleted
+	if !fromDisk || deleted || !utf8.Valid(content) {
+		return
+	}
+	document.Editable, document.Text = true, string(content)
+	document.Stamp = Stamp{Exists: true, Hash: sha256.Sum256(content)}
 }
 
 // readCurrent reads a file as the development has it: on disk, or in the last commit when changes

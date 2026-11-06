@@ -26,6 +26,9 @@ func (keys Keys) Command() bool { return keys.Down(input.KeySuper) || keys.Down(
 
 func (keys Keys) Shift() bool { return keys.Down(input.KeyShift) }
 
+// Alt tells whether Alt (Option on a Mac) is held.
+func (keys Keys) Alt() bool { return keys.Down(input.KeyAlt) }
+
 // Plain is a key pressed with no Command, Control or Alt: a one-letter shortcut.
 func (keys Keys) Plain(key input.Key) bool {
 	return keys.Pressed(key) && !keys.Command() && !keys.Down(input.KeyAlt)
@@ -33,6 +36,14 @@ func (keys Keys) Plain(key input.Key) bool {
 
 func (keys Keys) Clicked() bool {
 	return keys.state != nil && keys.state.ButtonPressed(input.MouseLeft)
+}
+
+// Clicks says which click of a run a click was: 1, 2 for a double click, 3 for a triple one.
+func (keys Keys) Clicks() int {
+	if keys.state == nil {
+		return 0
+	}
+	return keys.state.Clicks(input.MouseLeft)
 }
 
 func (keys Keys) Holding() bool { return keys.state != nil && keys.state.Button(input.MouseLeft) }

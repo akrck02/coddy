@@ -36,6 +36,8 @@ type Settings struct {
 	// Synchronous reads everything before the first frame instead of in the background: for
 	// capturing a frame to a picture, where there is only one frame.
 	Synchronous bool
+	// ReadOnly stops editing: files are only read, as before editing came.
+	ReadOnly bool
 }
 
 // focusedPane is the part of the window the keyboard moves in.
@@ -84,9 +86,7 @@ type Window struct {
 	tap         *inputTap
 	keys        pane.Keys
 	toast       string
-	// editable lets the whole file take the keyboard to be edited
-	editable bool
-	themeSet bool
+	themeSet    bool
 }
 
 // New makes a reader for these settings, with its modes in the rail's order; Driver must be given
@@ -110,6 +110,9 @@ func New(settings Settings, modes ...mode.Mode) (*Window, error) {
 	application.sidebar = sidebar.New()
 	application.startModes(modes, settings.Mode)
 	application.viewer = viewer.New()
+	if settings.Synchronous {
+		application.viewer.ColourPause = 0 // one frame, or a test: colour at once
+	}
 	application.setLook()
 	application.openFolders(settings.Folders)
 	if settings.Open != "" {

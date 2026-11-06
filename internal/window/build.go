@@ -31,7 +31,7 @@ func (application *Window) Build(context *ui.Context) {
 	windowOpen.Store(true)
 	application.work.take()
 	application.readClassKinds()
-	application.handleKeys(context)
+	application.typeInTheFile(context, application.handleKeys(context))
 
 	context.Frame(ui.Layout{Direction: ui.Vertical, Width: ui.Grow(), Height: ui.Grow()}, ui.Look{Fill: context.Theme.Background}, func() {
 		application.buildTitleBar(context)
@@ -397,13 +397,19 @@ func (application *Window) buildHelp(context *ui.Context) {
 	}
 	dismissed := context.Sheet("Keys", ui.SheetOptions{Width: ui.Fixed(helpSheetWidth)}, func() {
 		context.Caption("The reader never changes a repository: it only runs git commands that read.")
-		context.Box(ui.Layout{Width: ui.Grow(), Gap: helpColumnGap}, func() {
-			application.buildHelpColumn(context, "Anywhere", helpRows(commands, anywhere))
-			context.Box(ui.Layout{Direction: ui.Vertical, Gap: 16}, func() {
-				application.buildHelpColumn(context, "Modes", helpRows(application.modeCommands(), anywhere))
-				application.buildHelpColumn(context, "In the sidebar", helpRows(commands, inSidebar))
-				application.buildHelpColumn(context, "In the file", helpRows(commands, inViewer))
-				application.buildHelpColumn(context, "While editing", helpRows(commands, editing))
+		// the help scrolls when the window is too short for it
+		_, windowHeight := context.Size()
+		context.ScrollArea("help", ui.Layout{Width: ui.Grow(), Height: ui.Fixed(max(windowHeight-helpRoomAround, 200))}, func() {
+			context.Box(ui.Layout{Width: ui.Grow(), Gap: helpColumnGap}, func() {
+				context.Box(ui.Layout{Direction: ui.Vertical, Gap: 16}, func() {
+					application.buildHelpColumn(context, "Anywhere", helpRows(commands, anywhere))
+					application.buildHelpColumn(context, "Modes", helpRows(application.modeCommands(), anywhere))
+				})
+				context.Box(ui.Layout{Direction: ui.Vertical, Gap: 16}, func() {
+					application.buildHelpColumn(context, "In the sidebar", helpRows(commands, inSidebar))
+					application.buildHelpColumn(context, "In the file", helpRows(commands, inViewer))
+					application.buildHelpColumn(context, "While editing", append(helpRows(commands, editing), editingKeyRows()...))
+				})
 			})
 		})
 		context.Row(func() {
@@ -444,9 +450,11 @@ func (application *Window) buildHelpColumn(context *ui.Context, title string, ro
 // helpKeysWidth and helpTextWidth are the help's columns of keys and of what they do, in points;
 // the help shows two of each side by side.
 const (
-	helpKeysWidth  = 130
-	helpTextWidth  = 290
-	helpColumnGap  = 32
+	helpKeysWidth = 130
+	helpTextWidth = 290
+	helpColumnGap = 32
+	// helpRoomAround is the window's height the help leaves to its title, caption, button and margins
+	helpRoomAround = 200
 	helpSheetWidth = 2*(helpKeysWidth+12+helpTextWidth) + helpColumnGap + 48
 )
 

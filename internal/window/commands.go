@@ -3,6 +3,7 @@ package window
 import (
 	"github.com/akrck02/code-review/internal/finder"
 	"github.com/akrck02/code-review/internal/pane"
+	"github.com/akrck02/code-review/internal/text"
 	"github.com/akrck02/code-review/internal/viewer"
 	"github.com/akrck02/go-renderer/input"
 	ui "github.com/akrck02/go-ui"
@@ -34,8 +35,9 @@ type command struct {
 }
 
 // handleKeys runs the command the frame's keys ask for: the first one, in the order of commands,
-// whose key was pressed and that can act now. While a dialog is open, the dialog reads the keys.
-func (application *Window) handleKeys(context *ui.Context) {
+// whose key was pressed and that can act now, and tells whether one ran. While a dialog is open,
+// the dialog reads the keys.
+func (application *Window) handleKeys(context *ui.Context) bool {
 	dialogOpen := application.ModalOpen() || context.WantsKeyboard()
 	typing := application.editing()
 	for _, command := range application.allCommands() {
@@ -51,10 +53,11 @@ func (application *Window) handleKeys(context *ui.Context) {
 			}
 			if press.Matches(application.keys) {
 				command.do(application, context, press.Step)
-				return
+				return true
 			}
 		}
 	}
+	return false
 }
 
 // isIn tells whether the keyboard is in a place.
@@ -70,10 +73,10 @@ func (application *Window) isIn(where place) bool {
 	return true
 }
 
-// editing tells whether the keyboard is in a file being edited: the whole file, in the viewer.
+// editing tells whether the keyboard is in a file being edited: the whole file, in the viewer, and
+// not read-only.
 func (application *Window) editing() bool {
-	return application.editable && application.focus == viewerPane && application.viewer.IsOpen() &&
-		application.viewer.Mode == viewer.FileView
+	return !application.settings.ReadOnly && application.focus == viewerPane && application.viewer.Editable()
 }
 
 // commands are every shortcut of the reader, in the order they are tried. The help lists them.
@@ -100,6 +103,25 @@ var commands = []command{
 	{description: "Stop editing: the sidebar takes the keyboard", place: editing,
 		keys: []pane.Press{pane.AnyKey(input.KeyEscape, "Esc")},
 		do:   func(application *Window, _ *ui.Context, _ int) { application.focus = sidebarPane }},
+	{description: "Undo / redo", place: editing,
+		keys: []pane.Press{{Key: input.KeyZ, Command: true, Label: "⌘Z", Step: -1}, {Key: input.KeyZ, Command: true, Shift: true, Label: "⌘⇧Z", Step: 1}},
+		do: func(application *Window, _ *ui.Context, step int) {
+			application.viewer.Apply(application, func(buffer *text.Buffer) {
+				if step < 0 {
+					buffer.Undo()
+				} else {
+					buffer.Redo()
+				}
+			})
+		}},
+	{description: "Cut, copy, paste", place: editing,
+		keys: []pane.Press{{Key: input.KeyX, Command: true, Label: "⌘X", Step: cutting}, {Key: input.KeyC, Command: true, Label: "⌘C", Step: copying},
+			{Key: input.KeyV, Command: true, Label: "⌘V", Step: pasting}},
+		do: func(application *Window, context *ui.Context, step int) { application.clipboardEdit(context, step) }},
+	{description: "Select all", place: editing, keys: []pane.Press{pane.CommandKey(input.KeyA, "⌘A")},
+		do: func(application *Window, _ *ui.Context, _ int) {
+			application.viewer.Apply(application, func(buffer *text.Buffer) { buffer.SelectAll() })
+		}},
 	{description: "Back to every project", keys: []pane.Press{pane.AnyKey(input.KeyEscape, "Esc"), pane.AnyKey(input.KeyBackspace, "Backspace")},
 		applies: func(application *Window) bool { return application.sidebar.Entered != "" },
 		do: func(application *Window, _ *ui.Context, _ int) {
@@ -202,6 +224,15 @@ func helpRows(given []command, where place) []helpRow {
 			labels[index] = press.Label
 		}
 		rows = append(rows, helpRow{labels, command.description})
+	}
+	return rows
+}
+
+// editingKeyRows are the keys the file view answers itself while it is edited, for the help.
+func editingKeyRows() []helpRow {
+	rows := make([]helpRow, len(viewer.EditingKeys))
+	for index, key := range viewer.EditingKeys {
+		rows[index] = helpRow{key.Keys, key.Description}
 	}
 	return rows
 }

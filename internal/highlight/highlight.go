@@ -162,3 +162,48 @@ func expandTabs(text string, column int) (string, int) {
 	}
 	return builder.String(), column
 }
+
+// Uncoloured is a line of text in one colour, with its tabs turned into spaces: a line just
+// edited, before it is coloured again.
+func Uncoloured(text string) Line {
+	expanded, columns := expandTabs(text, 0)
+	if expanded == "" {
+		return Line{}
+	}
+	return Line{Spans: []Span{{Text: expanded, Kind: chroma.Text}}, Columns: columns}
+}
+
+// Column is where a character of a line starts on screen, counting tabs to their stop.
+func Column(line string, characters int) int {
+	column := 0
+	for _, character := range line {
+		if characters == 0 {
+			break
+		}
+		characters--
+		if character == '\t' {
+			column += TabWidth - column%TabWidth
+		} else {
+			column++
+		}
+	}
+	return column
+}
+
+// CharacterAt is the character of a line nearest a place on screen, in columns: the inverse of
+// Column, rounding to the nearer edge of a character.
+func CharacterAt(line string, place float32) int {
+	column, characters := 0, 0
+	for _, character := range line {
+		width := 1
+		if character == '\t' {
+			width = TabWidth - column%TabWidth
+		}
+		if place < float32(column)+float32(width)/2 {
+			return characters
+		}
+		column += width
+		characters++
+	}
+	return characters
+}

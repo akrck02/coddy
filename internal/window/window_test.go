@@ -127,8 +127,9 @@ func TestTheDiffOfAChangedFileMarksItsLines(test *testing.T) {
 		test.Errorf("found %d runs of changes, want 1", len(application.viewer.Hunks))
 	}
 	application.toggleView()
-	if application.viewer.Mode != viewer.FileView || application.viewer.RowCount() != 5 {
-		test.Errorf("the file view shows %d lines, want 5", application.viewer.RowCount())
+	// five lines, and the empty one after the last line break, where the caret can go
+	if application.viewer.Mode != viewer.FileView || application.viewer.RowCount() != 6 {
+		test.Errorf("the file view shows %d lines, want 5 and an empty one", application.viewer.RowCount())
 	}
 }
 
@@ -229,8 +230,8 @@ func TestTheFilesModeShowsAChangedFileWholeWithItsChangesMarked(test *testing.T)
 		test.Fatal("the reader did not start in the files mode")
 	}
 	view := &application.viewer
-	if view.Mode != viewer.FileView || view.RowCount() != 5 {
-		test.Fatalf("lamp.go opened in mode %d with %d rows, want the whole file of 5 lines", view.Mode, view.RowCount())
+	if view.Mode != viewer.FileView || view.RowCount() != 6 {
+		test.Fatalf("lamp.go opened in mode %d with %d rows, want the whole file of 5 lines and an empty one", view.Mode, view.RowCount())
 	}
 	if view.Marks[4] != workspace.ModifiedMark {
 		test.Errorf("the changed line 4 is marked %d, want modified", view.Marks[4])
@@ -238,10 +239,9 @@ func TestTheFilesModeShowsAChangedFileWholeWithItsChangesMarked(test *testing.T)
 	if len(view.Hunks) != 1 || view.Hunks[0] != 3 {
 		test.Errorf("the runs of marked lines are %v, want [3]", view.Hunks)
 	}
-	window.PressKey(input.Key2)
-	window.Frames(2)
+	press(window, input.Key2, input.KeySuper) // the file has the keyboard, where 2 would type
 	if application.mode.Name() != "Review" || view.Mode != viewer.DiffView {
-		test.Errorf("2 did not move to the review mode with the file as its diff")
+		test.Errorf("⌘2 did not move to the review mode with the file as its diff")
 	}
 	if span, found := view.Inline[view.Hunks[0]]; !found || span.Start != 11 {
 		test.Errorf("the changed word of the replaced line is %+v (found %v), want it from column 11, after the indent and \"return \"", span, found)

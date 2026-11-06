@@ -118,7 +118,8 @@ func (key shortcut) run(test *testing.T) {
 	if key.long {
 		addLongRepository(test, folder)
 	}
-	application := newReader(Settings{Folders: []string{folder}, WorkingTree: true, Synchronous: true, Open: key.open, Mode: startIn(key.review)})
+	// read-only, where a file with the keyboard answers the letters as before editing came
+	application := newReader(Settings{Folders: []string{folder}, WorkingTree: true, Synchronous: true, Open: key.open, Mode: startIn(key.review), ReadOnly: true})
 	window := newWindow(test, application)
 	clipboard := &memoryClipboard{}
 	application.tap.state.Clipboard = clipboard

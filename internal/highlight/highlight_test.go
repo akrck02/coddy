@@ -35,3 +35,18 @@ func TestTokensTakeTheRoleTheyAreColouredBy(test *testing.T) {
 		}
 	}
 }
+
+func TestColumnsCountTabsToTheirStop(test *testing.T) {
+	line := "\tab\tc"
+	if column := Column(line, 4); column != 8 {
+		test.Errorf("the fifth character starts at column %d, want 8", column)
+	}
+	for _, place := range []struct {
+		at   float32
+		want int
+	}{{1.9, 0}, {2.1, 1}, {4.4, 1}, {5.6, 3}, {99, 5}} {
+		if got := CharacterAt(line, place.at); got != place.want {
+			test.Errorf("at column %v is character %d, want %d", place.at, got, place.want)
+		}
+	}
+}
