@@ -1,0 +1,169 @@
+package window
+
+import (
+	"context"
+	"fmt"
+	"strings"
+	"unicode"
+
+	"github.com/akrck02/code-review/internal/finder"
+	"github.com/akrck02/code-review/internal/lsp"
+	"github.com/akrck02/code-review/internal/viewer"
+	ui "github.com/akrck02/go-ui"
+)
+
+// usesAsked lists every use of the name at the caret, or clicked last, in the finder's panel.
+func (application *Window) usesAsked() {
+	place, found := application.viewer.PlaceAsked()
+	if !found {
+		application.toast = "Click a name first, or place the caret on it"
+		return
+	}
+	client, path, ready := application.readyServer()
+	if !ready {
+		return
+	}
+	at := application.positionOf(place)
+	name := wordAt(application.viewer.LineText(place.Line), place.Column)
+	application.work.run("references", func(stop cancellation) func() {
+		ctx, cancel := context.WithTimeout(stop, requestWait)
+		defer cancel()
+		locations, err := client.References(ctx, path, at)
+		return func() {
+			if err != nil {
+				application.toast = "The uses could not be found: " + err.Error()
+				return
+			}
+			application.showUses(name, locations)
+		}
+	})
+}
+
+// showUses opens the finder on the uses a server found, those in the projects open.
+func (application *Window) showUses(name string, locations []lsp.Location) {
+	var uses []finder.Use
+	outside := 0
+	for _, location := range locations {
+		path := lsp.PathOf(location.URI)
+		reference, found := application.referenceOf(path)
+		if !found {
+			outside++
+			continue
+		}
+		start, end := location.Range.Start, location.Range.End
+		text := lineOf(path, start.Line, application)
+		column := lsp.CharacterColumn(text, start.Character)
+		length := 0
+		if end.Line == start.Line {
+			length = lsp.CharacterColumn(text, end.Character) - column
+		}
+		byteColumn := len(string([]rune(text)[:min(column, len([]rune(text)))]))
+		uses = append(uses, finder.Use{Project: reference.Project, Path: reference.Path, Line: start.Line + 1,
+			Column: byteColumn, Length: length, Text: text})
+	}
+	application.finder.ShowUses(application, name, uses)
+	if outside > 0 {
+		application.toast = fmt.Sprintf("%d more outside the projects open", outside)
+	}
+}
+
+// wordAt is the name a character of a line is in: letters, digits and _.
+func wordAt(line string, column int) string {
+	characters := []rune(line)
+	start, end := min(max(column, 0), len(characters)), min(max(column, 0), len(characters))
+	isName := func(character rune) bool {
+		return character == '_' || unicode.IsLetter(character) || unicode.IsDigit(character)
+	}
+	for start > 0 && isName(characters[start-1]) {
+		start--
+	}
+	for end < len(characters) && isName(characters[end]) {
+		end++
+	}
+	return string(characters[start:end])
+}
+
+// hoverCard is what a server said of the name the pointer rests on.
+type hoverCard struct {
+	place   viewer.Place
+	resting bool
+	text    string
+	x, y    float32
+}
+
+// Hover asks the server of the file open about the name the pointer rests on, and drops the card
+// once the pointer leaves it. It says nothing when there is no server: resting is not asking.
+func (application *Window) Hover(place viewer.Place, resting bool) {
+	if !resting {
+		application.work.cancel("hover")
+		application.hover = hoverCard{}
+		return
+	}
+	client, path, why := application.runningServer()
+	if why != "" {
+		return
+	}
+	at := application.positionOf(place)
+	application.hover = hoverCard{place: place, resting: true, x: application.pointerX, y: application.pointerY}
+	application.work.run("hover", func(stop cancellation) func() {
+		ctx, cancel := context.WithTimeout(stop, requestWait)
+		defer cancel()
+		text, err := client.Hover(ctx, path, at)
+		return func() {
+			if err == nil && application.hover.resting && application.hover.place == place {
+				application.hover.text = text
+			}
+		}
+	})
+}
+
+// hoverLines are the lines of a hover's Markdown worth showing in a small card: no code fences,
+// no emphasis marks, and no more than a few.
+func hoverLines(markdown string) []string {
+	var lines []string
+	for _, line := range strings.Split(markdown, "\n") {
+		if strings.HasPrefix(strings.TrimSpace(line), "```") {
+			continue
+		}
+		line = strings.ReplaceAll(strings.ReplaceAll(line, "**", ""), "`", "")
+		if line == "" && (len(lines) == 0 || lines[len(lines)-1] == "") {
+			continue
+		}
+		lines = append(lines, line)
+	}
+	if len(lines) > hoverLineLimit {
+		lines = append(lines[:hoverLineLimit], "…")
+	}
+	return lines
+}
+
+const (
+	hoverLineLimit = 14
+	hoverWidth     = 520
+)
+
+// buildHover shows the hover card under the pointer, kept inside the window.
+func (application *Window) buildHover(context *ui.Context) {
+	card := application.hover
+	lines := hoverLines(card.text)
+	if !card.resting || len(lines) == 0 || application.ModalOpen() {
+		return
+	}
+	width, height := context.Size()
+	tall := float32(len(lines))*20 + 20
+	left := max(min(card.x+8, width-hoverWidth-16), 8)
+	top := card.y + 20
+	if top+tall > height-8 {
+		top = max(card.y-tall-8, 8)
+	}
+	options := ui.LayerOptions{AlignX: ui.Start, AlignY: ui.Start, Padding: ui.Padding{Left: left, Top: top}, Width: ui.Fixed(hoverWidth)}
+	palette := context.Theme
+	look := ui.Look{Fill: palette.Surface, Border: application.look.Chosen, BorderWidth: 1, Radius: 8, Shadow: true}
+	context.Overlay("hover", options, func() {
+		context.Frame(ui.Layout{Direction: ui.Vertical, Width: ui.Grow(), Padding: ui.PadXY(12, 10), Gap: 2, Wrap: true}, look, func() {
+			for _, line := range lines {
+				context.Text(line, ui.TextStyle{Size: palette.SmallTextSize + 1, Color: palette.Ink})
+			}
+		})
+	})
+}

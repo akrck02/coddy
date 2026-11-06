@@ -54,6 +54,9 @@ type Window interface {
 	Run(key string, do func(stop context.Context) func())
 	// GoToDefinition opens where the name at a place of the file open is declared.
 	GoToDefinition(place Place)
+	// Hover shows what the server says of the name at a place while the pointer rests on it
+	// (resting), and stops showing it when the pointer leaves (not resting).
+	Hover(place Place, resting bool)
 }
 
 // Button is a button of the header a mode adds, such as Viewed: its icon, its tooltip, and
@@ -109,6 +112,13 @@ type Viewer struct {
 	selecting bool // a press in the code is dragging a selection
 	// ColourPause is how long typing must stop before the file is coloured again
 	ColourPause time.Duration
+	// HoverPause is how long the pointer rests on a name before the window is asked about it
+	HoverPause time.Duration
+	rest       resting
+	// clicked is the place of the code clicked last, in any view: what F12 and ⇧F12 ask about
+	// when there is no caret
+	clicked     Place
+	clickedSome bool
 	// codeLeft and codeWidth are where the code was painted last, to find what a click is on
 	codeLeft, codeWidth float32
 
@@ -122,7 +132,7 @@ type Viewer struct {
 // New makes a view with no file open.
 func New() Viewer {
 	return Viewer{openedFolds: map[int]bool{}, codeSize: 13, rowHeight: codeRowHeight, List: pane.Scroller{RowHeight: codeRowHeight},
-		ColourPause: colourPause}
+		ColourPause: colourPause, HoverPause: hoverPause}
 }
 
 // IsOpen tells whether a file is shown.
@@ -153,6 +163,7 @@ func (view *Viewer) Start(reference workspace.FileReference, project *workspace.
 	view.showing = true
 	view.openedFolds = map[int]bool{}
 	view.List.Offset, view.List.OffsetX = 0, 0
+	view.clickedSome = false
 }
 
 // Show puts a file's text in the view once it has been read: as its diff when showChanges asks for
@@ -415,10 +426,14 @@ func (view *Viewer) followInput(context *ui.Context, window Window) {
 			view.openFold(index)
 		}
 	}
-	if place, found := view.PlaceAt(x, y); clicked && keys.Command() && found {
-		window.GoToDefinition(place)
-		return
+	if place, found := view.PlaceAt(x, y); clicked && found {
+		view.clicked, view.clickedSome = place, true
+		if keys.Command() {
+			window.GoToDefinition(place)
+			return
+		}
 	}
+	view.hoverAt(context, window, x, y)
 	if view.Editable() && !window.ReadOnly() && !onBar {
 		view.followPointer(keys, x, y, clicked)
 	}

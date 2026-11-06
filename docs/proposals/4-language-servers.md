@@ -109,7 +109,7 @@ than hidden.
 - [x] T2 — A fake server for the tests, a small Go program in `testdata` that answers from a table · serves R1–R3 · test: it is what T3–T5 use
 - [x] T3 — Starting and stopping servers, the table of servers, a missing server · serves R5, R9 · test: `TestAServerStartsOnFirstUse`, `TestServersStopWithTheWindow`, `TestAMissingServerIsNamed`
 - [x] T4 — Definition and back · serves R1, R4 · test: `TestDefinitionOpensTheDeclaration`, `TestBackReturnsToThePlaceBefore`
-- [ ] T5 — References and hover · serves R2, R3 · test: `TestReferencesAreListed`, `TestHoverShowsTheServersText`
+- [x] T5 — References and hover · serves R2, R3 · test: `TestReferencesAreListed`, `TestHoverShowsTheServersText`
 - [ ] T6 — What servers write: the list before, the comparison, the record on disk · serves R6 · test: `TestFilesWrittenByAServerAreNotChanges`
 - [ ] T7 — The badge and the list of a server's files · serves R7 · test: `TestFilesWrittenByAServerAreListed`
 - [ ] T8 — Refusing `applyEdit` · serves R8 · test: `TestApplyEditIsRefused`

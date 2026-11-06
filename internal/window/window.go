@@ -93,6 +93,9 @@ type Window struct {
 	questions   questions
 	servers     languageServers
 	trail       trail
+	hover       hoverCard
+	// pointer is where the pointer was in the last frame, for a card shown under it
+	pointerX, pointerY float32
 }
 
 // New makes a reader for these settings, with its modes in the rail's order; Driver must be given
@@ -119,6 +122,7 @@ func New(settings Settings, modes ...mode.Mode) (*Window, error) {
 	application.viewer = viewer.New()
 	if settings.Synchronous {
 		application.viewer.ColourPause = 0 // one frame, or a test: colour at once
+		application.viewer.HoverPause = 0
 	}
 	application.setLook()
 	application.openFolders(settings.Folders)

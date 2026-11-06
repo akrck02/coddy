@@ -166,15 +166,15 @@ type FileReference struct {
 	Path    string
 }
 
-// LineOfFile is a line of a file on disk, from 0; "" when there is no such line.
-func LineOfFile(path string, line int) string {
+// LinesOfFile are the lines of a file on disk, without their endings; none when it cannot be read.
+func LinesOfFile(path string) []string {
 	content, err := os.ReadFile(path)
 	if err != nil {
-		return ""
+		return nil
 	}
 	lines := strings.Split(string(content), "\n")
-	if line < 0 || line >= len(lines) {
-		return ""
+	for index, line := range lines {
+		lines[index] = strings.TrimSuffix(line, "\r")
 	}
-	return strings.TrimSuffix(lines[line], "\r")
+	return lines
 }

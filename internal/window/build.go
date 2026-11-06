@@ -49,6 +49,8 @@ func (application *Window) Build(context *ui.Context) {
 	application.buildHelp(context)
 	application.buildPicker(context)
 	application.buildQuestions(context)
+	application.buildHover(context)
+	application.pointerX, application.pointerY = context.Pointer()
 	if application.toast != "" {
 		context.Toast(application.toast, false)
 		application.toast = ""

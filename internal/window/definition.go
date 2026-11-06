@@ -39,21 +39,28 @@ func (application *Window) here() (spot, bool) {
 // readyServer is the running server of the file open and the file's path, after telling it the
 // text as it is now; otherwise it says why there is none.
 func (application *Window) readyServer() (*lsp.Client, string, bool) {
+	client, path, why := application.runningServer()
+	if why != "" {
+		application.toast = why
+	}
+	return client, path, why == ""
+}
+
+// runningServer is readyServer without a word: why there is no server, if there is none.
+func (application *Window) runningServer() (client *lsp.Client, path, why string) {
 	server, root, path, found := application.serverOfOpenFile()
 	servers := &application.servers
 	switch {
 	case !found:
-		application.toast = "No language server reads this file"
+		return nil, "", "No language server reads this file"
 	case servers.missing[server.Name]:
-		application.toast = server.Name + " is not installed: " + server.Install
-	case servers.running[serverKey(server, root)] == nil:
-		application.serveOpenFile()
-		application.toast = server.Name + " is starting: try again in a moment"
-	default:
-		application.serveOpenFile()
-		return servers.running[serverKey(server, root)], path, true
+		return nil, "", server.Name + " is not installed: " + server.Install
 	}
-	return nil, "", false
+	application.serveOpenFile()
+	if client = servers.running[serverKey(server, root)]; client == nil {
+		return nil, "", server.Name + " is starting: try again in a moment"
+	}
+	return client, path, ""
 }
 
 // positionOf is a place of the file open as the protocol counts it.
@@ -88,10 +95,10 @@ func (application *Window) GoToDefinition(place viewer.Place) {
 	})
 }
 
-// definitionAtCaret goes to the declaration of the name at the caret.
-func (application *Window) definitionAtCaret() {
-	place, editing := application.viewer.Caret()
-	if !editing {
+// definitionAsked goes to the declaration of the name at the caret, or clicked last.
+func (application *Window) definitionAsked() {
+	place, found := application.viewer.PlaceAsked()
+	if !found {
 		application.toast = "⌘-click a name to go to its declaration"
 		return
 	}
@@ -126,7 +133,11 @@ func lineOf(path string, line int, application *Window) string {
 	if view.IsOpen() && view.Project != nil && filepath.Join(view.Project.Path, filepath.FromSlash(view.Reference.Path)) == path {
 		return view.LineText(line)
 	}
-	return workspace.LineOfFile(path, line)
+	lines := workspace.LinesOfFile(path)
+	if line < 0 || line >= len(lines) {
+		return ""
+	}
+	return lines[line]
 }
 
 // referenceOf is the file of a project open at a path on disk: in the project nearest to it, as

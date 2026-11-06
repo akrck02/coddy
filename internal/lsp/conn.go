@@ -165,7 +165,8 @@ func (conn *Conn) read(reader *bufio.Reader) {
 	}
 }
 
-// dispatch hands a reply to the request waiting for it, and the server's own messages to the handler.
+// dispatch hands a reply to the request waiting for it, and the other side's own messages to the
+// handler: its notifications one after another, its requests each on its own goroutine.
 func (conn *Conn) dispatch(incoming message) {
 	if incoming.Method == "" {
 		if incoming.ID == nil {
@@ -180,7 +181,11 @@ func (conn *Conn) dispatch(incoming message) {
 		}
 		return
 	}
-	go conn.answer(incoming)
+	if incoming.ID == nil {
+		conn.answer(incoming) // in order: a didChange is never handled before its didOpen
+		return
+	}
+	go conn.answer(incoming) // a request may take long, and must not hold up the others
 }
 
 // answer runs the handler on a message of the server, and replies when it was a request.

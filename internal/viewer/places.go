@@ -46,6 +46,15 @@ func (view *Viewer) Caret() (Place, bool) {
 	return Place{Line: caret.Line, Column: caret.Column}, true
 }
 
+// PlaceAsked is the place a command about a name asks about: the caret while editing, otherwise
+// the place clicked last.
+func (view *Viewer) PlaceAsked() (Place, bool) {
+	if place, editing := view.Caret(); editing {
+		return place, true
+	}
+	return view.clicked, view.clickedSome && view.showing
+}
+
 // LineText is the text of a line of the file as it is now, edits included.
 func (view *Viewer) LineText(index int) string {
 	if index < 0 || index >= view.fileLineCount() {
@@ -75,4 +84,12 @@ func (view *Viewer) PlaceCaret(place Place) {
 		view.Edit.Place(text.Position(place), false)
 		view.revealCaret()
 	}
+}
+
+// PointOf is the middle of a place of the file view, where it was drawn last: what a test points
+// at, and where a card about a name goes.
+func (view *Viewer) PointOf(place Place) (x, y float32) {
+	x = view.codeLeft + (float32(place.Column)+0.5)*view.charWidth - view.List.OffsetX
+	y = view.List.Area.Y + (float32(place.Line)+0.5)*view.List.RowHeight - view.List.Offset
+	return x, y
 }

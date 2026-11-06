@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"strconv"
 	"testing"
 	"time"
 )
@@ -73,6 +74,29 @@ func TestANotificationReachesTheHandler(test *testing.T) {
 		}
 	case <-time.After(time.Second):
 		test.Fatal("the notification never arrived")
+	}
+}
+
+func TestNotificationsAreHandledInTheOrderSent(test *testing.T) {
+	heard := make(chan string, 200)
+	client, _ := pair(nil, func(_ string, params json.RawMessage) (any, error) {
+		heard <- string(params)
+		return nil, nil
+	})
+	for number := range 200 {
+		if err := client.Notify("textDocument/didChange", number); err != nil {
+			test.Fatal(err)
+		}
+	}
+	for number := range 200 {
+		select {
+		case got := <-heard:
+			if got != strconv.Itoa(number) {
+				test.Fatalf("notification %d was heard as %s", number, got)
+			}
+		case <-time.After(time.Second):
+			test.Fatalf("notification %d never arrived", number)
+		}
 	}
 }
 

@@ -25,8 +25,9 @@ import (
 type Scope int
 
 const (
-	NamesScope   Scope = iota // fuzzy, over every file's project and path
-	ContentScope              // the lines that hold the text typed, in every file
+	NamesScope      Scope = iota // fuzzy, over every file's project and path
+	ContentScope                 // the lines that hold the text typed, in every file
+	ReferencesScope              // the places a name is used, from a language server; typing narrows them
 )
 
 // Window is what the finder needs from the window it opens over.
@@ -70,6 +71,10 @@ type Finder struct {
 	Hits      []ContentHit
 	searching bool
 	truncated bool
+
+	// the uses of a name a language server found, all of them; Hits are those the query keeps
+	Name       string
+	references []ContentHit
 }
 
 // ContentHit is a line found by the content search.
@@ -78,6 +83,7 @@ type ContentHit struct {
 	changed bool
 	status  git.Status
 	git.Hit
+	length int // how many characters were found, for a use of a name; 0 is the query's length
 }
 
 const (
@@ -112,14 +118,14 @@ func (finder *Finder) setScope(scope Scope) {
 }
 
 func (finder *Finder) count() int {
-	if finder.Scope == ContentScope {
+	if finder.Scope != NamesScope {
 		return len(finder.Hits)
 	}
 	return len(finder.matches)
 }
 
 func (finder *Finder) rowHeight() float32 {
-	if finder.Scope == ContentScope {
+	if finder.Scope != NamesScope {
 		return contentRowHeight
 	}
 	return finderRowHeight
@@ -133,8 +139,12 @@ func (finder *Finder) refresh(window Window) {
 	finder.Stale = false
 	finder.selected = 0
 	finder.list.Offset = 0
-	if finder.Scope == NamesScope {
+	switch finder.Scope {
+	case NamesScope:
 		finder.matches = FuzzyFind(window.Candidates(), finder.Query, finderLimit)
+		return
+	case ReferencesScope:
+		finder.Hits = narrowed(finder.references, finder.Query, window)
 		return
 	}
 	finder.searchContent(window, strings.TrimSpace(finder.Query))
@@ -211,7 +221,7 @@ func (finder *Finder) takeHits(window Window, projects []searchedProject, found 
 		project := window.Projects()[index]
 		for _, hit := range hits {
 			change, changed := project.ChangeOf(hit.Path)
-			finder.Hits = append(finder.Hits, ContentHit{index, changed, change.Status, hit})
+			finder.Hits = append(finder.Hits, ContentHit{index, changed, change.Status, hit, 0})
 		}
 	}
 	// the development's own files first: they are what is being reviewed
@@ -232,7 +242,7 @@ func (finder *Finder) choose(window Window) {
 	}
 	var reference workspace.FileReference
 	line := 0
-	if finder.Scope == ContentScope {
+	if finder.Scope != NamesScope {
 		hit := finder.Hits[finder.selected]
 		reference, line = workspace.FileReference{Project: hit.project, Path: hit.Path}, hit.Line
 	} else {
@@ -274,8 +284,10 @@ func (finder *Finder) followKeys(keys pane.Keys) {
 		finder.selected += finderRows
 	case keys.Typed(input.KeyPageUp):
 		finder.selected -= finderRows
+	case keys.Pressed(input.KeyTab) && finder.Scope == NamesScope:
+		finder.setScope(ContentScope)
 	case keys.Pressed(input.KeyTab):
-		finder.setScope(1 - finder.Scope)
+		finder.setScope(NamesScope)
 	}
 }
 
@@ -295,7 +307,7 @@ func (finder *Finder) buildPanel(context *ui.Context, window Window) {
 		submitted = true
 	}
 	rows := min(max(count, 1), finderRows)
-	if finder.Scope == ContentScope {
+	if finder.Scope != NamesScope {
 		rows = min(max(count, 1), contentRows)
 	}
 	height := float32(rows) * finder.rowHeight()
@@ -318,8 +330,11 @@ func (finder *Finder) buildQuery(context *ui.Context, window Window) bool {
 	pill := ui.Look{Fill: look.Hover.WithAlpha(0.7), Radius: 20, Border: palette.Primary.WithAlpha(0.5), BorderWidth: 1}
 	context.Frame(ui.Layout{Width: ui.Grow(), Height: ui.Fixed(40), Padding: ui.Padding{Left: 14, Right: 5}, Gap: 10, AlignY: ui.Center}, pill, func() {
 		icon, placeholder := "search", "Find a file by its name, in any project"
-		if finder.Scope == ContentScope {
+		switch finder.Scope {
+		case ContentScope:
 			icon, placeholder = "text-search", "Find a text in the files of every project"
+		case ReferencesScope:
+			icon, placeholder = "list-tree", "Narrow the uses of "+finder.Name+" by file or line"
 		}
 		context.IconSized(icon, 16, palette.InkSoft)
 		if finder.focusNext {
@@ -347,6 +362,8 @@ func (finder *Finder) buildFooter(context *ui.Context) {
 			context.Text("Searching…", quiet)
 		case finder.Scope == ContentScope && utf8.RuneCountInString(strings.TrimSpace(finder.Query)) < contentMinLength:
 			context.Text("Type two letters or more; a capital makes it match case", quiet)
+		case finder.Scope == ReferencesScope:
+			context.Text(fmt.Sprintf("%d of %d uses of %s", len(finder.Hits), len(finder.references), finder.Name), quiet)
 		case finder.Scope == ContentScope:
 			words := fmt.Sprintf("%d lines", len(finder.Hits))
 			if finder.truncated {
@@ -380,7 +397,10 @@ func (finder *Finder) paint(context *ui.Context, window Window, drawing *draw2d.
 	drawing.PushClip(area)
 	if finder.count() == 0 {
 		message := "No file matches"
-		if finder.Scope == ContentScope {
+		switch finder.Scope {
+		case ReferencesScope:
+			message = "No use left"
+		case ContentScope:
 			message = "No line holds it"
 			if finder.searching || utf8.RuneCountInString(strings.TrimSpace(finder.Query)) < contentMinLength {
 				message = ""
@@ -400,7 +420,7 @@ func (finder *Finder) paint(context *ui.Context, window Window, drawing *draw2d.
 		case hovered:
 			drawing.Rectangle(rowArea, 8, window.Look().Hover, draw2d.Color{}, 0)
 		}
-		if finder.Scope == ContentScope {
+		if finder.Scope != NamesScope {
 			finder.paintHit(context, window, drawing, finder.Hits[index], rowArea)
 		} else {
 			finder.paintName(context, window, drawing, finder.matches[index], rowArea)
@@ -464,6 +484,9 @@ func (finder *Finder) paintHit(context *ui.Context, window Window, drawing *draw
 	shown := text[start:]
 	codeBaseline := row.Y + 8 + code.Ascent
 	found := utf8.RuneCountInString(strings.TrimSpace(finder.asked))
+	if hit.length > 0 {
+		found = hit.length
+	}
 	matchX := left + float32(utf8.RuneCountInString(text[start:min(column, len(text))]))*code.Width
 	wash := draw2d.Rectangle{X: matchX - 1, Y: row.Y + 6, Width: float32(found)*code.Width + 2, Height: code.Ascent + code.Descent + 4}
 	drawing.Rectangle(wash, 3, palette.Primary.WithAlpha(0.3), draw2d.Color{}, 0)
