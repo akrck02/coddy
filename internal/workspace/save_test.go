@@ -64,3 +64,20 @@ func TestSavingANewFileCreatesIt(test *testing.T) {
 		test.Errorf("the new file holds %q", content)
 	}
 }
+
+func TestSavingALinkWritesTheFileItPointsAt(test *testing.T) {
+	project := projectWith(test, "real.txt", "a\n", 0o644)
+	if err := os.Symlink("real.txt", filepath.Join(project.Path, "link.txt")); err != nil {
+		test.Fatal(err)
+	}
+	read, _ := StampOf(project, "link.txt")
+	if _, err := Save(project, "link.txt", "b\n", read); err != nil {
+		test.Fatal(err)
+	}
+	if info, _ := os.Lstat(filepath.Join(project.Path, "link.txt")); info.Mode()&os.ModeSymlink == 0 {
+		test.Error("the link was replaced by a file")
+	}
+	if content, _ := os.ReadFile(filepath.Join(project.Path, "real.txt")); string(content) != "b\n" {
+		test.Errorf("the file pointed at holds %q", content)
+	}
+}

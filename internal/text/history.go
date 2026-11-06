@@ -25,6 +25,7 @@ type edit struct {
 	removed, inserted         string
 	caretBefore, anchorBefore Position
 	caretAfter                Position
+	removedBreaks             []string // the line endings removed, as they were, to undo exactly
 	kind                      editKind
 	version                   int
 }
@@ -35,6 +36,9 @@ type history struct {
 	version      int // grows with every change, undoing included
 	savedVersion int
 	nextVersion  int
+	// baseVersion is the version of the text under the oldest edit kept: 0, the text as read,
+	// until the oldest edits are dropped
+	baseVersion int
 }
 
 // push keeps an edit, joined to the one before when both are the same word typed or deleted.
@@ -50,6 +54,7 @@ func (history *history) push(record edit) {
 		return
 	}
 	if len(history.undo) == mostUndoSteps {
+		history.baseVersion = history.undo[0].version
 		history.undo = append(history.undo[:0], history.undo[1:]...)
 	}
 	history.undo = append(history.undo, record)
@@ -99,7 +104,7 @@ func (buffer *Buffer) Undo() bool {
 	}
 	record := history.undo[count-1]
 	history.undo = history.undo[:count-1]
-	buffer.replace(record.start, endOf(record.start, record.inserted), record.removed)
+	buffer.replace(record.start, endOf(record.start, record.inserted), record.removed, record.removedBreaks)
 	buffer.caret, buffer.anchor = record.caretBefore, record.anchorBefore
 	buffer.goalColumn = buffer.caret.Column
 	history.redo = append(history.redo, record)
@@ -116,17 +121,17 @@ func (buffer *Buffer) Redo() bool {
 	}
 	record := history.redo[count-1]
 	history.redo = history.redo[:count-1]
-	after := buffer.replace(record.start, endOf(record.start, record.removed), record.inserted)
+	after, _ := buffer.replace(record.start, endOf(record.start, record.removed), record.inserted, nil)
 	buffer.Place(after, false)
 	history.undo = append(history.undo, record)
 	history.version = record.version
 	return true
 }
 
-// topVersion is the version of the text the edits still kept make: 0 for the text as read.
+// topVersion is the version of the text the edits still kept make: the base when none are.
 func (history *history) topVersion() int {
 	if len(history.undo) == 0 {
-		return 0
+		return history.baseVersion
 	}
 	return history.undo[len(history.undo)-1].version
 }

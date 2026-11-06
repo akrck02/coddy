@@ -117,3 +117,15 @@ func TestOnlyTheLastStepsAreKept(test *testing.T) {
 		test.Errorf("undid %d steps, want %d", undone, mostUndoSteps)
 	}
 }
+
+func TestUndoingEverythingKeptStaysModifiedOnceOldEditsAreDropped(test *testing.T) {
+	buffer := New("")
+	for range mostUndoSteps + 1 {
+		buffer.Paste("x")
+	}
+	for buffer.Undo() {
+	}
+	if buffer.Text() == "" || !buffer.Modified() {
+		test.Errorf("after undoing every edit kept, the text is %q and modified is %v", buffer.Text(), buffer.Modified())
+	}
+}

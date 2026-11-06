@@ -82,12 +82,26 @@ func writeWhole(full string, content []byte) error {
 	return os.Rename(temporary.Name(), full)
 }
 
-// pathIn is the full path of a file of a project, refusing a path that leads out of it.
+// pathIn is the full path of a file of a project, refusing a path that leads out of it. A link is
+// followed, so saving writes the file it points at, never over the link, and only inside the project.
 func pathIn(project *Project, path string) (string, error) {
 	full := filepath.Join(project.Path, filepath.FromSlash(path))
-	inside, err := filepath.Rel(project.Path, full)
-	if err != nil || inside == ".." || strings.HasPrefix(inside, ".."+string(filepath.Separator)) || filepath.IsAbs(path) {
+	if filepath.IsAbs(path) || !inside(project.Path, full) {
+		return "", failure.Wrap(OutsideTheProject, path, nil)
+	}
+	target, err := filepath.EvalSymlinks(full)
+	if err != nil || target == full {
+		return full, nil // a new file, or not a link
+	}
+	root, err := filepath.EvalSymlinks(project.Path)
+	if err != nil || !inside(root, target) {
 		return "", failure.Wrap(OutsideTheProject, path, err)
 	}
-	return full, nil
+	return target, nil
+}
+
+// inside tells whether a path lies inside a folder.
+func inside(folder, path string) bool {
+	relative, err := filepath.Rel(folder, path)
+	return err == nil && relative != ".." && !strings.HasPrefix(relative, ".."+string(filepath.Separator))
 }

@@ -135,7 +135,8 @@ var commands = []command{
 		do: func(application *Window, _ *ui.Context, _ int) { application.toggleFocus() }},
 	{description: "Next / previous changed file, across every project",
 		keys: []pane.Press{{Key: input.KeyN, Label: "n", Step: 1}, {Key: input.KeyM, Label: "m", Step: -1},
-			{Key: input.KeyN, Command: true, Label: "⌘N", Step: 1}, {Key: input.KeyM, Command: true, Label: "⌘M", Step: -1}},
+			// with Shift: macOS's window menu takes ⌘M to minimize
+			{Key: input.KeyN, Command: true, Shift: true, Label: "⌘⇧N", Step: 1}, {Key: input.KeyM, Command: true, Shift: true, Label: "⌘⇧M", Step: -1}},
 		do: func(application *Window, _ *ui.Context, step int) { application.stepChangedFile(step) }},
 	{description: "Next / previous change in the file",
 		keys: []pane.Press{{Key: input.KeyRightBracket, Label: "]", Step: 1, AnyModifiers: true}, {Key: input.KeyLeftBracket, Label: "[", Step: -1, AnyModifiers: true},
@@ -153,10 +154,7 @@ var commands = []command{
 		do: func(application *Window, _ *ui.Context, _ int) { application.setOnlyChanged(!application.onlyChanged) }},
 	{description: "Count the changes not committed yet, or only commits", keys: []pane.Press{pane.Key(input.KeyW, "w"), pane.CommandShiftKey(input.KeyW, "⌘⇧W")},
 		do: func(application *Window, _ *ui.Context, _ int) {
-			application.settings.WorkingTree = !application.settings.WorkingTree
-			application.clearDocuments()
-			application.reloadAll()
-			application.toast = workingTreeNote(application.settings.WorkingTree)
+			application.keepingEdits(application.toggleWorkingTree)
 		}},
 	{description: "Read-only: files are only read, or can be edited",
 		keys: []pane.Press{pane.Key(input.KeyL, "l"), pane.CommandShiftKey(input.KeyL, "⌘⇧L")},

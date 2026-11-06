@@ -42,6 +42,7 @@ func (view *Viewer) startEditing() {
 		return
 	}
 	view.Edit = text.New(document.Text)
+	view.editedFrom = document.Stamp
 	view.coloured, view.colouredVersion = document.NewLines, view.Edit.Version()
 	view.indent = "    "
 	if strings.HasPrefix(document.Text, "\t") || strings.Contains(document.Text, "\n\t") {
@@ -54,9 +55,10 @@ func (view *Viewer) startEditing() {
 func (view *Viewer) keepEditing() {
 	buffer, document := view.Edit, view.Document
 	switch {
+	case buffer != nil && buffer.Modified():
+		// the edits stay, still measured against the file as they started from it
 	case buffer == nil || !document.Editable:
 		view.startEditing()
-	case buffer.Modified():
 	case buffer.Text() == document.Text:
 		view.coloured, view.colouredVersion = document.NewLines, buffer.Version()
 	default:
@@ -69,10 +71,16 @@ func (view *Viewer) keepEditing() {
 // Unsaved tells whether the file open has edits not saved.
 func (view *Viewer) Unsaved() bool { return view.showing && view.Edit != nil && view.Edit.Modified() }
 
+// EditedFrom is what the file was when the edits started from it, for saving over it safely.
+func (view *Viewer) EditedFrom() workspace.Stamp { return view.editedFrom }
+
 // Saved records that the buffer was written: what it wrote, and the file's stamp now.
 func (view *Viewer) Saved(content string, stamp workspace.Stamp) {
 	view.Edit.MarkSaved()
-	view.Document.Text, view.Document.Stamp = content, stamp
+	view.editedFrom = stamp
+	if view.Document != nil {
+		view.Document.Text, view.Document.Stamp = content, stamp
+	}
 }
 
 // Discard drops the edits not saved, going back to the file as read.
@@ -191,8 +199,7 @@ func (view *Viewer) changeByKeys(buffer *text.Buffer, keys pane.Keys) {
 	case keys.Typed(input.KeyDelete):
 		buffer.Delete()
 	case keys.Typed(input.KeyEnter):
-		line := buffer.Line(buffer.Caret().Line)
-		buffer.Insert("\n" + line[:len(line)-len(strings.TrimLeft(line, " \t"))])
+		buffer.Insert("\n" + indentBefore(buffer))
 	case keys.Typed(input.KeyTab) && !keys.Command():
 		buffer.Insert(view.indent)
 	}
@@ -204,6 +211,14 @@ func (view *Viewer) changeByKeys(buffer *text.Buffer, keys pane.Keys) {
 			buffer.Insert(string(character))
 		}
 	}
+}
+
+// indentBefore is the indentation of the caret's line, as far as the caret: Enter at the start of
+// a line or inside its indent keeps only what is before the caret.
+func indentBefore(buffer *text.Buffer) string {
+	caret := buffer.Caret()
+	before := string([]rune(buffer.Line(caret.Line))[:caret.Column])
+	return before[:len(before)-len(strings.TrimLeft(before, " \t"))]
 }
 
 // colourLater colours the buffer again in the background, once typing has stopped for a moment;

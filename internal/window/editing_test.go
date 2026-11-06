@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/akrck02/code-review/internal/text"
 	"github.com/akrck02/go-renderer/input"
 )
 
@@ -102,5 +103,19 @@ func TestReadOnlyModeSavesNothing(test *testing.T) {
 	press(window, input.KeyL) // in read-only mode nothing is edited, so the letter runs its command
 	if application.ReadOnly() {
 		test.Error("l did not turn the read-only mode off again")
+	}
+}
+
+func TestEnterAtTheStartOfALineKeepsItsIndent(test *testing.T) {
+	application, window := editingAFile(test)
+	view := &application.viewer
+	view.Apply(application, func(buffer *text.Buffer) {
+		buffer.Paste("    indented\n")
+		buffer.Move(text.Up, false)
+		buffer.Move(text.LineStart, false)
+	})
+	press(window, input.KeyEnter)
+	if line := view.Edit.Line(1); line != "    indented" {
+		test.Errorf("the line moved down reads %q", line)
 	}
 }

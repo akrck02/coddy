@@ -146,6 +146,10 @@ func (application *Window) Closed() { windowOpen.Store(false) }
 
 // openFolders adds repositories, or the repositories inside folders, and reads them.
 func (application *Window) openFolders(folders []string) {
+	if application.viewer.Unsaved() {
+		application.keepingEdits(func() { application.openFolders(folders) })
+		return
+	}
 	known := map[string]bool{}
 	for _, project := range application.projects {
 		known[project.Path] = true
@@ -171,6 +175,10 @@ func (application *Window) openFolders(folders []string) {
 
 // closeAll forgets every project.
 func (application *Window) closeAll() {
+	if application.viewer.Unsaved() {
+		application.keepingEdits(application.closeAll)
+		return
+	}
 	application.projects = nil
 	application.folders = nil
 	application.documentCache = map[workspace.FileReference]*workspace.Document{}

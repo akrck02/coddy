@@ -18,7 +18,10 @@ func (position Position) Before(other Position) bool {
 // Buffer is the text of a file being edited, with its caret and selection and what can be undone.
 // The selection runs from the anchor to the caret; when they are equal nothing is selected.
 type Buffer struct {
-	lines         [][]rune
+	lines [][]rune
+	// breaks are the line endings, breaks[i] after lines[i], each as read: "\n" or "\r\n".
+	// lineEnding is the one most lines end with, which a new line break gets.
+	breaks        []string
 	lineEnding    string
 	caret, anchor Position
 	// goalColumn is the column moving up and down aims for, kept across short lines.
@@ -26,36 +29,45 @@ type Buffer struct {
 	history    history
 }
 
-// New starts editing a text. Its line endings are kept: a file written with "\r\n" is saved with
-// them.
+// New starts editing a text. Its line endings are kept, each as it was: a file written with
+// "\r\n", or with both, is saved as it was read.
 func New(content string) *Buffer {
 	buffer := &Buffer{lineEnding: "\n"}
-	if strings.Contains(content, "\r\n") {
+	buffer.lines, buffer.breaks = splitLines(content)
+	if crlf := strings.Count(content, "\r\n"); crlf > 0 && crlf*2 >= len(buffer.breaks) {
 		buffer.lineEnding = "\r\n"
 	}
-	buffer.lines = splitLines(content)
 	return buffer
 }
 
-// splitLines cuts a text into lines of characters. A text ending in a line break ends with an
-// empty line, so writing the lines back gives the same text.
-func splitLines(content string) [][]rune {
-	content = strings.ReplaceAll(content, "\r\n", "\n")
+// splitLines cuts a text into lines of characters and the line endings between them. A text
+// ending in a line break ends with an empty line, so writing the lines back gives the same text.
+func splitLines(content string) ([][]rune, []string) {
 	parts := strings.Split(content, "\n")
 	lines := make([][]rune, len(parts))
+	breaks := make([]string, len(parts)-1)
 	for index, part := range parts {
+		if index < len(breaks) {
+			breaks[index] = "\n"
+			if strings.HasSuffix(part, "\r") {
+				part, breaks[index] = part[:len(part)-1], "\r\n"
+			}
+		}
 		lines[index] = []rune(part)
 	}
-	return lines
+	return lines, breaks
 }
 
 // Text is the whole text, with the line endings it was read with.
 func (buffer *Buffer) Text() string {
-	parts := make([]string, len(buffer.lines))
+	var builder strings.Builder
 	for index, line := range buffer.lines {
-		parts[index] = string(line)
+		builder.WriteString(string(line))
+		if index < len(buffer.breaks) {
+			builder.WriteString(buffer.breaks[index])
+		}
 	}
-	return strings.Join(parts, buffer.lineEnding)
+	return builder.String()
 }
 
 // LineCount is how many lines the text has; an empty text has one, empty.

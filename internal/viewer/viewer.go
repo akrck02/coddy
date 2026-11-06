@@ -98,7 +98,12 @@ type Viewer struct {
 	coloured        []highlight.Line
 	colouredVersion int
 	indent          string // what Tab types: a tab, or spaces, as the file indents
-	selecting       bool   // a press in the code is dragging a selection
+	// editedFrom is what the file was when the edits started from it: saving checks the disk
+	// against it, not against a file read again since
+	editedFrom workspace.Stamp
+	// reopening is the file read again where it is (Reopen), keeping its view
+	reopening bool
+	selecting bool // a press in the code is dragging a selection
 	// ColourPause is how long typing must stop before the file is coloured again
 	ColourPause time.Duration
 	// codeLeft and codeWidth are where the code was painted last, to find what a click is on
@@ -136,6 +141,7 @@ func (view *Viewer) Start(reference workspace.FileReference, project *workspace.
 	view.Request++
 	if view.Reference != reference || !view.showing {
 		view.Edit, view.selecting = nil, false // the same file read again keeps its edits
+		view.reopening = false
 	}
 	view.Reference = reference
 	view.Project = project
@@ -149,7 +155,8 @@ func (view *Viewer) Start(reference workspace.FileReference, project *workspace.
 // Show puts a file's text in the view once it has been read: as its diff when showChanges asks for
 // it and the file changed, whole otherwise.
 func (view *Viewer) Show(document *workspace.Document, showChanges bool) {
-	keepPlace := view.Document != nil && view.Document.Path == document.Path
+	keepPlace := view.reopening || (view.Document != nil && view.Document.Path == document.Path)
+	view.reopening = false
 	view.Document = document
 	view.keepEditing()
 	if !keepPlace {
@@ -203,10 +210,11 @@ func (view *Viewer) RevealLine(number int) {
 // where it was scrolled to.
 func (view *Viewer) Reopen(path string, open func(file workspace.FileReference)) {
 	if view.showing && view.Project != nil && view.Project.Path == path {
-		offset := view.List.Offset
+		offset, sideways := view.List.Offset, view.List.OffsetX
 		view.Document = nil
+		view.reopening = true
 		open(view.Reference)
-		view.List.Offset = offset
+		view.List.Offset, view.List.OffsetX = offset, sideways
 	}
 }
 

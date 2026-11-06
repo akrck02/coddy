@@ -69,19 +69,29 @@ func (buffer *Buffer) change(start, end Position, inserted string, kind editKind
 	}
 	record := edit{start: start, removed: removed, inserted: inserted, kind: kind,
 		caretBefore: buffer.caret, anchorBefore: buffer.anchor}
-	after := buffer.replace(start, end, inserted)
+	after, removedBreaks := buffer.replace(start, end, inserted, nil)
+	record.removedBreaks = removedBreaks
 	buffer.Place(after, false)
 	record.caretAfter = after
 	buffer.history.push(record)
 	return true
 }
 
-// replace swaps the text between two positions for another and returns where the new text ends.
-// It is the only place the lines change.
-func (buffer *Buffer) replace(start, end Position, text string) Position {
+// replace swaps the text between two positions for another, with "\n" between its lines, and
+// returns where the new text ends and the line endings taken out. The new line breaks are breaks,
+// or the text's usual ending when nil. It is the only place the lines change.
+func (buffer *Buffer) replace(start, end Position, text string, breaks []string) (Position, []string) {
 	before := buffer.lines[start.Line][:start.Column]
 	after := buffer.lines[end.Line][end.Column:]
-	pieces := splitLines(text)
+	pieces, _ := splitLines(text)
+	removed := append([]string(nil), buffer.breaks[start.Line:end.Line]...)
+	if breaks == nil {
+		breaks = make([]string, len(pieces)-1)
+		for index := range breaks {
+			breaks[index] = buffer.lineEnding
+		}
+	}
+	buffer.breaks = append(append(append([]string(nil), buffer.breaks[:start.Line]...), breaks...), buffer.breaks[end.Line:]...)
 	replacement := make([][]rune, len(pieces))
 	for index, piece := range pieces {
 		replacement[index] = append([]rune(nil), piece...)
@@ -98,7 +108,7 @@ func (buffer *Buffer) replace(start, end Position, text string) Position {
 	lines = append(lines, replacement...)
 	lines = append(lines, buffer.lines[end.Line+1:]...)
 	buffer.lines = lines
-	return Position{Line: start.Line + last, Column: endColumn}
+	return Position{Line: start.Line + last, Column: endColumn}, removed
 }
 
 // endOf is where a text put in at a position ends.

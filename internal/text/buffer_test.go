@@ -46,3 +46,26 @@ func TestColumnsCountCharactersNotBytes(test *testing.T) {
 		test.Errorf("the end of ñandú is at column %d, want 5", buffer.Caret().Column)
 	}
 }
+
+func TestMixedLineEndingsAreKeptEachAsItWas(test *testing.T) {
+	const content = "a\nb\r\nc\n"
+	buffer := New(content)
+	if buffer.Text() != content {
+		test.Fatalf("read and written back: %q", buffer.Text())
+	}
+	buffer.Place(Position{Line: 1, Column: 1}, false)
+	buffer.Delete() // joins b and c, taking out the "\r\n"
+	buffer.Undo()
+	if buffer.Text() != content {
+		test.Errorf("undoing a line break taken out gave %q", buffer.Text())
+	}
+}
+
+func TestANewLineBreakTakesTheTextsUsualEnding(test *testing.T) {
+	buffer := New("one\r\ntwo\r\n")
+	buffer.Place(Position{Line: 0, Column: 3}, false)
+	buffer.Insert("\n")
+	if buffer.Text() != "one\r\n\r\ntwo\r\n" {
+		test.Errorf("got %q", buffer.Text())
+	}
+}

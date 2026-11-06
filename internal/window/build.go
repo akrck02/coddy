@@ -206,10 +206,7 @@ func (application *Window) buildSettingButtons(context *ui.Context) {
 		application.setOnlyChanged(!application.onlyChanged)
 	}
 	if theme.ToolButton(context, "Count the changes not committed yet (w)", "file-pen-line", application.settings.WorkingTree) {
-		application.settings.WorkingTree = !application.settings.WorkingTree
-		application.clearDocuments()
-		application.reloadAll()
-		application.toast = workingTreeNote(application.settings.WorkingTree)
+		application.keepingEdits(application.toggleWorkingTree)
 	}
 	if theme.ToolButton(context, "Compare against another branch, tag or commit (b)", "git-branch", false) {
 		application.openBaseDialog()

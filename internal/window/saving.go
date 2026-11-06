@@ -32,6 +32,15 @@ func (application *Window) keepingEdits(then func()) {
 	application.questions.unsavedOpen, application.questions.then = true, then
 }
 
+// toggleWorkingTree counts the changes not committed yet, or the commits only; the files are read
+// again, from disk or from the last commit.
+func (application *Window) toggleWorkingTree() {
+	application.settings.WorkingTree = !application.settings.WorkingTree
+	application.clearDocuments()
+	application.reloadAll()
+	application.toast = workingTreeNote(application.settings.WorkingTree)
+}
+
 // quit closes the window, asking first about edits not saved.
 func (application *Window) quit() { application.keepingEdits(platform.Quit) }
 
@@ -41,7 +50,7 @@ func (application *Window) save() bool {
 	if view.Edit == nil || application.settings.ReadOnly {
 		return false
 	}
-	return application.write(view.Document.Stamp)
+	return application.write(view.EditedFrom())
 }
 
 // write saves the file being edited over the file on disk as read describes it, and reads its
@@ -66,21 +75,32 @@ func (application *Window) write(read workspace.Stamp) bool {
 	return true
 }
 
-// keepMine saves over the file changed on disk.
+// keepMine saves over the file changed on disk, then does what was waiting for the save.
 func (application *Window) keepMine() {
 	view := &application.viewer
-	if now, err := workspace.StampOf(view.Project, view.Reference.Path); err == nil {
-		application.write(now)
+	if now, err := workspace.StampOf(view.Project, view.Reference.Path); err == nil && application.write(now) {
+		application.doWhatWasAsked()
 	}
 }
 
-// takeTheirs drops the edits and reads the file again as it is on disk.
+// takeTheirs drops the edits and reads the file again as it is on disk, then does what was
+// waiting for the edits to be safe.
 func (application *Window) takeTheirs() {
 	view := &application.viewer
 	view.Edit = nil
 	delete(application.documentCache, view.Reference)
 	view.Document = nil
 	application.openFile(view.Reference)
+	application.doWhatWasAsked()
+}
+
+// doWhatWasAsked runs what was waiting for the edits to be saved or discarded, if anything.
+func (application *Window) doWhatWasAsked() {
+	then := application.questions.then
+	application.questions.then = nil
+	if then != nil {
+		then()
+	}
 }
 
 // buildQuestions shows the dialog about edits that is open, if one is.
@@ -103,18 +123,20 @@ func (application *Window) buildQuestions(context *ui.Context) {
 	}
 }
 
-// answerUnsaved saves or discards the edits, then does what was asked for, unless saving failed.
+// answerUnsaved saves or discards the edits, then does what was asked for. When the file changed
+// on disk, that waits for the answer to the next question; when it cannot be saved, it is dropped.
 func (application *Window) answerUnsaved(save bool) {
-	then := application.questions.then
-	application.questions.then = nil
-	if save && !application.save() {
-		return
-	}
-	if !save {
+	switch {
+	case !save:
 		application.viewer.Discard()
-	}
-	if then != nil {
-		then()
+		application.doWhatWasAsked()
+	case application.settings.ReadOnly:
+		application.toast = "Read-only: turn editing on (⌘⇧L) to save"
+		application.questions.then = nil
+	case application.save():
+		application.doWhatWasAsked()
+	case !application.questions.conflictOpen:
+		application.questions.then = nil
 	}
 }
 
@@ -127,6 +149,7 @@ func (application *Window) ask(context *ui.Context, title, caption string, answe
 			context.Spacer()
 			if context.Button("Cancel") {
 				*open = false
+				application.questions.then = nil
 			}
 			if context.Button(answers[1]) {
 				chosen = 2
@@ -138,6 +161,7 @@ func (application *Window) ask(context *ui.Context, title, caption string, answe
 	})
 	if dismissed {
 		*open = false
+		application.questions.then = nil
 	}
 	if chosen > 0 {
 		*open = false
