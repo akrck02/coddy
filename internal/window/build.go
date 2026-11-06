@@ -398,10 +398,12 @@ func (application *Window) buildHelp(context *ui.Context) {
 	dismissed := context.Sheet("Keys", ui.SheetOptions{Width: ui.Fixed(helpSheetWidth)}, func() {
 		context.Caption("The reader never changes a repository: it only runs git commands that read.")
 		context.Box(ui.Layout{Width: ui.Grow(), Gap: helpColumnGap}, func() {
-			application.buildHelpColumn(context, "Anywhere", application.helpRows(anywhere))
+			application.buildHelpColumn(context, "Anywhere", helpRows(commands, anywhere))
 			context.Box(ui.Layout{Direction: ui.Vertical, Gap: 16}, func() {
-				application.buildHelpColumn(context, "In the sidebar", application.helpRows(inSidebar))
-				application.buildHelpColumn(context, "In the file", application.helpRows(inViewer))
+				application.buildHelpColumn(context, "Modes", helpRows(application.modeCommands(), anywhere))
+				application.buildHelpColumn(context, "In the sidebar", helpRows(commands, inSidebar))
+				application.buildHelpColumn(context, "In the file", helpRows(commands, inViewer))
+				application.buildHelpColumn(context, "While editing", helpRows(commands, editing))
 			})
 		})
 		context.Row(func() {
@@ -422,11 +424,17 @@ func (application *Window) buildHelpColumn(context *ui.Context, title string, ro
 		context.Text(title, ui.TextStyle{Weight: draw2d.Bold})
 		for _, row := range rows {
 			context.Box(ui.Layout{Gap: 12}, func() {
-				context.Box(ui.Layout{Width: ui.Fixed(helpKeysWidth)}, func() {
-					context.Text(row.keys, ui.TextStyle{Weight: draw2d.Mono, Color: context.Theme.Primary})
+				keyStyle := ui.TextStyle{Weight: draw2d.Mono, Color: context.Theme.Primary}
+				context.Box(ui.Layout{Width: ui.Fixed(helpKeysWidth), Gap: 10, Wrap: true}, func() {
+					for _, key := range row.keys {
+						context.Text(key, keyStyle)
+					}
 				})
-				context.Box(ui.Layout{Width: ui.Fixed(helpTextWidth)}, func() {
-					context.Label(row.description)
+				// go-ui draws a text on one line, so the words wrap as pieces of a box
+				context.Box(ui.Layout{Width: ui.Fixed(helpTextWidth), Gap: 4, Wrap: true}, func() {
+					for _, word := range strings.Fields(row.description) {
+						context.Label(word)
+					}
 				})
 			})
 		}
@@ -436,8 +444,8 @@ func (application *Window) buildHelpColumn(context *ui.Context, title string, ro
 // helpKeysWidth and helpTextWidth are the help's columns of keys and of what they do, in points;
 // the help shows two of each side by side.
 const (
-	helpKeysWidth  = 150
-	helpTextWidth  = 250
+	helpKeysWidth  = 130
+	helpTextWidth  = 290
 	helpColumnGap  = 32
 	helpSheetWidth = 2*(helpKeysWidth+12+helpTextWidth) + helpColumnGap + 48
 )

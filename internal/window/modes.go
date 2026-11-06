@@ -64,13 +64,14 @@ func (application *Window) modeCommands() []command {
 		chosen := each
 		result = append(result, command{
 			description: chosen.Name() + " mode",
-			keys:        []pane.Press{pane.Key(input.Key1+input.Key(index), fmt.Sprint(index+1))},
-			do:          func(application *Window, _ *ui.Context, _ int) { application.setMode(chosen) },
+			keys: []pane.Press{pane.Key(input.Key1+input.Key(index), fmt.Sprint(index+1)),
+				pane.CommandKey(input.Key1+input.Key(index), fmt.Sprint("⌘", index+1))},
+			do: func(application *Window, _ *ui.Context, _ int) { application.setMode(chosen) },
 		})
 	}
 	result = append(result, command{
 		description: "The next mode",
-		keys:        []pane.Press{pane.Key(input.KeyC, "c")},
+		keys:        []pane.Press{pane.Key(input.KeyC, "c"), pane.CommandKey(input.Key0, "⌘0")},
 		do:          func(application *Window, _ *ui.Context, _ int) { application.nextMode() },
 	})
 	for _, each := range application.modes {

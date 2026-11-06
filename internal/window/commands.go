@@ -1,8 +1,6 @@
 package window
 
 import (
-	"strings"
-
 	"github.com/akrck02/code-review/internal/finder"
 	"github.com/akrck02/code-review/internal/pane"
 	"github.com/akrck02/code-review/internal/viewer"
@@ -11,13 +9,15 @@ import (
 	platform "github.com/akrck02/go-ui/window"
 )
 
-// place is where a command works: anywhere in the window, or in the pane with the keyboard.
+// place is where a command works: anywhere in the window, in the pane with the keyboard, or in a
+// file being edited, where the plain keys type and only keys with Command, F-keys and Esc run commands.
 type place int
 
 const (
 	anywhere place = iota
 	inSidebar
 	inViewer
+	editing
 )
 
 // command is one thing the reader does from the keyboard: the keys that do it, what the help says
@@ -37,6 +37,7 @@ type command struct {
 // whose key was pressed and that can act now. While a dialog is open, the dialog reads the keys.
 func (application *Window) handleKeys(context *ui.Context) {
 	dialogOpen := application.ModalOpen() || context.WantsKeyboard()
+	typing := application.editing()
 	for _, command := range application.allCommands() {
 		if dialogOpen && !command.inDialogs {
 			continue
@@ -45,6 +46,9 @@ func (application *Window) handleKeys(context *ui.Context) {
 			continue
 		}
 		for _, press := range command.keys {
+			if typing && !press.WorksWhileEditing() {
+				continue // the key types
+			}
 			if press.Matches(application.keys) {
 				command.do(application, context, press.Step)
 				return
@@ -59,9 +63,17 @@ func (application *Window) isIn(where place) bool {
 	case inSidebar:
 		return application.focus == sidebarPane
 	case inViewer:
-		return application.focus == viewerPane
+		return application.focus == viewerPane && !application.editing()
+	case editing:
+		return application.editing()
 	}
 	return true
+}
+
+// editing tells whether the keyboard is in a file being edited: the whole file, in the viewer.
+func (application *Window) editing() bool {
+	return application.editable && application.focus == viewerPane && application.viewer.IsOpen() &&
+		application.viewer.Mode == viewer.FileView
 }
 
 // commands are every shortcut of the reader, in the order they are tried. The help lists them.
@@ -69,7 +81,7 @@ var commands = []command{
 	{description: "Quit", inDialogs: true, keys: []pane.Press{pane.CommandKey(input.KeyQ, "⌘Q")},
 		do: func(*Window, *ui.Context, int) { platform.Quit() }},
 	{description: "Find a text in the files of every project (Tab switches in the finder)",
-		keys: []pane.Press{{Key: input.KeyF, Command: true, Shift: true, Label: "⌘⇧F"}, {Text: "/", Label: "/"}},
+		keys: []pane.Press{pane.CommandShiftKey(input.KeyF, "⌘⇧F"), {Text: "/", Label: "/"}},
 		do:   func(application *Window, _ *ui.Context, _ int) { application.finder.Show(finder.ContentScope) }},
 	{description: "Find a file by its name, in any project",
 		keys: []pane.Press{pane.CommandKey(input.KeyP, "⌘P"), {Key: input.KeyP, Shift: true, Label: "Shift+P"}},
@@ -83,47 +95,52 @@ var commands = []command{
 			application.reloadAll()
 			application.toast = "Reading the projects again"
 		}},
-	{description: "Compare against another branch, tag or commit", keys: []pane.Press{pane.Key(input.KeyB, "b")},
+	{description: "Compare against another branch, tag or commit", keys: []pane.Press{pane.Key(input.KeyB, "b"), pane.CommandKey(input.KeyB, "⌘B")},
 		do: func(application *Window, _ *ui.Context, _ int) { application.openBaseDialog() }},
+	{description: "Stop editing: the sidebar takes the keyboard", place: editing,
+		keys: []pane.Press{pane.AnyKey(input.KeyEscape, "Esc")},
+		do:   func(application *Window, _ *ui.Context, _ int) { application.focus = sidebarPane }},
 	{description: "Back to every project", keys: []pane.Press{pane.AnyKey(input.KeyEscape, "Esc"), pane.AnyKey(input.KeyBackspace, "Backspace")},
 		applies: func(application *Window) bool { return application.sidebar.Entered != "" },
 		do: func(application *Window, _ *ui.Context, _ int) {
 			application.sidebar.Leave(application)
 			application.focus = sidebarPane
 		}},
-	{description: "Enter the project: the sidebar lists only its tree", keys: []pane.Press{pane.Key(input.KeyE, "e")},
+	{description: "Enter the project: the sidebar lists only its tree", keys: []pane.Press{pane.Key(input.KeyE, "e"), pane.CommandKey(input.KeyE, "⌘E")},
 		do: func(application *Window, _ *ui.Context, _ int) { application.enterCurrentProject() }},
-	{description: "Move between the sidebar and the file", keys: []pane.Press{pane.AnyKey(input.KeyTab, "Tab")},
+	{description: "Move between the sidebar and the file", keys: []pane.Press{pane.AnyKey(input.KeyTab, "Tab"), pane.CommandKey(input.KeyTab, "⌃Tab")},
 		do: func(application *Window, _ *ui.Context, _ int) { application.toggleFocus() }},
 	{description: "Next / previous changed file, across every project",
-		keys: []pane.Press{{Key: input.KeyN, Label: "n", Step: 1}, {Key: input.KeyM, Label: "m", Step: -1}},
-		do:   func(application *Window, _ *ui.Context, step int) { application.stepChangedFile(step) }},
+		keys: []pane.Press{{Key: input.KeyN, Label: "n", Step: 1}, {Key: input.KeyM, Label: "m", Step: -1},
+			{Key: input.KeyN, Command: true, Label: "⌘N", Step: 1}, {Key: input.KeyM, Command: true, Label: "⌘M", Step: -1}},
+		do: func(application *Window, _ *ui.Context, step int) { application.stepChangedFile(step) }},
 	{description: "Next / previous change in the file",
-		keys: []pane.Press{{Key: input.KeyRightBracket, Label: "]", Step: 1, AnyModifiers: true}, {Key: input.KeyLeftBracket, Label: "[", Step: -1, AnyModifiers: true}},
-		do:   func(application *Window, _ *ui.Context, step int) { application.viewer.StepHunk(step) }},
-	{description: "Diff or the whole file", keys: []pane.Press{pane.Key(input.KeyD, "d")},
+		keys: []pane.Press{{Key: input.KeyRightBracket, Label: "]", Step: 1, AnyModifiers: true}, {Key: input.KeyLeftBracket, Label: "[", Step: -1, AnyModifiers: true},
+			{Key: input.KeyRightBracket, Command: true, Label: "⌘]", Step: 1}, {Key: input.KeyLeftBracket, Command: true, Label: "⌘[", Step: -1}},
+		do: func(application *Window, _ *ui.Context, step int) { application.viewer.StepHunk(step) }},
+	{description: "Diff or the whole file", keys: []pane.Press{pane.Key(input.KeyD, "d"), pane.CommandKey(input.KeyD, "⌘D")},
 		do: func(application *Window, _ *ui.Context, _ int) { application.toggleView() }},
-	{description: "Fold the unchanged lines, or show them all", keys: []pane.Press{pane.Key(input.KeyF, "f")},
+	{description: "Fold the unchanged lines, or show them all", keys: []pane.Press{pane.Key(input.KeyF, "f"), pane.CommandKey(input.KeyU, "⌘U")},
 		do: func(application *Window, _ *ui.Context, _ int) {
 			if application.viewer.Mode == viewer.DiffView {
 				application.viewer.ToggleContext()
 			}
 		}},
-	{description: "Only the projects with changes, or every project (sidebar and finder)", keys: []pane.Press{pane.Key(input.KeyH, "h")},
+	{description: "Only the projects with changes, or every project (sidebar and finder)", keys: []pane.Press{pane.Key(input.KeyH, "h"), pane.CommandShiftKey(input.KeyH, "⌘⇧H")},
 		do: func(application *Window, _ *ui.Context, _ int) { application.setOnlyChanged(!application.onlyChanged) }},
-	{description: "Count the changes not committed yet, or only commits", keys: []pane.Press{pane.Key(input.KeyW, "w")},
+	{description: "Count the changes not committed yet, or only commits", keys: []pane.Press{pane.Key(input.KeyW, "w"), pane.CommandShiftKey(input.KeyW, "⌘⇧W")},
 		do: func(application *Window, _ *ui.Context, _ int) {
 			application.settings.WorkingTree = !application.settings.WorkingTree
 			application.clearDocuments()
 			application.reloadAll()
 			application.toast = workingTreeNote(application.settings.WorkingTree)
 		}},
-	{description: "Light or dark", keys: []pane.Press{pane.Key(input.KeyT, "t")},
+	{description: "Light or dark", keys: []pane.Press{pane.Key(input.KeyT, "t"), pane.CommandShiftKey(input.KeyT, "⌘⇧T")},
 		do: func(application *Window, context *ui.Context, _ int) {
 			application.dark = !application.dark
 			application.applyTheme(context)
 		}},
-	{description: "Copy the open file's path", keys: []pane.Press{pane.Key(input.KeyY, "y")},
+	{description: "Copy the open file's path", keys: []pane.Press{pane.Key(input.KeyY, "y"), pane.CommandShiftKey(input.KeyC, "⌘⇧C")},
 		do: func(application *Window, context *ui.Context, _ int) { application.copyPath(context) }},
 	{description: "These keys", keys: []pane.Press{{Text: "?", Label: "?"}, pane.Key(input.KeyF1, "F1")},
 		do: func(application *Window, _ *ui.Context, _ int) { application.helpOpen = true }},
@@ -168,12 +185,15 @@ var commands = []command{
 }
 
 // helpRow is a command as the help shows it: its keys and what it does.
-type helpRow struct{ keys, description string }
+type helpRow struct {
+	keys        []string
+	description string
+}
 
-// helpRows lists the commands of a place for the help.
-func (application *Window) helpRows(where place) []helpRow {
+// helpRows lists the commands of a place, of those given, for the help.
+func helpRows(given []command, where place) []helpRow {
 	var rows []helpRow
-	for _, command := range application.allCommands() {
+	for _, command := range given {
 		if command.place != where {
 			continue
 		}
@@ -181,7 +201,7 @@ func (application *Window) helpRows(where place) []helpRow {
 		for index, press := range command.keys {
 			labels[index] = press.Label
 		}
-		rows = append(rows, helpRow{strings.Join(labels, "  "), command.description})
+		rows = append(rows, helpRow{labels, command.description})
 	}
 	return rows
 }

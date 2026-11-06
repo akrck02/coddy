@@ -84,7 +84,9 @@ type Window struct {
 	tap         *inputTap
 	keys        pane.Keys
 	toast       string
-	themeSet    bool
+	// editable lets the whole file take the keyboard to be edited
+	editable bool
+	themeSet bool
 }
 
 // New makes a reader for these settings, with its modes in the rail's order; Driver must be given

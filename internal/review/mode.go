@@ -175,7 +175,7 @@ func (review *Mode) openNextUnviewed(after workspace.FileReference) bool {
 func (review *Mode) Commands() []mode.Command {
 	return []mode.Command{{
 		Description: "Mark the file as viewed and open the next one not viewed",
-		Keys:        []pane.Press{pane.Key(input.KeyV, "v")},
+		Keys:        []pane.Press{pane.Key(input.KeyV, "v"), pane.CommandShiftKey(input.KeyV, "⌘⇧V")},
 		Do: func(int) {
 			if file, inViewer, found := review.window.Target(); found {
 				review.Press(file, inViewer)

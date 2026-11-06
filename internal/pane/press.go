@@ -32,7 +32,7 @@ func (press Press) Matches(keys Keys) bool {
 	case press.Text != "":
 		return strings.Contains(keys.TypedText(), press.Text)
 	case press.Command:
-		return keys.Command() && keys.Pressed(press.Key) && (!press.Shift || keys.Shift())
+		return keys.Command() && keys.Pressed(press.Key) && press.Shift == keys.Shift()
 	case press.Shift && !keys.Shift():
 		return false
 	case press.Repeats:
@@ -40,6 +40,13 @@ func (press Press) Matches(keys Keys) bool {
 	default:
 		return keys.Plain(press.Key)
 	}
+}
+
+// WorksWhileEditing tells whether the key can run a command while a file is being edited, where
+// plain keys type: a key with Command, an F-key, or Esc.
+func (press Press) WorksWhileEditing() bool {
+	functionKey := press.Key >= input.KeyF1 && press.Key <= input.KeyF12
+	return press.Text == "" && (press.Command || functionKey || press.Key == input.KeyEscape)
 }
 
 // Key is a plain key with its label.
@@ -53,6 +60,11 @@ func StepKey(code input.Key, label string, step int) Press {
 // CommandKey is a key pressed with Command.
 func CommandKey(code input.Key, label string) Press {
 	return Press{Key: code, Label: label, Command: true}
+}
+
+// CommandShiftKey is a key pressed with Command and Shift.
+func CommandShiftKey(code input.Key, label string) Press {
+	return Press{Key: code, Label: label, Command: true, Shift: true}
 }
 
 // AnyKey is a key that runs its command whatever modifiers are held.

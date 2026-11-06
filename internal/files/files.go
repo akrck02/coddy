@@ -79,7 +79,7 @@ func (files *Mode) BuildInsteadOfAFile(context *ui.Context) bool { return false 
 func (files *Mode) Commands() []mode.Command {
 	return []mode.Command{{
 		Description: "Files mode: only the changed files, or every file",
-		Keys:        []pane.Press{pane.Key(input.KeyG, "g")},
+		Keys:        []pane.Press{pane.Key(input.KeyG, "g"), pane.CommandShiftKey(input.KeyG, "⌘⇧G")},
 		Do:          func(int) { files.window.ToggleChangedFilter() },
 	}}
 }
