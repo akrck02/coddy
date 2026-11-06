@@ -85,3 +85,15 @@ func TestBackReturnsToThePlaceBefore(test *testing.T) {
 		test.Errorf("the trail keeps %d places back, want 1", len(application.trail.back))
 	}
 }
+
+func TestACancelledJumpLeavesNoTrail(test *testing.T) {
+	application, window := followingNames(test)
+	application.viewer.PlaceCaret(viewer.Place{Line: 2, Column: 2})
+	typeText(window, "x") // an edit not saved, in the comment: going to another file asks first
+	application.GoToDefinition(keeperUse)
+	window.Frames(1)
+	if !application.questions.unsavedOpen || len(application.trail.back) != 0 || application.viewer.GoToColumn != 0 {
+		test.Errorf("while asking, the trail has %d places back and the column %d is set (asking %t)",
+			len(application.trail.back), application.viewer.GoToColumn, application.questions.unsavedOpen)
+	}
+}

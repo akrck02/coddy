@@ -44,12 +44,13 @@ func TestADocumentOpenIsSentWithItsEdits(test *testing.T) {
 		test.Fatal(err)
 	}
 	path := filepath.Join(folder, "lamp.go")
-	client.Open(path, "package lamp // as read\n")
-	client.Open(path, "package lamp // edited\n")
+	client.Tell(path, "package lamp // as read\n", 1)
+	client.Tell(path, "package lamp // edited\n", 3)
+	client.Tell(path, "package lamp // older\n", 2) // overtaken: dropped
 	client.Stop()
 	content, _ := os.ReadFile(log)
 	if !strings.Contains(string(content), "opened lamp.go package lamp // as read") ||
-		!strings.Contains(string(content), "changed lamp.go package lamp // edited") {
+		!strings.Contains(string(content), "changed lamp.go package lamp // edited") || strings.Contains(string(content), "older") {
 		test.Errorf("the server heard:\n%s", content)
 	}
 	select {

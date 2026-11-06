@@ -19,7 +19,7 @@ func (application *Window) usesAsked() {
 		application.toast = "Click a name first, or place the caret on it"
 		return
 	}
-	client, path, ready := application.readyServer()
+	asked, ready := application.readyServer()
 	if !ready {
 		return
 	}
@@ -28,7 +28,8 @@ func (application *Window) usesAsked() {
 	application.work.run("references", func(stop cancellation) func() {
 		ctx, cancel := context.WithTimeout(stop, requestWait)
 		defer cancel()
-		locations, err := client.References(ctx, path, at)
+		asked.tellFirst()
+		locations, err := asked.client.References(ctx, asked.path, at)
 		return func() {
 			if err != nil {
 				application.toast = "The uses could not be found: " + err.Error()
@@ -99,7 +100,7 @@ func (application *Window) Hover(place viewer.Place, resting bool) {
 		application.hover = hoverCard{}
 		return
 	}
-	client, path, why := application.runningServer()
+	asked, why := application.runningServer()
 	if why != "" {
 		return
 	}
@@ -108,7 +109,8 @@ func (application *Window) Hover(place viewer.Place, resting bool) {
 	application.work.run("hover", func(stop cancellation) func() {
 		ctx, cancel := context.WithTimeout(stop, requestWait)
 		defer cancel()
-		text, err := client.Hover(ctx, path, at)
+		asked.tellFirst()
+		text, err := asked.client.Hover(ctx, asked.path, at)
 		return func() {
 			if err == nil && application.hover.resting && application.hover.place == place {
 				application.hover.text = text
@@ -176,9 +178,10 @@ func (application *Window) ShowServerFiles(project int) {
 	}
 	var files []finder.Use
 	for _, file := range application.projects[project].ServerFiles {
-		note := "written by " + file.Server
+		// the reader cannot tell who wrote a file outside it: it says what it saw
+		note := "new while " + file.Server + " ran: by it, or by you outside the reader"
 		if file.Existed {
-			note = "changed while " + file.Server + " ran: maybe by you, outside the reader"
+			note = "changed while " + file.Server + " ran: by it, or by you outside the reader"
 		}
 		files = append(files, finder.Use{Project: project, Path: file.Path, Line: 1, Text: note})
 	}

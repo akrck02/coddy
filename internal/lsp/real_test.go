@@ -57,7 +57,7 @@ func TestGoplsFollowsANameInThisRepository(test *testing.T) {
 	defer client.Stop()
 	use := filepath.Join(root, "internal", "window", "uses.go")
 	content, _ := os.ReadFile(use)
-	client.Open(use, string(content))
+	client.Tell(use, string(content), 1)
 	declared, err := client.Definition(ctx, use, placeOf(test, use, "PathOf("))
 	if err != nil || len(declared) == 0 || !strings.HasSuffix(PathOf(declared[0].URI), filepath.Join("lsp", "protocol.go")) {
 		test.Fatalf("PathOf is declared at %+v (%v), want internal/lsp/protocol.go", declared, err)
@@ -85,7 +85,7 @@ func TestJdtlsFollowsANameAcrossProjects(test *testing.T) {
 	defer client.Stop()
 	use := filepath.Join(keeper, "src", "keeper", "Keeper.java")
 	content, _ := os.ReadFile(use)
-	client.Open(use, string(content))
+	client.Tell(use, string(content), 1)
 	declared, err := client.Definition(ctx, use, placeOf(test, use, "beam("))
 	if err != nil || len(declared) == 0 || filepath.Base(PathOf(declared[0].URI)) != "Lamp.java" {
 		test.Errorf("beam is declared at %+v (%v), want Lamp.java", declared, err)

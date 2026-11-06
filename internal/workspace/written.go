@@ -82,31 +82,33 @@ func DefaultWrittenPath() string {
 }
 
 // SortOut takes what servers wrote out of a project just read: out of its changes, its counts and
-// its fingerprints, into ServerFiles. A file is the server's when it was recorded so, or when it
-// changed since the snapshot (nil when no server started in the project) and the reader did not
-// save it. Servers write on disk, so only a project read with the changes not committed yet holds
-// their files; one read without them is left as it is.
+// its fingerprints, into ServerFiles. Only a file that differs from the last commit on disk, and
+// that the reader did not save, can be a server's: one recorded as the server's while it keeps the
+// text the server left (or while a server runs in the project), or one that changed since the
+// snapshot (nil when no server started in the project). Anything else stays the person's: a
+// commit, a pull or another base never hides a change. A project read without the changes not
+// committed yet holds no server's file.
 func (written *Written) SortOut(project *Project, snapshot *Snapshot, workingTree bool) error {
 	project.ServerFiles = nil
-	if !workingTree {
-		return nil
-	}
 	written.mutex.Lock()
 	defer written.mutex.Unlock()
 	known := written.files[project.Path]
+	if !workingTree || (snapshot == nil && len(known) == 0) {
+		return nil
+	}
+	onDisk := notCommitted(project.Path)
 	found := map[string]ServerFile{}
 	for _, change := range project.Changes {
 		fingerprint, hashed := project.Fingerprints[change.Path]
-		if !hashed || change.Status == git.Deleted {
-			continue // a server adds and rewrites files; a file gone is the person's doing
+		if !hashed || change.Status == git.Deleted || !onDisk[change.Path] {
+			continue // a server adds and rewrites files; a file gone, or committed, is the person's
 		}
-		file, isServers := whoWrote(project, change.Path, textOf(fingerprint), known, snapshot)
-		if isServers {
+		if file, isServers := whoWrote(project, change.Path, textOf(fingerprint), known, snapshot); isServers {
 			found[change.Path] = file
 		}
 	}
 	project.leave(found)
-	if sameFiles(known, found) || (snapshot == nil && len(found) == len(known)) {
+	if sameFiles(known, found) {
 		return nil
 	}
 	if len(found) == 0 {
@@ -117,13 +119,27 @@ func (written *Written) SortOut(project *Project, snapshot *Snapshot, workingTre
 	return written.keep()
 }
 
+// notCommitted are the files of a repository that differ from its last commit on disk, or that git
+// does not know yet; none when git cannot tell, so nothing is taken for a server's.
+func notCommitted(repository string) map[string]bool {
+	changes, err := git.Changes(repository, git.Comparison{MergeBase: "HEAD", WorkingTree: true})
+	paths := map[string]bool{}
+	if err != nil {
+		return paths
+	}
+	for _, change := range changes {
+		paths[change.Path] = true
+	}
+	return paths
+}
+
 // whoWrote tells whether a changed file is a server's, and how.
 func whoWrote(project *Project, path, text string, known map[string]ServerFile, snapshot *Snapshot) (ServerFile, bool) {
 	if SavedHere(filepath.Join(project.Path, filepath.FromSlash(path)), text) {
 		return ServerFile{}, false // the person saved it in the reader
 	}
-	if file, recorded := known[path]; recorded {
-		file.Text = text
+	if file, recorded := known[path]; recorded && (file.Text == text || snapshot != nil) {
+		file.Text = text // a server running rewrites its own files
 		return file, true
 	}
 	if snapshot == nil || snapshot.Changed[path] == text {
@@ -134,13 +150,13 @@ func whoWrote(project *Project, path, text string, known map[string]ServerFile, 
 	return ServerFile{Path: path, Server: snapshot.Server, Text: text, Existed: existed}, true
 }
 
-// sameFiles tells whether two records hold the same files, written by the same servers.
+// sameFiles tells whether two records hold the same files, as the same texts by the same servers.
 func sameFiles(one, other map[string]ServerFile) bool {
 	if len(one) != len(other) {
 		return false
 	}
 	for path, file := range one {
-		if other[path].Server != file.Server || other[path].Existed != file.Existed {
+		if other[path] != file {
 			return false
 		}
 	}

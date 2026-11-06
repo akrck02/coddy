@@ -84,6 +84,16 @@ func (work *work) runSettling(key string, do func(stop cancellation) func(), set
 	}()
 }
 
+// whenDone runs then on the interface's goroutine once done is closed, waking the window: always
+// in the background, even for a capture or a test, as done may close long after.
+func (work *work) whenDone(done <-chan struct{}, then func()) {
+	go func() {
+		<-done
+		work.results <- then
+		wake()
+	}()
+}
+
 // cancel stops the job running under a key, if any, and drops its result.
 func (work *work) cancel(key string) {
 	if older, found := work.running[key]; found {

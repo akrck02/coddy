@@ -6,11 +6,13 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/akrck02/code-review/internal/lsp"
+	"github.com/akrck02/code-review/internal/text"
 	"github.com/akrck02/code-review/internal/workspace"
 )
 
@@ -20,9 +22,12 @@ type languageServers struct {
 	table    []lsp.Server
 	running  map[string]*lsp.Client // by key: the server's name, and its root when it has one
 	starting map[string]bool
-	told     map[string]int  // the version of each file each server was told, by key and path
-	missing  map[string]bool // servers not installed, by name, said once
-	stopped  bool            // the window closed: a server that starts now stops at once
+	told     map[string]told   // what each server was told of each file, by key and path
+	version  int               // grows with each text told, for every file and server
+	missing  map[string]bool   // servers not installed, by name
+	failed   map[string]string // servers that did not start, or kept stopping, by name, with why
+	crashes  map[string]int    // how many times each server stopped on its own
+	stopped  bool              // the window closed: a server that starts now stops at once
 	// snapshots are what each project held when a server started in it, by the project's folder;
 	// written is what servers wrote, kept across starts of the reader
 	snapshots map[string]*workspace.Snapshot
@@ -39,7 +44,7 @@ func newLanguageServers(table []lsp.Server, writtenPath string) languageServers 
 		table = lsp.Servers
 	}
 	return languageServers{table: table, running: map[string]*lsp.Client{}, starting: map[string]bool{},
-		told: map[string]int{}, missing: map[string]bool{}, snapshots: map[string]*workspace.Snapshot{},
+		told: map[string]told{}, missing: map[string]bool{}, failed: map[string]string{}, crashes: map[string]int{}, snapshots: map[string]*workspace.Snapshot{},
 		written: workspace.OpenWritten(writtenPath), adding: map[string]bool{}, roots: map[string]string{}}
 }
 
@@ -71,13 +76,23 @@ func (application *Window) serverOfOpenFile() (server lsp.Server, root, path str
 	return server, root, path, true
 }
 
+// told is the text of a file a server was told: the document read and the buffer editing it, at
+// a version of the buffer, and the version it was told at.
+type told struct {
+	document    *workspace.Document
+	buffer      *text.Buffer
+	editVersion int
+	version     int
+}
+
 // serveOpenFile starts the server of the file open if it is not running, and tells it the file's
-// text, edits included, whenever that changed. It runs every frame and is cheap when nothing did.
-func (application *Window) serveOpenFile() {
+// text, edits included, whenever that changed: an edit, or the file read again from disk. It runs
+// every frame and is cheap when nothing changed. It gives the server and what it was told last.
+func (application *Window) serveOpenFile() (*lsp.Client, told, string) {
 	servers := &application.servers
 	server, root, path, found := application.serverOfOpenFile()
-	if !found || servers.missing[server.Name] {
-		return
+	if !found || servers.missing[server.Name] || servers.failed[server.Name] != "" {
+		return nil, told{}, ""
 	}
 	key := serverKey(server, root)
 	client := servers.running[key]
@@ -85,27 +100,35 @@ func (application *Window) serveOpenFile() {
 		if !servers.starting[key] {
 			application.startServer(server, root, key)
 		}
-		return
+		return nil, told{}, ""
 	}
 	if project := application.viewer.Project.Path; server.OnePerWindow && !servers.adding[project] && !client.HasFolder(project) {
 		application.addFolder(client, server.Name, project)
 	}
-	version := 1
-	if application.viewer.Edit != nil {
-		version += application.viewer.Edit.Version()
+	now, text := application.textNow()
+	last := servers.told[key+"|"+path]
+	if last.document == now.document && last.buffer == now.buffer && last.editVersion == now.editVersion {
+		return client, last, text
 	}
-	if servers.told[key+"|"+path] == version {
-		return
-	}
-	servers.told[key+"|"+path] = version
-	text := application.viewer.Document.Text
-	if application.viewer.Edit != nil {
-		text = application.viewer.Edit.Text()
-	}
-	application.work.run("tell "+key+"|"+path, func(cancellation) func() {
-		_ = client.Open(path, text)
+	servers.version++
+	now.version = servers.version
+	servers.told[key+"|"+path] = now
+	application.work.run("", func(cancellation) func() {
+		_ = client.Tell(path, text, now.version) // an older text, sent late, is dropped
 		return nil
 	})
+	return client, now, text
+}
+
+// textNow is the text of the file open, edits included, and what it is made of.
+func (application *Window) textNow() (told, string) {
+	view := &application.viewer
+	now := told{document: view.Document, buffer: view.Edit}
+	if view.Edit == nil {
+		return now, view.Document.Text
+	}
+	now.editVersion = view.Edit.Version()
+	return now, view.Edit.Text()
 }
 
 // startServer starts a server in the background, once what its projects hold is noted; once it
@@ -126,8 +149,9 @@ func (application *Window) startServer(server lsp.Server, root, key string) {
 		defer cancel()
 		client, err := lsp.Start(ctx, server, root, folders, data)
 		return func() {
-			application.keepSnapshots(snapshots)
-			application.serverStarted(server, key, client, err)
+			if application.serverStarted(server, key, client, err) {
+				application.keepSnapshots(snapshots) // a server that never ran wrote nothing
+			}
 		}
 	})
 }
@@ -175,8 +199,9 @@ func (application *Window) keepSnapshots(snapshots map[string]*workspace.Snapsho
 	}
 }
 
-// serverStarted keeps a server that started, or says why it did not.
-func (application *Window) serverStarted(server lsp.Server, key string, client *lsp.Client, err error) {
+// serverStarted keeps a server that started, and watches it, or says why it did not; it tells
+// whether the server runs.
+func (application *Window) serverStarted(server lsp.Server, key string, client *lsp.Client, err error) bool {
 	servers := &application.servers
 	delete(servers.starting, key)
 	switch {
@@ -184,13 +209,41 @@ func (application *Window) serverStarted(server lsp.Server, key string, client *
 		servers.missing[server.Name] = true
 		application.toast = server.Name + " is not installed: " + server.Install
 	case err != nil:
-		servers.missing[server.Name] = true // not tried again until the reader starts again
+		servers.failed[server.Name] = err.Error() // not tried again until the reader starts again
 		application.toast = server.Name + " did not start: " + err.Error()
 	case servers.stopped:
 		go client.Stop()
 	default:
 		servers.running[key] = client
+		application.work.whenDone(client.Done(), func() { application.serverEnded(server.Name, key, client) })
+		return true
 	}
+	return false
+}
+
+// crashLimit is how many times a server may stop on its own before the reader stops starting it.
+const crashLimit = 3
+
+// serverEnded forgets a server that stopped on its own, so the next file that needs it starts it
+// again; one that keeps stopping is left stopped.
+func (application *Window) serverEnded(name, key string, client *lsp.Client) {
+	servers := &application.servers
+	if servers.stopped || servers.running[key] != client {
+		return // the window stopped it
+	}
+	delete(servers.running, key)
+	for told := range servers.told {
+		if strings.HasPrefix(told, key+"|") {
+			delete(servers.told, told)
+		}
+	}
+	servers.crashes[name]++
+	if servers.crashes[name] >= crashLimit {
+		servers.failed[name] = "it stopped " + strconv.Itoa(crashLimit) + " times"
+		application.toast = name + " stopped again: it is left stopped until the reader starts again"
+		return
+	}
+	application.toast = name + " stopped; it starts again when a file needs it"
 }
 
 // foldersFor are the workspace folders of a server that runs for the whole window: every project
@@ -262,6 +315,9 @@ func (application *Window) serverStatus() string {
 	}
 	for name := range servers.missing {
 		parts = append(parts, name+" not installed")
+	}
+	for name := range servers.failed {
+		parts = append(parts, name+" failed")
 	}
 	sort.Strings(parts)
 	return strings.Join(unique(parts), " · ")

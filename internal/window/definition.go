@@ -11,10 +11,11 @@ import (
 	"github.com/akrck02/code-review/internal/workspace"
 )
 
-// spot is a place the person was, to go back to: a file and a line of it, from 1.
+// spot is a place the person was, to go back to: a file, by its path on disk as projects may be
+// opened, closed and sorted again meanwhile, and a line of it, from 1.
 type spot struct {
-	reference workspace.FileReference
-	line      int
+	path string
+	line int
 }
 
 // trail is where following names has been: the places to go back to, and forward again.
@@ -30,37 +31,53 @@ const requestWait = 3 * time.Minute
 // here is the spot the person is at: the file open and the line to come back to.
 func (application *Window) here() (spot, bool) {
 	view := &application.viewer
-	if !view.IsOpen() {
+	if !view.IsOpen() || view.Project == nil {
 		return spot{}, false
 	}
-	return spot{reference: view.Reference, line: view.LineInSight()}, true
+	path := filepath.Join(view.Project.Path, filepath.FromSlash(view.Reference.Path))
+	return spot{path: path, line: view.LineInSight()}, true
 }
 
-// readyServer is the running server of the file open and the file's path, after telling it the
-// text as it is now; otherwise it says why there is none.
-func (application *Window) readyServer() (*lsp.Client, string, bool) {
-	client, path, why := application.runningServer()
+// asking is what a request about the file open needs: its server, its path, and its text as it is
+// now with the version it was told at.
+type asking struct {
+	client  *lsp.Client
+	path    string
+	text    string
+	version int
+}
+
+// tellFirst sends the text of the file as it was when the request was made, on the request's own
+// goroutine, so the request never reaches the server before it; a text sent already is not sent again.
+func (asked asking) tellFirst() { _ = asked.client.Tell(asked.path, asked.text, asked.version) }
+
+// readyServer is the running server of the file open, to ask it about the file; otherwise it says
+// why there is none.
+func (application *Window) readyServer() (asking, bool) {
+	asked, why := application.runningServer()
 	if why != "" {
 		application.toast = why
 	}
-	return client, path, why == ""
+	return asked, why == ""
 }
 
 // runningServer is readyServer without a word: why there is no server, if there is none.
-func (application *Window) runningServer() (client *lsp.Client, path, why string) {
-	server, root, path, found := application.serverOfOpenFile()
+func (application *Window) runningServer() (asking, string) {
+	server, _, path, found := application.serverOfOpenFile()
 	servers := &application.servers
 	switch {
 	case !found:
-		return nil, "", "No language server reads this file"
+		return asking{}, "No language server reads this file"
 	case servers.missing[server.Name]:
-		return nil, "", server.Name + " is not installed: " + server.Install
+		return asking{}, server.Name + " is not installed: " + server.Install
+	case servers.failed[server.Name] != "":
+		return asking{}, server.Name + " did not start: " + servers.failed[server.Name]
 	}
-	application.serveOpenFile()
-	if client = servers.running[serverKey(server, root)]; client == nil {
-		return nil, "", server.Name + " is starting: try again in a moment"
+	client, told, text := application.serveOpenFile()
+	if client == nil {
+		return asking{}, server.Name + " is starting: try again in a moment"
 	}
-	return client, path, ""
+	return asking{client: client, path: path, text: text, version: told.version}, ""
 }
 
 // positionOf is a place of the file open as the protocol counts it.
@@ -72,7 +89,7 @@ func (application *Window) positionOf(place viewer.Place) lsp.Position {
 // GoToDefinition asks the server of the file open where the name at a place is declared, and
 // opens it there, keeping where the person was to go back to.
 func (application *Window) GoToDefinition(place viewer.Place) {
-	client, path, ready := application.readyServer()
+	asked, ready := application.readyServer()
 	if !ready {
 		return
 	}
@@ -81,7 +98,8 @@ func (application *Window) GoToDefinition(place viewer.Place) {
 	application.work.run("definition", func(stop cancellation) func() {
 		ctx, cancel := context.WithTimeout(stop, requestWait)
 		defer cancel()
-		locations, err := client.Definition(ctx, path, at)
+		asked.tellFirst()
+		locations, err := asked.client.Definition(ctx, asked.path, at)
 		return func() {
 			switch {
 			case err != nil:
@@ -114,17 +132,20 @@ func (application *Window) goToLocation(from spot, location lsp.Location) {
 		application.toast = "Outside the projects open: " + path
 		return
 	}
-	trail := &application.trail
-	if from.line > 0 {
-		trail.back = append(trail.back, from)
-		if len(trail.back) > trailLength {
-			trail.back = trail.back[1:]
-		}
-	}
-	trail.forward = nil
 	start := location.Range.Start
-	application.viewer.GoToColumn = lsp.CharacterColumn(lineOf(path, start.Line, application), start.Character)
-	application.openFileAt(reference, start.Line+1)
+	column := lsp.CharacterColumn(lineOf(path, start.Line, application), start.Character)
+	application.leavingFor(reference, func() {
+		trail := &application.trail
+		if from.line > 0 {
+			trail.back = append(trail.back, from)
+			if len(trail.back) > trailLength {
+				trail.back = trail.back[1:]
+			}
+		}
+		trail.forward = nil
+		application.viewer.GoToColumn = column
+		application.openFileAt(reference, start.Line+1)
+	})
 }
 
 // lineOf is a line of a file, from 0, as the reader has it: edits included when it is the file open.
@@ -161,7 +182,7 @@ func (application *Window) referenceOf(path string) (workspace.FileReference, bo
 }
 
 // stepTrail goes back (step -1) to where the person was before following a name, or forward
-// again (step 1).
+// again (step 1), once the edits not saved of the file open are kept or dropped.
 func (application *Window) stepTrail(step int) {
 	trail := &application.trail
 	from, to := &trail.back, &trail.forward
@@ -172,9 +193,27 @@ func (application *Window) stepTrail(step int) {
 		return
 	}
 	target := (*from)[len(*from)-1]
-	*from = (*from)[:len(*from)-1]
-	if current, open := application.here(); open {
-		*to = append(*to, current)
+	reference, found := application.referenceOf(target.path)
+	if !found {
+		*from = (*from)[:len(*from)-1] // its project was closed
+		application.toast = "No longer open: " + target.path
+		return
 	}
-	application.openFileAt(target.reference, target.line)
+	application.leavingFor(reference, func() {
+		*from = (*from)[:len(*from)-1]
+		if current, open := application.here(); open {
+			*to = append(*to, current)
+		}
+		application.openFileAt(reference, target.line)
+	})
+}
+
+// leavingFor does what goes to another file once the edits not saved of the one open are kept or
+// dropped, as the person answers; a person who cancels stays, and nothing is done.
+func (application *Window) leavingFor(reference workspace.FileReference, going func()) {
+	if application.viewer.Reference != reference {
+		application.keepingEdits(going)
+		return
+	}
+	going()
 }

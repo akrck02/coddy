@@ -21,6 +21,7 @@ type Client struct {
 	command *exec.Cmd
 
 	lock     sync.Mutex
+	telling  sync.Mutex     // held while a document's text is sent, so texts go out in order
 	versions map[string]int // the documents opened, by URI, with the version last sent
 	folders  map[string]bool
 }
@@ -114,22 +115,30 @@ func (client *Client) handle(method string, params json.RawMessage) (any, error)
 	return nil, nil // registrations, progress and messages need no more than a reply
 }
 
-// Open tells the server about a document, with its text as the reader has it, edits included; a
-// document already open gets its new text.
-func (client *Client) Open(path, text string) error {
+// Tell tells the server a document's text as the reader has it, edits included, at a version
+// that grows with each new text (from 1): didOpen the first time, didChange afterwards. A text
+// older than the one sent already is dropped, so texts told from several goroutines never leave
+// the server on an old one.
+func (client *Client) Tell(path, text string, version int) error {
 	uri := FileURI(path)
+	client.telling.Lock()
+	defer client.telling.Unlock()
 	client.lock.Lock()
-	version, open := client.versions[uri]
-	client.versions[uri] = version + 1
+	sent, open := client.versions[uri]
+	if version <= sent {
+		client.lock.Unlock()
+		return nil
+	}
+	client.versions[uri] = version
 	client.lock.Unlock()
 	if open {
 		return client.conn.Notify("textDocument/didChange", map[string]any{
-			"textDocument":   map[string]any{"uri": uri, "version": version + 1},
+			"textDocument":   map[string]any{"uri": uri, "version": version},
 			"contentChanges": []map[string]string{{"text": text}},
 		})
 	}
 	return client.conn.Notify("textDocument/didOpen", map[string]any{"textDocument": map[string]any{
-		"uri": uri, "languageId": LanguageOf(path), "version": 1, "text": text,
+		"uri": uri, "languageId": LanguageOf(path), "version": version, "text": text,
 	}})
 }
 

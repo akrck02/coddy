@@ -266,6 +266,7 @@ func (application *Window) baseFor(path string) string {
 // projectsChanged rebuilds what is made from the projects: the finder's files, the order of the
 // changed files and the sidebar's rows.
 func (application *Window) projectsChanged() {
+	application.servers.roots = map[string]string{} // a go.mod may have come or gone
 	application.candidates = application.candidates[:0]
 	application.changedOrder = application.changedOrder[:0]
 	for index, project := range application.projects {
@@ -431,7 +432,8 @@ func (application *Window) openByLabel(label string) {
 // only the projects with changes, one that was read and has none. A project still being read, or
 // that could not be read, stays in sight.
 func (application *Window) hidden(project *workspace.Project) bool {
-	return application.onlyChanged && project.Loaded && len(project.Changes) == 0 && project.Error == ""
+	// a project where only a server wrote stays, to show its files (badge and list)
+	return application.onlyChanged && project.Loaded && len(project.Changes) == 0 && len(project.ServerFiles) == 0 && project.Error == ""
 }
 
 // setOnlyChanged shows only the projects with changes, or every project.

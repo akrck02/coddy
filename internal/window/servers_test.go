@@ -124,6 +124,9 @@ func TestAMissingServerIsNamed(test *testing.T) {
 	if shown := strings.Join(window.Texts(), " "); !strings.Contains(shown, "nols is not installed: brew install nols") {
 		test.Errorf("the window shows %q", shown)
 	}
+	if len(application.servers.snapshots) != 0 {
+		test.Error("a server that never ran left a snapshot, which would take later changes for its own")
+	}
 	if application.serverStatus() != "nols not installed" {
 		test.Errorf("the status bar says %q", application.serverStatus())
 	}
@@ -177,11 +180,59 @@ func TestFilesWrittenByAServerAreListed(test *testing.T) {
 	}
 	application.ShowServerFiles(0)
 	window.Frames(1)
-	if hits := application.finder.Hits; len(hits) != 1 || hits[0].Path != ".classpath" || hits[0].Text != "written by fakels" {
+	if hits := application.finder.Hits; len(hits) != 1 || hits[0].Path != ".classpath" || !strings.HasPrefix(hits[0].Text, "new while fakels ran") {
 		test.Fatalf("the list of the server's files is %+v", hits)
 	}
 	press(window, input.KeyEnter)
 	if application.viewer.Reference.Path != ".classpath" || application.viewer.Document == nil {
 		test.Errorf("Enter opened %q, want .classpath", application.viewer.Reference.Path)
+	}
+}
+
+func TestACommitWhileAServerRunsStaysAChange(test *testing.T) {
+	folder := makeRepository(test)
+	application := newReader(Settings{Folders: []string{folder}, WorkingTree: true, Synchronous: true,
+		Open: "lighthouse/src/lamp.go", Servers: writingServer(test)})
+	test.Cleanup(application.stopServers)
+	window := newWindow(test, application)
+	repository := filepath.Join(folder, "lighthouse")
+	os.WriteFile(filepath.Join(repository, "src", "keeper.go"), []byte("package lamp\n\ntype Keeper struct{ Night bool }\n"), 0o644)
+	for _, arguments := range [][]string{{"add", "src/keeper.go"}, {"-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "night"}} {
+		command := exec.Command("git", arguments...)
+		command.Dir = repository
+		if output, err := command.CombinedOutput(); err != nil {
+			test.Fatalf("git %v: %v\n%s", arguments, err, output)
+		}
+	}
+	application.reloadAll()
+	window.Frames(2)
+	if _, changed := application.projects[0].ChangeOf("src/keeper.go"); !changed {
+		test.Errorf("a commit made while the server ran left the review; the server's files are %+v", application.projects[0].ServerFiles)
+	}
+}
+
+func TestAServerThatStopsIsStartedAgain(test *testing.T) {
+	log := filepath.Join(test.TempDir(), "log")
+	application := readerWithServers(test, "lighthouse/src/lamp.go", fakeGo(test, log))
+	window := newWindow(test, application)
+	key := "fakels " + application.projects[0].Path
+	first := application.servers.running[key]
+	first.Stop() // as if it had crashed
+	for attempt := 0; attempt < 100 && application.servers.running[key] == first; attempt++ {
+		time.Sleep(10 * time.Millisecond)
+		window.Frames(1)
+	}
+	window.Frames(2)
+	if again := application.servers.running[key]; again == nil || again == first {
+		test.Fatalf("after it stopped, the server runs as %v (the first was %p)", again, first)
+	}
+}
+
+func TestAProjectWhereOnlyAServerWroteStaysListed(test *testing.T) {
+	application := newReader(Settings{Synchronous: true})
+	application.onlyChanged = true
+	project := &workspace.Project{Loaded: true, ServerFiles: []workspace.ServerFile{{Path: ".classpath", Server: "jdtls"}}}
+	if application.hidden(project) {
+		test.Error("a project with only a server's files is hidden, and its badge with it")
 	}
 }

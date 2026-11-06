@@ -3,6 +3,7 @@ package workspace
 import (
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 
@@ -38,6 +39,14 @@ func recordUnderAFile(test *testing.T) error {
 	blocker := filepath.Join(test.TempDir(), "a file")
 	os.WriteFile(blocker, nil, 0o644)
 	project := &Project{Path: test.TempDir(), Fingerprints: map[string]string{".classpath": "base:abc"}}
+	for _, arguments := range [][]string{{"init", "-q"}, {"-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--allow-empty", "-m", "start"}} {
+		command := exec.Command("git", arguments...)
+		command.Dir = project.Path
+		if output, err := command.CombinedOutput(); err != nil {
+			test.Fatalf("git %v: %v\n%s", arguments, err, output)
+		}
+	}
+	os.WriteFile(filepath.Join(project.Path, ".classpath"), []byte("by the server"), 0o644)
 	project.setChanges([]git.Change{{Status: git.Added, Path: ".classpath", Untracked: true}})
 	snapshot := Snapshot{Server: "jdtls", Files: map[string]bool{}, Changed: map[string]string{}}
 	return OpenWritten(filepath.Join(blocker, "wrote.json")).SortOut(project, &snapshot, true)
