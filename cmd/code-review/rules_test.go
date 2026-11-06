@@ -50,6 +50,25 @@ func TestNoErrorIsMadeWithoutACode(test *testing.T) {
 	}
 }
 
+// The reader writes inside a repository only through workspace.Save; the only other file that
+// writes is the one keeping its own marks, in its own folder. Git itself runs read-only commands.
+func TestOnlyTheSaveWritesInARepository(test *testing.T) {
+	allowed := map[string]bool{
+		filepath.Join(moduleRoot, "internal/workspace/save.go"):  true,
+		filepath.Join(moduleRoot, "internal/review/reviewed.go"): true,
+	}
+	writers := []string{"os.WriteFile(", "os.Create(", "os.CreateTemp(", "os.OpenFile(", "os.Rename(",
+		"os.Remove(", "os.RemoveAll(", "os.Mkdir(", "os.MkdirAll(", "os.Chmod(", "os.Truncate(",
+		"os.Symlink(", "os.Link(", "ioutil.WriteFile("}
+	for path, source := range goSources(test) {
+		for _, writer := range writers {
+			if strings.Contains(source, writer) && !allowed[path] {
+				test.Errorf("%s writes with %s; only workspace.Save may write in a repository", path, writer)
+			}
+		}
+	}
+}
+
 // dependencies lists every package a package of this module imports, directly or not.
 func dependencies(test *testing.T, name string) []string {
 	test.Helper()
