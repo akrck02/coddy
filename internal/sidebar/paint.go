@@ -58,6 +58,7 @@ func (sidebar *Sidebar) paint(context *ui.Context, window Window, drawing *draw2
 // row under the pointer, if no dialog takes the pointer.
 func (sidebar *Sidebar) startPainting(context *ui.Context, window Window, drawing *draw2d.List) painting {
 	pointerX, pointerY := context.Pointer()
+	sidebar.badges = map[int][2]float32{}
 	hovered := -1
 	if !window.ModalOpen() {
 		hovered = sidebar.list.RowAt(pointerX, pointerY)
@@ -95,7 +96,7 @@ func (sidebar *Sidebar) paintRow(painter painting, index int) {
 	if row.Kind == ProjectRow && index == painter.hovered {
 		right = sidebar.paintEnterButton(painter, index, rowArea, top)
 	}
-	right = sidebar.paintRight(painter, row, right, baseline, top)
+	right = sidebar.paintRight(painter, row, index, right, baseline, top)
 	painter.drawing.PushClip(draw2d.Rectangle{X: area.X, Y: top, Width: max(right-area.X-8, 0), Height: RowHeight})
 	paintRowName(painter, row, text, baseline)
 	painter.drawing.PopClip()
@@ -225,7 +226,7 @@ func (side *rightSide) text(words string, colour draw2d.Color) {
 
 // paintRight paints what a row shows on its right, from right to left, and returns where it ends:
 // a file's status letter, a project still being read, and what the mode adds.
-func (sidebar *Sidebar) paintRight(painter painting, row Row, right, baseline, top float32) float32 {
+func (sidebar *Sidebar) paintRight(painter painting, row Row, index int, right, baseline, top float32) float32 {
 	palette := painter.context.Theme
 	side := &rightSide{painter: painter, right: right, baseline: baseline}
 	switch row.Kind {
@@ -242,6 +243,7 @@ func (sidebar *Sidebar) paintRight(painter painting, row Row, right, baseline, t
 			side.text("…", palette.InkQuiet)
 			return side.right
 		}
+		sidebar.paintServerBadge(side, row, index, top)
 		if row.Changed == 0 {
 			return side.right
 		}

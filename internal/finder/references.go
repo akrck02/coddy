@@ -18,8 +18,8 @@ type Use struct {
 	Text         string
 }
 
-// ShowUses opens the finder on the uses of a name: the development's own files first, then by
-// project, file and line.
+// ShowUses opens the finder on places a language server gave, named by what they are ("uses of
+// Keeper"): the development's own files first, then by project, file and line.
 func (finder *Finder) ShowUses(window Window, name string, uses []Use) {
 	finder.Show(ReferencesScope)
 	finder.Name = name
@@ -30,7 +30,7 @@ func (finder *Finder) ShowUses(window Window, name string, uses []Use) {
 		}
 		change, changed := window.Projects()[use.Project].ChangeOf(use.Path)
 		hit := git.Hit{Path: use.Path, Line: use.Line, Column: use.Column, Text: use.Text}
-		finder.references = append(finder.references, ContentHit{use.Project, changed, change.Status, hit, max(use.Length, 1)})
+		finder.references = append(finder.references, ContentHit{use.Project, changed, change.Status, hit, use.Length})
 	}
 	sort.SliceStable(finder.references, func(first, second int) bool {
 		one, other := finder.references[first], finder.references[second]

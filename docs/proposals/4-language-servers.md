@@ -111,7 +111,7 @@ than hidden.
 - [x] T4 — Definition and back · serves R1, R4 · test: `TestDefinitionOpensTheDeclaration`, `TestBackReturnsToThePlaceBefore`
 - [x] T5 — References and hover · serves R2, R3 · test: `TestReferencesAreListed`, `TestHoverShowsTheServersText`
 - [x] T6 — What servers write: the list before, the comparison, the record on disk · serves R6 · test: `TestFilesWrittenByAServerAreNotChanges`
-- [ ] T7 — The badge and the list of a server's files · serves R7 · test: `TestFilesWrittenByAServerAreListed`
+- [x] T7 — The badge and the list of a server's files · serves R7 · test: `TestFilesWrittenByAServerAreListed`
 - [ ] T8 — Refusing `applyEdit` · serves R8 · test: `TestApplyEditIsRefused`
 - [ ] T9 — Trying it on the real servers: `gopls` on this repository, `jdtls` on the big workspace · serves R1–R7 · test: an integration test that skips when the server is not installed, and a note of what `jdtls` wrote in the big workspace
 

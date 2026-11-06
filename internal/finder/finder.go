@@ -72,7 +72,8 @@ type Finder struct {
 	searching bool
 	truncated bool
 
-	// the uses of a name a language server found, all of them; Hits are those the query keeps
+	// the places a language server gave (the uses of a name, the files it wrote), all of them, and
+	// what they are ("uses of Keeper"); Hits are those the query keeps
 	Name       string
 	references []ContentHit
 }
@@ -334,7 +335,7 @@ func (finder *Finder) buildQuery(context *ui.Context, window Window) bool {
 		case ContentScope:
 			icon, placeholder = "text-search", "Find a text in the files of every project"
 		case ReferencesScope:
-			icon, placeholder = "list-tree", "Narrow the uses of "+finder.Name+" by file or line"
+			icon, placeholder = "list-tree", "Narrow the "+finder.Name+" by file or line"
 		}
 		context.IconSized(icon, 16, palette.InkSoft)
 		if finder.focusNext {
@@ -363,7 +364,7 @@ func (finder *Finder) buildFooter(context *ui.Context) {
 		case finder.Scope == ContentScope && utf8.RuneCountInString(strings.TrimSpace(finder.Query)) < contentMinLength:
 			context.Text("Type two letters or more; a capital makes it match case", quiet)
 		case finder.Scope == ReferencesScope:
-			context.Text(fmt.Sprintf("%d of %d uses of %s", len(finder.Hits), len(finder.references), finder.Name), quiet)
+			context.Text(fmt.Sprintf("%d of %d %s", len(finder.Hits), len(finder.references), finder.Name), quiet)
 		case finder.Scope == ContentScope:
 			words := fmt.Sprintf("%d lines", len(finder.Hits))
 			if finder.truncated {

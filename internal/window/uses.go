@@ -61,7 +61,7 @@ func (application *Window) showUses(name string, locations []lsp.Location) {
 		uses = append(uses, finder.Use{Project: reference.Project, Path: reference.Path, Line: start.Line + 1,
 			Column: byteColumn, Length: length, Text: text})
 	}
-	application.finder.ShowUses(application, name, uses)
+	application.finder.ShowUses(application, "uses of "+name, uses)
 	if outside > 0 {
 		application.toast = fmt.Sprintf("%d more outside the projects open", outside)
 	}
@@ -166,4 +166,21 @@ func (application *Window) buildHover(context *ui.Context) {
 			}
 		})
 	})
+}
+
+// ShowServerFiles lists the files language servers wrote in a project in the finder's panel, to
+// open any of them.
+func (application *Window) ShowServerFiles(project int) {
+	if project < 0 || project >= len(application.projects) {
+		return
+	}
+	var files []finder.Use
+	for _, file := range application.projects[project].ServerFiles {
+		note := "written by " + file.Server
+		if file.Existed {
+			note = "changed while " + file.Server + " ran: maybe by you, outside the reader"
+		}
+		files = append(files, finder.Use{Project: project, Path: file.Path, Line: 1, Text: note})
+	}
+	application.finder.ShowUses(application, "the files servers wrote", files)
 }

@@ -17,7 +17,7 @@ func TestReferencesAreListed(test *testing.T) {
 	application.viewer.PlaceCaret(keeperUse)
 	press(window, input.KeyF12, input.KeyShift)
 	found := application.finder
-	if !found.Open || found.Scope != finder.ReferencesScope || found.Name != "Keeper" || len(found.Hits) != 3 {
+	if !found.Open || found.Scope != finder.ReferencesScope || found.Name != "uses of Keeper" || len(found.Hits) != 3 {
 		test.Fatalf("⇧F12 listed %d uses of %q (open %t), want the 3 of Keeper", len(found.Hits), found.Name, found.Open)
 	}
 	typeText(window, "harbour")

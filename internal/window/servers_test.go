@@ -164,3 +164,24 @@ func TestFilesWrittenByAServerAreNotChanges(test *testing.T) {
 		test.Error("after a restart, the server's .classpath counts as a change")
 	}
 }
+
+func TestFilesWrittenByAServerAreListed(test *testing.T) {
+	application := newReader(Settings{Folders: []string{makeRepository(test)}, WorkingTree: true, Synchronous: true,
+		Open: "lighthouse/src/lamp.go", Servers: writingServer(test)})
+	test.Cleanup(application.stopServers)
+	window := newWindow(test, application)
+	application.reloadAll()
+	window.Frames(2)
+	if shown := strings.Join(window.Texts(), " "); !strings.Contains(shown, "fakels · 1") {
+		test.Fatalf("the project shows no badge of the server's files: %q", shown)
+	}
+	application.ShowServerFiles(0)
+	window.Frames(1)
+	if hits := application.finder.Hits; len(hits) != 1 || hits[0].Path != ".classpath" || hits[0].Text != "written by fakels" {
+		test.Fatalf("the list of the server's files is %+v", hits)
+	}
+	press(window, input.KeyEnter)
+	if application.viewer.Reference.Path != ".classpath" || application.viewer.Document == nil {
+		test.Errorf("Enter opened %q, want .classpath", application.viewer.Reference.Path)
+	}
+}

@@ -55,6 +55,8 @@ type Window interface {
 	// Loading tells whether projects are being read, and ReadingKinds whether class kinds are.
 	Loading() bool
 	ReadingKinds() bool
+	// ShowServerFiles lists the files language servers wrote in a project, to open any of them.
+	ShowServerFiles(project int)
 }
 
 // Row is a row of the sidebar.
@@ -79,6 +81,8 @@ type Sidebar struct {
 	expanded map[string]bool
 	trees    map[treeKey]*workspace.Folder
 	Rows     []Row
+	// badges are where each project's badge of server files was painted last, by row
+	badges   map[int][2]float32
 	Stale    bool
 	Selected int
 	list     pane.Scroller
@@ -481,6 +485,8 @@ func (sidebar *Sidebar) followPointer(context *ui.Context, window Window) {
 	window.FocusSidebar()
 	row := sidebar.Rows[index]
 	switch {
+	case sidebar.onBadge(index, x):
+		window.ShowServerFiles(row.Project)
 	case sidebar.onEnter(index, x):
 		sidebar.Enter(window, row.Project)
 	case sidebar.onCheck(index, x):
