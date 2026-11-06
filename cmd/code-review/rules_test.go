@@ -15,13 +15,16 @@ import (
 // moduleRoot is the folder of go.mod, seen from this package's folder.
 const moduleRoot = "../.."
 
-// goSources gives each Go file of the module that is not a test, with its text.
+// goSources gives each Go file of the module that is not a test or under testdata, with its text.
 func goSources(test *testing.T) map[string]string {
 	test.Helper()
 	sources := map[string]string{}
 	err := filepath.WalkDir(moduleRoot, func(path string, entry fs.DirEntry, err error) error {
 		if err != nil {
 			return err
+		}
+		if entry.IsDir() && entry.Name() == "testdata" {
+			return filepath.SkipDir // programs for the tests, which Go leaves out of the build too
 		}
 		if !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
 			return nil
