@@ -47,6 +47,7 @@ func (application *Window) Build(context *ui.Context) {
 	application.buildBaseDialog(context)
 	application.buildHelp(context)
 	application.buildPicker(context)
+	application.buildQuestions(context)
 	if application.toast != "" {
 		context.Toast(application.toast, false)
 		application.toast = ""
@@ -76,7 +77,9 @@ func (application *Window) applyTheme(context *ui.Context) {
 }
 
 func (application *Window) ModalOpen() bool {
-	return application.finder.Open || application.base.open || application.helpOpen || application.pickerOpen
+	asked := application.questions
+	return application.finder.Open || application.base.open || application.helpOpen || application.pickerOpen ||
+		asked.unsavedOpen || asked.conflictOpen
 }
 
 // enterCurrentProject takes the sidebar into the project of the selected row, or of the file open.
@@ -396,7 +399,7 @@ func (application *Window) buildHelp(context *ui.Context) {
 		return
 	}
 	dismissed := context.Sheet("Keys", ui.SheetOptions{Width: ui.Fixed(helpSheetWidth)}, func() {
-		context.Caption("The reader never changes a repository: it only runs git commands that read.")
+		context.Caption("The reader writes a file only when you save it, and git only reads: no commit, no push.")
 		// the help scrolls when the window is too short for it
 		_, windowHeight := context.Size()
 		context.ScrollArea("help", ui.Layout{Width: ui.Grow(), Height: ui.Fixed(max(windowHeight-helpRoomAround, 200))}, func() {

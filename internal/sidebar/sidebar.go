@@ -41,6 +41,8 @@ type Window interface {
 	// OpenedFile is the file the viewer shows, if any.
 	OpenedFile() (workspace.FileReference, bool)
 	IsOpened(file workspace.FileReference) bool
+	// Unsaved tells whether a file has edits not saved.
+	Unsaved(file workspace.FileReference) bool
 	FocusViewer()
 	FocusSidebar()
 	SidebarFocused() bool

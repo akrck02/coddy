@@ -7,7 +7,6 @@ import (
 	"github.com/akrck02/code-review/internal/viewer"
 	"github.com/akrck02/go-renderer/input"
 	ui "github.com/akrck02/go-ui"
-	platform "github.com/akrck02/go-ui/window"
 )
 
 // place is where a command works: anywhere in the window, in the pane with the keyboard, or in a
@@ -82,7 +81,7 @@ func (application *Window) editing() bool {
 // commands are every shortcut of the reader, in the order they are tried. The help lists them.
 var commands = []command{
 	{description: "Quit", inDialogs: true, keys: []pane.Press{pane.CommandKey(input.KeyQ, "⌘Q")},
-		do: func(*Window, *ui.Context, int) { platform.Quit() }},
+		do: func(application *Window, _ *ui.Context, _ int) { application.quit() }},
 	{description: "Find a text in the files of every project (Tab switches in the finder)",
 		keys: []pane.Press{pane.CommandShiftKey(input.KeyF, "⌘⇧F"), {Text: "/", Label: "/"}},
 		do:   func(application *Window, _ *ui.Context, _ int) { application.finder.Show(finder.ContentScope) }},
@@ -103,6 +102,8 @@ var commands = []command{
 	{description: "Stop editing: the sidebar takes the keyboard", place: editing,
 		keys: []pane.Press{pane.AnyKey(input.KeyEscape, "Esc")},
 		do:   func(application *Window, _ *ui.Context, _ int) { application.focus = sidebarPane }},
+	{description: "Save", place: editing, keys: []pane.Press{pane.CommandKey(input.KeyS, "⌘S")},
+		do: func(application *Window, _ *ui.Context, _ int) { application.save() }},
 	{description: "Undo / redo", place: editing,
 		keys: []pane.Press{{Key: input.KeyZ, Command: true, Label: "⌘Z", Step: -1}, {Key: input.KeyZ, Command: true, Shift: true, Label: "⌘⇧Z", Step: 1}},
 		do: func(application *Window, _ *ui.Context, step int) {

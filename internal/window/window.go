@@ -87,6 +87,7 @@ type Window struct {
 	keys        pane.Keys
 	toast       string
 	themeSet    bool
+	questions   questions
 }
 
 // New makes a reader for these settings, with its modes in the rail's order; Driver must be given
@@ -258,9 +259,14 @@ func walkFiles(folder *workspace.Folder, visit func(path string)) {
 	}
 }
 
-// openFile opens a file of a project in the viewer, reading it on another goroutine.
+// openFile opens a file of a project in the viewer, reading it on another goroutine. Another
+// file asks first about the edits not saved of the one open.
 func (application *Window) openFile(reference workspace.FileReference) {
 	if reference.Project < 0 || reference.Project >= len(application.projects) {
+		return
+	}
+	if application.viewer.Unsaved() && reference != application.viewer.Reference {
+		application.keepingEdits(func() { application.openFile(reference) })
 		return
 	}
 	project := application.projects[reference.Project]

@@ -230,6 +230,9 @@ func (sidebar *Sidebar) paintRight(painter painting, row Row, right, baseline, t
 	side := &rightSide{painter: painter, right: right, baseline: baseline}
 	switch row.Kind {
 	case FileRow:
+		if painter.window.Unsaved(workspace.FileReference{Project: row.Project, Path: row.Path}) {
+			side.text("●", palette.InkSoft)
+		}
 		if row.Status == git.Unchanged {
 			return side.right
 		}

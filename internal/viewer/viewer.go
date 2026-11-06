@@ -134,11 +134,13 @@ func (view *Viewer) Start(reference workspace.FileReference, project *workspace.
 		return
 	}
 	view.Request++
+	if view.Reference != reference || !view.showing {
+		view.Edit, view.selecting = nil, false // the same file read again keeps its edits
+	}
 	view.Reference = reference
 	view.Project = project
 	view.MarkedLine = 0
 	view.Document = nil
-	view.Edit, view.selecting = nil, false
 	view.showing = true
 	view.openedFolds = map[int]bool{}
 	view.List.Offset, view.List.OffsetX = 0, 0
@@ -149,9 +151,7 @@ func (view *Viewer) Start(reference workspace.FileReference, project *workspace.
 func (view *Viewer) Show(document *workspace.Document, showChanges bool) {
 	keepPlace := view.Document != nil && view.Document.Path == document.Path
 	view.Document = document
-	if !keepPlace || view.Edit == nil || !view.Edit.Modified() {
-		view.startEditing()
-	}
+	view.keepEditing()
 	if !keepPlace {
 		view.Mode = FileView
 		if document.Changed && showChanges {
@@ -489,6 +489,9 @@ func (view *Viewer) buildPath(context *ui.Context, compact bool) {
 		nameInk = theme.StatusColour(palette, document.Change.Status)
 	}
 	context.Text(name, ui.TextStyle{Weight: draw2d.Medium, Color: nameInk})
+	if view.Unsaved() {
+		context.Text("●", ui.TextStyle{Color: palette.InkSoft}) // changes not saved
+	}
 }
 
 // buildChange says how the file changed: its status, the path it came from, the lines added and

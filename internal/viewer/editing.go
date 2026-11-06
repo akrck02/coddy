@@ -9,6 +9,7 @@ import (
 	"github.com/akrck02/code-review/internal/highlight"
 	"github.com/akrck02/code-review/internal/pane"
 	"github.com/akrck02/code-review/internal/text"
+	"github.com/akrck02/code-review/internal/workspace"
 	"github.com/akrck02/go-renderer/draw2d"
 	"github.com/akrck02/go-renderer/input"
 )
@@ -45,6 +46,39 @@ func (view *Viewer) startEditing() {
 	view.indent = "    "
 	if strings.HasPrefix(document.Text, "\t") || strings.Contains(document.Text, "\n\t") {
 		view.indent = "\t"
+	}
+}
+
+// keepEditing keeps the buffer when the file it edits is read again: its edits not saved, or its
+// caret when the text read is the same. Otherwise the buffer starts again from what was read.
+func (view *Viewer) keepEditing() {
+	buffer, document := view.Edit, view.Document
+	switch {
+	case buffer == nil || !document.Editable:
+		view.startEditing()
+	case buffer.Modified():
+	case buffer.Text() == document.Text:
+		view.coloured, view.colouredVersion = document.NewLines, buffer.Version()
+	default:
+		caret := buffer.Caret()
+		view.startEditing()
+		view.Edit.Place(caret, false)
+	}
+}
+
+// Unsaved tells whether the file open has edits not saved.
+func (view *Viewer) Unsaved() bool { return view.showing && view.Edit != nil && view.Edit.Modified() }
+
+// Saved records that the buffer was written: what it wrote, and the file's stamp now.
+func (view *Viewer) Saved(content string, stamp workspace.Stamp) {
+	view.Edit.MarkSaved()
+	view.Document.Text, view.Document.Stamp = content, stamp
+}
+
+// Discard drops the edits not saved, going back to the file as read.
+func (view *Viewer) Discard() {
+	if view.Document != nil {
+		view.startEditing()
 	}
 }
 
