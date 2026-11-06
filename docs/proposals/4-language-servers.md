@@ -1,6 +1,6 @@
 # 4. Language servers: definition, references and hover
 
-> Status: building · Author's approval: proposal ☑ plan ☑
+> Status: built against a fake server; T9 waits for gopls and jdtls to be installed · Author's approval: proposal ☑ plan ☑
 
 ## Why
 
@@ -117,4 +117,45 @@ than hidden.
 
 ## Result
 
-Not built yet.
+T1–T8 are built and tested against the fake server. T9 has its integration tests
+(`TestGoplsFollowsANameInThisRepository`, `TestJdtlsFollowsANameAcrossProjects`), which skip
+because neither server is installed on this machine yet; the note of what `jdtls` writes in the big workspace is
+still to take.
+
+| Id | Met | How |
+|---|---|---|
+| R1 | yes, on the fake server | F12 on the caret or the place clicked, or ⌘-click; across projects with one server for the window |
+| R2 | yes, on the fake server | ⇧F12 lists the uses in the finder's panel, the development's files first; typing narrows them |
+| R3 | yes, on the fake server | half a second at rest on a name; the card closes when the pointer leaves |
+| R4 | yes | ⌃- and ⌃⇧-, a hundred places back, kept by path on disk |
+| R5 | yes | started on the first file of its language, stopped with the window; one that stops on its own starts again, three times at most |
+| R6 | yes | below |
+| R7 | yes | a dashed badge on the project, "jdtls · 4", opens the list in the finder's panel |
+| R8 | yes | the client answers "not applied" |
+| R9 | yes | a toast and the status bar name the server and the command that installs it |
+| R10 | yes | `lsp.server-not-found`, `server-stopped`, `request-failed`, `bad-message`, and `workspace.record-not-kept` |
+
+What changed from the plan:
+
+- **Who wrote a file.** Only a file that differs from the last commit on disk, and that the reader
+  did not save, can be a server's: one that changed since the snapshot taken before the server
+  started, or one recorded as the server's that still holds the text it left (or while a server
+  runs). A commit, a pull or another base never hides a change. The reader cannot tell a file the
+  person made outside it from the server's, so the list says "new while jdtls ran: by it, or by you
+  outside the reader" (or "changed while…"), rather than "written by".
+- **The snapshot reads each project afresh** before the server starts, which delays the start by
+  one reading of the projects (on the big workspace, of every Java project).
+- **The finder's panel holds the uses and the server's files**, as a third scope, rather than a
+  panel of its own.
+- **Requests about the file tell its text first**, on the same goroutine, with versions that only
+  grow: the server never answers about an older text.
+- **Notifications are handled in order**, in the connection, after a test caught a didChange
+  overtaking its didOpen.
+- **F12 and ⇧F12 without a caret** (read-only, or in the diff) ask about the place clicked last.
+
+The review of the build found nine problems, all fixed with a test where one could be written: a
+commit or a pull while a server ran hid the person's changes; a recorded file stayed hidden
+whatever it became; a missing server left a snapshot; a project where only a server wrote vanished
+with its badge; a server that crashed stayed "running"; texts could reach the server out of order;
+a file read again from disk was not told again; the trail kept project indices; and a jump
+cancelled at the unsaved question left a trail entry and a column.
