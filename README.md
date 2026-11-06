@@ -1,8 +1,9 @@
 # Code review
 
-**A small, fast, read-only code reader for developments that change many repositories at once.**
+**A small, fast code reader for developments that change many repositories at once.**
 Open a folder of projects, see which ones a development changed against their base branch, and
-read each changed file's diff, coloured, without leaving the keyboard.
+read each changed file's diff, coloured, without leaving the keyboard. Fix what you find in the
+file as you read it, or switch to read-only and only read.
 
 Built with [go-ui](https://github.com/akrck02/go-ui) over
 [go-renderer](https://github.com/akrck02/go-renderer), dressed in
@@ -63,10 +64,19 @@ It has two modes, chosen on the rail at the far left (or with `1`, `2`, `c`):
 - **Icons by file type** in the tree and the finder, tinted with the code's own colours.
 - **Syntax colouring** for Java, Kotlin, Vue, SQL, Gradle, Groovy, XML, YAML, Markdown and the
   rest of chroma's languages; text that is not UTF-8 is read as Latin-1.
-- **Never writes to a repository.** It only runs `git cat-file`, `diff`, `ls-files`, `merge-base`,
-  `rev-list`, `rev-parse` and `symbolic-ref` (any other command is refused by
-  `internal/git/run.go`), without the optional locks, the file system monitor or external diff
-  programs. It never fetches, so a remote branch is as fresh as the last `git fetch` you ran.
+- **Edits a file opened whole**: a caret, a selection (Shift, a drag, a double click), undo by
+  word, cut, copy and paste. The file is coloured again a moment after you stop typing. `⌘S`
+  writes the whole file at once, and refuses to overwrite one changed on disk since it was read: it
+  asks whether to keep yours or take theirs. A dot after the name marks edits not saved, and
+  opening another file or quitting asks first. A saved file shows as changed at once. The diff
+  stays for reading.
+- **A read-only mode**: the lock in the title bar, `⌘⇧L` or `-read-only` turn editing off, and
+  the choice is remembered.
+- **Writes a file only when you save it; git only reads.** It only runs `git cat-file`, `diff`,
+  `ls-files`, `merge-base`, `rev-list`, `rev-parse` and `symbolic-ref` (any other command is
+  refused by `internal/git/run.go`), without the optional locks, the file system monitor or
+  external diff programs: no commit, no push, no checkout. It never fetches, so a remote branch is
+  as fresh as the last `git fetch` you ran.
 
 ## Build and run
 
@@ -89,6 +99,7 @@ go build -o bin/code-review ./cmd/code-review
 | `-find text` | Start with the finder searching the files' content for a text |
 | `-code-font file.ttf` | Read the code in this TrueType face (default SF Mono, from macOS; Go Mono where there is none) |
 | `-all` | Show every project, not only those with changes |
+| `-read-only` | Start read-only: files are only read, not edited |
 | `-light` | Start in the light theme (dark by default) |
 | `-width`, `-height`, `-capture shot.png` | go-ui's window flags; `-capture` draws one frame to a picture |
 
@@ -98,31 +109,47 @@ go vet ./... && go test ./...     # the interface tests drive the window with no
 
 ## Keys
 
+While you edit a file, letters type: commands then take the key with `⌘` (or `⌃`), shown second
+below, an F-key or `Esc`. `Esc` gives the keyboard back to the sidebar, where the letters work.
+
 | Key | |
 |---|---|
 | `⌘P` (or `Shift+P`) | Find a file by its name, in any project; changed files first |
 | `⌘⇧F` (or `/`) | Find a text in the files of every project; `Tab` in the finder switches between names and content |
-| `n` / `m` | Next / previous changed file, across every project |
-| `]` / `[` | Next / previous change in the file (the diff, or the marked lines) |
-| `1` / `2` (`c` switches) | Files mode / Review mode |
-| `Enter` on a project, `e`, or its → button | Enter the project: the sidebar lists only its tree, and `n`/`m`/`v` stay in it |
+| `n` / `m` (`⌘⇧N` / `⌘⇧M`) | Next / previous changed file, across every project |
+| `]` / `[` (`⌘]` / `⌘[`) | Next / previous change in the file (the diff, or the marked lines) |
+| `1` / `2` (`⌘1` / `⌘2`; `c` or `⌘0` switches) | Files mode / Review mode |
+| `Enter` on a project, `e` (`⌘E`), or its → button | Enter the project: the sidebar lists only its tree, and `n`/`m`/`v` stay in it |
 | `Esc` / `Backspace` | Back to every project |
-| `g` | Files mode: list only the changed files (they still open whole), or every file |
-| `v` | Mark the file as viewed (or not); marking it opens the next file not viewed |
-| `d` | Diff, or the whole file |
-| `f` | Fold the unchanged lines, or show them all |
-| `Tab` | Move between the sidebar and the editor |
+| `g` (`⌘⇧G`) | Files mode: list only the changed files (they still open whole), or every file |
+| `v` (`⌘⇧V`) | Mark the file as viewed (or not); marking it opens the next file not viewed |
+| `d` (`⌘D`) | Diff, or the whole file |
+| `f` (`⌘U`) | Fold the unchanged lines, or show them all |
+| `Tab` (`⌃Tab`) | Move between the sidebar and the editor |
 | `↑ ↓ ← →`, `PgUp PgDn`, `Home End` | Move in the sidebar (←/→ close and open folders), or scroll the file |
 | `j` / `k`, `Space` | Scroll a line, a page |
 | `Enter` | Open a file or a folder (sidebar), open a fold (editor) |
-| `h` | Only the projects with changes, or every project (sidebar and finder) |
-| `b` | Compare against another branch, tag or commit |
-| `w` | Count the changes not committed yet, or the commits only |
+| `h` (`⌘⇧H`) | Only the projects with changes, or every project (sidebar and finder) |
+| `b` (`⌘B`) | Compare against another branch, tag or commit |
+| `w` (`⌘⇧W`) | Count the changes not committed yet, or the commits only |
 | `r` (`⌘R`) | Read every project again |
 | `o` (`⌘O`) | Open a repository or a folder of repositories |
-| `y` | Copy the open file's path |
-| `t` | Light or dark |
-| `?` | These keys |
+| `y` (`⌘⇧C`) | Copy the open file's path |
+| `t` (`⌘⇧T`) | Light or dark |
+| `l` (`⌘⇧L`) | Read-only, or editing |
+| `?` (`F1`) | These keys |
+
+Editing a file:
+
+| Key | |
+|---|---|
+| `⌘S` | Save |
+| `⌘Z` / `⌘⇧Z` | Undo / redo |
+| `⌘X` `⌘C` `⌘V`, `⌘A` | Cut, copy, paste, select all |
+| Arrows (`Shift` selects), `⌥←` `⌥→` | Move by a character, a word |
+| `⌘←` `⌘→` (or `Home` `End`), `⌘↑` `⌘↓` | The start or end of the line, of the file |
+| `⌥Backspace` | Delete the word before the caret |
+| `Esc` | Stop editing: the sidebar takes the keyboard |
 
 ## Design
 

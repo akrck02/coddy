@@ -1,6 +1,6 @@
 # 3. Edit files, with an optional read-only mode
 
-> Status: building · Author's approval: proposal ☑ plan ☑
+> Status: done, R7 in part (see Result) · Author's approval: proposal ☑ plan ☑
 
 ## Why
 
@@ -138,8 +138,45 @@ someone saves it, through `workspace.Save`, and git still only reads. The help g
 - [x] T5 — The caret in the viewer: drawing it and the selection, clicks, typing, colouring again · serves R1 · test: a window test typing into a file
 - [x] T6 — Saving from the window, the dot of a file not saved, asking before losing it, reading the changes again · serves R2, R6, R7 · test: `TestASavedFileShowsAsChanged`, `TestClosingAnEditedFileAsks`
 - [x] T7 — The read-only mode: switch, key, flag, remembered · serves R3 · test: `TestReadOnlyModeTypesNothing`, `TestReadOnlyModeSavesNothing`
-- [ ] T8 — Documentation: the rule, the keys, the read-only mode · serves R8 · test: `TestOnlyReadOnlyCommandsRun` unchanged
+- [x] T8 — Documentation: the rule, the keys, the read-only mode · serves R8 · test: `TestOnlyReadOnlyCommandsRun` unchanged
 
 ## Result
 
-Not built yet.
+Built on `feature/code-reader`, 6 November 2026, in seven commits from `418ca46` (T1, T2) to the
+one that ticks T8.
+
+| Id | Met | How |
+|---|---|---|
+| R1 | Yes | `internal/text` holds the file; the viewer paints the caret, the selection and the line it is on; arrows (Shift selects, ⌥ by words, ⌘ to the ends), Home, End, the page keys, a click, a drag and a double click; ⌘Z ⌘⇧Z ⌘X ⌘C ⌘V ⌘A. The file is coloured again 300 ms after typing stops. |
+| R2 | Yes | `workspace.Save`: a temporary file renamed over the original, its permissions kept, a link followed to the file it points at; refused when the file's hash differs from the one the edits started from, and the window asks: keep mine, take theirs, cancel. |
+| R3 | Yes | The lock in the title bar, `l` or ⌘⇧L, `-read-only`; remembered. No caret, nothing typed, pasted or saved, and the status bar says "read-only". |
+| R4 | Yes | `TestOnlyTheSaveWritesInARepository`. |
+| R5 | Yes | `TestNoPlainKeyCommandWhileEditing`; every command has a key with ⌘ (or an F-key, or Esc), and the help lists both. |
+| R6 | Yes | Saving reads the project again: the tree, the counts and the diff show the change (`TestASavedFileShowsAsChanged`). |
+| R7 | In part | ⌘Q, opening another file, opening or closing folders, and counting only commits ask to save, not save or cancel; a dot after the name marks edits not saved. **The window's close button, and ⌘Q when macOS's menu takes it first, still close without asking**: go-renderer leaves GLFW's default menu bar on and gives the program no way to refuse a close. That needs a change in go-renderer (or go-ui) first. |
+| R8 | Yes | `internal/git` is unchanged: no command that writes. |
+
+What changed from the plan:
+
+- **No `text/errors.go`.** The buffer keeps every position inside the text instead of failing, so
+  `text.position-out-of-range` had nothing to name. A new code, `workspace.outside-the-project`,
+  refuses a path that leads out of its project.
+- **⌘⇧N / ⌘⇧M** for the next and previous changed file, not ⌘N / ⌘M: macOS's window menu takes
+  ⌘M to minimize.
+- **A file ending in a line break shows the empty line after it**, numbered, as Zed does: the caret
+  can go there.
+- **Line endings are kept line by line**, so a file mixing "\n" and "\r\n" is saved as it was
+  read; a new line break takes the ending most lines have.
+- **The help groups the modes' keys apart, wraps its words, and scrolls** when the window is short.
+- **The read-only mode has a plain key, `l`,** besides ⌘⇧L: where nothing is edited, letters run
+  commands.
+
+A review of the change found ten problems, all fixed with a test each except the close button (R7
+above): a save after reading the project again overwrote a change on disk without asking; counting
+only commits, opening or closing folders dropped edits; saving in the review mode went back to the
+diff; Enter at the start of a line doubled its indent; a link was replaced by a file; mixed line
+endings were all turned into "\r\n"; past 1,000 undo steps, undoing everything looked unchanged;
+and a save from the question that met a change on disk forgot what was asked for.
+
+Left for later: asking before the window closes (go-renderer); deleting by Backspace is undone line
+by line, not word by word.

@@ -5,10 +5,17 @@ piece lives, how to build and test it, and how to add a mode.
 
 ## The one rule
 
-Code Review only reads the repositories it reviews. Every git command goes through
-`internal/git`, which runs only the commands on its read-only list and refuses the rest
-(`git.command-not-read-only`). Nothing else may start git or write inside a repository. The marks
-of the files viewed live in the reader's own folder, never in a repository.
+Code Review writes a file of a repository only when someone saves it, and git only reads.
+
+- `workspace.Save` is the one function that writes inside a repository: the whole file at once,
+  through a file beside it renamed over it, and never over a change made on disk since it was read
+  (`workspace.changed-on-disk`). `TestOnlyTheSaveWritesInARepository` fails on a file write
+  anywhere else; the marks of the files viewed, kept in the reader's own folder, are the one
+  other place allowed.
+- Every git command goes through `internal/git`, which runs only the commands on its read-only
+  list and refuses the rest (`git.command-not-read-only`): no commit, no push, no checkout.
+- While a file is edited, plain keys type: every command keeps a key with Command, an F-key or
+  Esc (`TestNoPlainKeyCommandWhileEditing`).
 
 ## Where things are
 
