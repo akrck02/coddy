@@ -322,6 +322,7 @@ func (application *Window) openFile(reference workspace.FileReference) {
 	}
 	project := application.projects[reference.Project]
 	application.viewer.Start(reference, project)
+	application.viewer.Uses = application.usesOfFile(reference)
 	if document, cached := application.documentCache[reference]; cached {
 		application.viewer.Show(document, application.mode.ShowsChanges())
 		return

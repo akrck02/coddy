@@ -17,6 +17,15 @@ type Listing interface {
 	Press(file workspace.FileReference, moveOn bool)
 }
 
+// Chooser is a listing that lists files of its own, not the projects': the files of a search, say.
+// A project with none of them is left out, and the projects come in the order it gives.
+type Chooser interface {
+	// ListedFiles are the files of a project to list, when the listing chooses them (own).
+	ListedFiles(project int) (paths []string, own bool)
+	// ProjectOrder is the order of the projects, by index; nil keeps the window's.
+	ProjectOrder() []int
+}
+
 // Mark is what a file row shows before its icon.
 type Mark int
 

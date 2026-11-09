@@ -39,6 +39,33 @@ type Command struct {
 	Description string
 	Keys        []pane.Press
 	Do          func(step int)
+	// OnlyWhenOn keeps the command to while its mode is on, before the window's own keys: a mode
+	// may then give a key of the window (n) a meaning of its own.
+	OnlyWhenOn bool
+}
+
+// Use is a place a name is used: a line of a file, from 1, and the characters of the name in it.
+type Use struct {
+	File       workspace.FileReference
+	Line       int
+	Start, End int
+}
+
+// UsesHolder is a mode that shows the uses of a name the window searches (⇧F12): the window gives
+// it the uses as they are found, and asks it which to mark in a file.
+type UsesHolder interface {
+	Mode
+	// SetUses gives the uses of a name found so far, in the order to go through them, and a note
+	// on how the search goes; home is the project the name was asked in.
+	SetUses(name string, home int, uses []Use, note string)
+	// UsesIn are the uses of a file to mark, by line from 1.
+	UsesIn(file workspace.FileReference) map[int][]workspace.Span
+}
+
+// Cover is a mode that may show something of its own over the viewer, such as a graph; it tells
+// whether it did.
+type Cover interface {
+	BuildOverViewer(context *ui.Context) bool
 }
 
 // Window is what a mode needs from the window it works in.
@@ -61,4 +88,8 @@ type Window interface {
 	Loading() bool
 	// Toast shows a short note at the bottom of the window.
 	Toast(words string)
+	// RevealLine opens a file at a line, from 1, marked, and shows it in the sidebar.
+	RevealLine(file workspace.FileReference, line int)
+	// Relist lists the files again, as what the mode lists changed.
+	Relist()
 }

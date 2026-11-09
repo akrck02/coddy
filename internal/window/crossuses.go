@@ -10,6 +10,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/akrck02/code-review/internal/finder"
 	"github.com/akrck02/code-review/internal/git"
@@ -36,6 +38,7 @@ type usesSearch struct {
 	projects    map[string]bool // the projects the places are in
 	left        int             // places past the limit, not checked
 	unchecked   int             // places no server reads
+	noted       string          // the note shown last
 }
 
 // candidate is a place of another file that holds the name, to check.
@@ -110,8 +113,7 @@ func (application *Window) startUses(search *usesSearch, locations, declared []l
 		application.addCandidates(search, hits)
 	}
 	application.uses = search
-	application.finder.ShowUsesFrom(application, "uses of "+search.name, search.home, application.usesListed(search))
-	application.finder.Note = application.usesNote(search)
+	application.showUses(search, true)
 	application.advanceUses()
 }
 
@@ -121,9 +123,40 @@ func (application *Window) inProjects(location lsp.Location) bool {
 	return found
 }
 
-// placeKey names a place by its file and line.
+// placeKey names a place by its file, line and character.
 func placeKey(location lsp.Location) string {
-	return lsp.PathOf(location.URI) + ":" + strconv.Itoa(location.Range.Start.Line)
+	start := location.Range.Start
+	return lsp.PathOf(location.URI) + ":" + strconv.Itoa(start.Line) + ":" + strconv.Itoa(start.Character)
+}
+
+// wordColumns are where a name stands as a whole word in a line, in bytes: git grep gives the
+// first only.
+func wordColumns(line, name string) []int {
+	var columns []int
+	isName := func(at int) bool {
+		character, _ := utf8.DecodeRuneInString(line[at:])
+		return character == '_' || unicode.IsLetter(character) || unicode.IsDigit(character)
+	}
+	for from := 0; from <= len(line)-len(name); {
+		at := strings.Index(line[from:], name)
+		if at < 0 {
+			break
+		}
+		at += from
+		before := at > 0 && isNameBefore(line, at)
+		after := at+len(name) < len(line) && isName(at+len(name))
+		if !before && !after {
+			columns = append(columns, at)
+		}
+		from = at + len(name)
+	}
+	return columns
+}
+
+// isNameBefore tells whether the character before a byte of a line is part of a name.
+func isNameBefore(line string, at int) bool {
+	character, _ := utf8.DecodeLastRuneInString(line[:at])
+	return character == '_' || unicode.IsLetter(character) || unicode.IsDigit(character)
 }
 
 // addCandidates keeps the places that hold the name and the server did not give, the nearest
@@ -133,9 +166,11 @@ func (application *Window) addCandidates(search *usesSearch, hits map[string][]g
 	for project, found := range hits {
 		for _, hit := range found {
 			path := filepath.Join(project, filepath.FromSlash(hit.Path))
-			at := lsp.Position{Line: hit.Line - 1, Character: lsp.UTF16Column(hit.Text, len([]rune(hit.Text[:min(hit.Column, len(hit.Text))])))}
-			if _, known := search.found[path+":"+strconv.Itoa(at.Line)]; !known {
-				places = append(places, candidate{path: path, project: project, at: at})
+			for _, column := range wordColumns(hit.Text, search.name) {
+				at := lsp.Position{Line: hit.Line - 1, Character: lsp.UTF16Column(hit.Text, len([]rune(hit.Text[:column])))}
+				if _, known := search.found[placeKey(lsp.Location{URI: lsp.FileURI(path), Range: lsp.Range{Start: at}})]; !known {
+					places = append(places, candidate{path: path, project: project, at: at})
+				}
 			}
 		}
 	}
@@ -215,7 +250,7 @@ func (application *Window) advanceUses() {
 		search.checking[key] = true
 		application.checkPlaces(search, key, clients[key], batch)
 	}
-	application.finder.Note = application.usesNote(search)
+	application.noteUses(search)
 }
 
 // clientOf is the running server of a place's file, starting it when it is not; state is "none"
@@ -340,8 +375,7 @@ func (application *Window) keepChecked(search *usesSearch, places []candidate, a
 			}
 		}
 	}
-	application.finder.UpdateUses(application, application.usesListed(search))
-	application.finder.Note = application.usesNote(search)
+	application.showUses(search, false)
 }
 
 // askUsesAgain asks the file's server again for the uses, now that it has read the projects.
@@ -359,8 +393,7 @@ func (application *Window) askUsesAgain(search *usesSearch) {
 			for _, location := range locations {
 				search.found[placeKey(location)] = location
 			}
-			application.finder.UpdateUses(application, application.usesListed(search))
-			application.finder.Note = application.usesNote(search)
+			application.showUses(search, false)
 		}
 	})
 }

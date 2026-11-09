@@ -2,6 +2,7 @@ package window
 
 import (
 	"fmt"
+	"github.com/akrck02/code-review/internal/mode"
 	"strings"
 	"time"
 
@@ -76,7 +77,16 @@ func (application *Window) buildPanes(context *ui.Context) {
 			application.sidebar.Build(context, application)
 		})
 	context.Frame(ui.Layout{Width: ui.Fixed(1), Height: ui.Grow()}, ui.Look{Fill: context.Theme.Line}, nil)
-	application.viewer.Build(context, application)
+	cover, covers := application.mode.(mode.Cover)
+	if !covers {
+		application.viewer.Build(context, application)
+		return
+	}
+	context.Box(ui.Layout{Direction: ui.Vertical, Width: ui.Grow(), Height: ui.Grow()}, func() {
+		if !cover.BuildOverViewer(context) {
+			application.viewer.Build(context, application)
+		}
+	})
 }
 
 func (application *Window) applyTheme(context *ui.Context) {
@@ -118,9 +128,12 @@ func (application *Window) toggleFocus() {
 
 func (application *Window) toggleView() {
 	view := &application.viewer
-	if view.Mode == viewer.DiffView {
+	switch {
+	case view.Mode != viewer.FileView:
 		view.SetMode(viewer.FileView)
-	} else {
+	case len(view.Uses) > 0:
+		view.SetMode(viewer.UsesView)
+	default:
 		view.SetMode(viewer.DiffView)
 	}
 }

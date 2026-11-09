@@ -146,7 +146,7 @@ var commands = []command{
 		do: func(application *Window, _ *ui.Context, _ int) { application.toggleView() }},
 	{description: "Fold the unchanged lines, or show them all", keys: []pane.Press{pane.Key(input.KeyF, "f"), pane.CommandKey(input.KeyU, "⌘U")},
 		do: func(application *Window, _ *ui.Context, _ int) {
-			if application.viewer.Mode == viewer.DiffView {
+			if application.viewer.Mode != viewer.FileView {
 				application.viewer.ToggleContext()
 			}
 		}},

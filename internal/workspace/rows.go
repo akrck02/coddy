@@ -25,7 +25,12 @@ func DiffRows(diff []git.DiffLine, context int, opened map[int]bool) []Row {
 		}
 		return rows
 	}
-	near := nearChanges(diff, context)
+	return foldRows(diff, nearChanges(diff, context), opened)
+}
+
+// foldRows folds away the lines of a diff not near, except the folds opened.
+func foldRows(diff []git.DiffLine, near []bool, opened map[int]bool) []Row {
+	rows := make([]Row, 0, len(diff))
 	for index := 0; index < len(diff); {
 		if near[index] {
 			rows = append(rows, Row{Line: diff[index]})
@@ -69,6 +74,39 @@ func nearChanges(diff []git.DiffLine, context int) []bool {
 		}
 	}
 	return near
+}
+
+// FocusRows shows a file of count lines, each unchanged, with the lines more than context lines
+// away from a line in focus (by number, from 1) folded away, except the folds opened (by where they
+// start, a line from 0). A negative context shows all. It gives the file as an unchanged diff too,
+// which the folds count in.
+func FocusRows(count int, focus map[int]bool, context int, opened map[int]bool) ([]Row, []git.DiffLine) {
+	diff := make([]git.DiffLine, count)
+	near := make([]bool, count)
+	for index := range diff {
+		diff[index] = git.DiffLine{Kind: git.Context, OldNumber: index + 1, NewNumber: index + 1}
+		near[index] = context < 0
+	}
+	for number := range focus {
+		for index := max(number-1-context, 0); index <= min(number-1+context, count-1) && context >= 0; index++ {
+			near[index] = true
+		}
+	}
+	return foldRows(diff, near, opened), diff
+}
+
+// FocusStarts are the rows where a run of lines in focus starts, to jump from one to the next.
+func FocusStarts(rows []Row, focus map[int]bool) []int {
+	var starts []int
+	previous := false
+	for index, row := range rows {
+		inFocus := !row.IsFold() && focus[row.Line.NewNumber]
+		if inFocus && !previous {
+			starts = append(starts, index)
+		}
+		previous = inFocus
+	}
+	return starts
 }
 
 // HunkStarts are the rows where a run of changes starts, to jump from one to the next.

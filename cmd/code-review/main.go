@@ -20,6 +20,7 @@ import (
 	"github.com/akrck02/code-review/internal/files"
 	"github.com/akrck02/code-review/internal/lsp"
 	"github.com/akrck02/code-review/internal/review"
+	"github.com/akrck02/code-review/internal/uses"
 	"github.com/akrck02/code-review/internal/window"
 	"github.com/akrck02/code-review/internal/workspace"
 	"github.com/akrck02/go-renderer/opengl/overlay"
@@ -45,6 +46,8 @@ func main() {
 		files.New(),
 		// the files marked as viewed are kept in the reader's own folder, never in the repositories
 		review.New(review.DefaultReviewedPath()),
+		// every use of a name, across the projects, and their graphs (⇧F12)
+		uses.New(),
 	)
 	if err != nil {
 		log.Fatal(err)

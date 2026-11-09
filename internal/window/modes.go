@@ -33,9 +33,13 @@ func (application *Window) setMode(chosen mode.Mode) {
 	application.mode = chosen
 	application.sidebar.Listing = chosen
 	application.sidebar.Stale = true
-	if chosen.ShowsChanges() {
+	application.viewer.SetUses(application.usesOfFile(application.viewer.Reference))
+	switch {
+	case len(application.viewer.Uses) > 0:
+		application.viewer.SetMode(viewer.UsesView)
+	case chosen.ShowsChanges():
 		application.viewer.SetMode(viewer.DiffView)
-	} else {
+	default:
 		application.viewer.SetMode(viewer.FileView)
 	}
 	if application.viewer.IsOpen() {
@@ -74,22 +78,34 @@ func (application *Window) modeCommands() []command {
 		keys:        []pane.Press{pane.Key(input.KeyC, "c"), pane.CommandKey(input.Key0, "⌘0")},
 		do:          func(application *Window, _ *ui.Context, _ int) { application.nextMode() },
 	})
+	return append(result, application.declaredCommands(false)...)
+}
+
+// declaredCommands are the keys the modes declare: those kept to while their mode is on (own), or
+// the others, which work whatever mode is on, as each acts on its own state.
+func (application *Window) declaredCommands(own bool) []command {
+	var result []command
 	for _, each := range application.modes {
+		owner := each
 		for _, declared := range each.Commands() {
+			if declared.OnlyWhenOn != own {
+				continue
+			}
 			do := declared.Do
-			result = append(result, command{
-				description: declared.Description,
-				keys:        declared.Keys,
-				do:          func(_ *Window, _ *ui.Context, step int) { do(step) },
-			})
+			found := command{description: declared.Description, keys: declared.Keys,
+				do: func(_ *Window, _ *ui.Context, step int) { do(step) }}
+			if own {
+				found.applies = func(application *Window) bool { return application.mode == owner }
+			}
+			result = append(result, found)
 		}
 	}
 	return result
 }
 
-// allCommands are the window's commands, then the modes'.
+// allCommands are the keys of the mode that is on kept to it, then the window's, then the modes'.
 func (application *Window) allCommands() []command {
-	return append(append([]command{}, commands...), application.modeCommands()...)
+	return append(append(application.declaredCommands(true), commands...), application.modeCommands()...)
 }
 
 // progress is how far the first mode with work to count has gone, for the status bar, with the

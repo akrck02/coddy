@@ -111,3 +111,10 @@ func TestUsesAskedWhileTheServerReadsAreAskedAgainOnceItIsDone(test *testing.T) 
 		test.Errorf("once the server was done the uses are %d, noted %q", len(application.finder.Hits), application.finder.Note)
 	}
 }
+
+func TestANameIsFoundEachTimeItStandsAsAWordInALine(test *testing.T) {
+	columns := wordColumns("    Lamp lamp = new Lamp(); // Lamps", "Lamp")
+	if len(columns) != 2 || columns[0] != 4 || columns[1] != 20 {
+		test.Errorf("Lamp stands at %v, want [4 20]", columns)
+	}
+}

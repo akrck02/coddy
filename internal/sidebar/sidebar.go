@@ -121,8 +121,8 @@ func (sidebar *Sidebar) isExpanded(window Window, project int, path string, isPr
 	if open, chosen := sidebar.expanded[sidebar.expandedKey(project, path)]; chosen {
 		return open
 	}
-	if sidebar.Listing.ChangesOnly() {
-		return true
+	if _, chooses := sidebar.Listing.(Chooser); chooses || sidebar.Listing.ChangesOnly() {
+		return true // a few files, chosen: all in sight
 	}
 	return isProject && len(window.Projects()) == 1
 }
@@ -137,6 +137,11 @@ func (sidebar *Sidebar) tree(window Window, project int) *workspace.Folder {
 	paths := model.Files
 	if sidebar.listsChangesOnly() {
 		paths = model.ChangedPaths()
+	}
+	if chooser, chooses := sidebar.Listing.(Chooser); chooses {
+		if chosen, own := chooser.ListedFiles(project); own {
+			paths = chosen
+		}
 	}
 	// a Gradle or Maven project is shown as IntelliJ shows it: modules, source roots, packages
 	build := workspace.BuildTree
@@ -190,8 +195,13 @@ func (sidebar *Sidebar) addEnteredProject(window Window) {
 // are hidden.
 func (sidebar *Sidebar) addEveryProject(window Window) {
 	hidden := 0
-	for index, project := range window.Projects() {
-		if window.Hidden(project) {
+	for _, index := range sidebar.projectOrder(window) {
+		project := window.Projects()[index]
+		if listed, chosen := sidebar.chosenCount(index); chosen {
+			if listed == 0 {
+				continue // the listing chooses no file of it: not hidden, only not part of it
+			}
+		} else if window.Hidden(project) {
 			hidden++
 			continue
 		}
@@ -208,6 +218,30 @@ func (sidebar *Sidebar) addEveryProject(window Window) {
 		sidebar.Rows = append(sidebar.Rows, Row{Kind: NoteRow, Project: -1, Quiet: true,
 			Label: fmt.Sprintf("%d projects without changes hidden (h shows them)", hidden)})
 	}
+}
+
+// projectOrder is the order the projects are listed in: the listing's, when it chooses its files.
+func (sidebar *Sidebar) projectOrder(window Window) []int {
+	if chooser, chooses := sidebar.Listing.(Chooser); chooses {
+		if order := chooser.ProjectOrder(); order != nil {
+			return order
+		}
+	}
+	order := make([]int, len(window.Projects()))
+	for index := range order {
+		order[index] = index
+	}
+	return order
+}
+
+// chosenCount is how many files of a project the listing chooses, when it chooses them.
+func (sidebar *Sidebar) chosenCount(project int) (int, bool) {
+	chooser, chooses := sidebar.Listing.(Chooser)
+	if !chooses {
+		return 0, false
+	}
+	paths, own := chooser.ListedFiles(project)
+	return len(paths), own
 }
 
 // addProjectContent lists a project's tree at a depth, or why it cannot be listed yet.

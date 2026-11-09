@@ -25,6 +25,7 @@ type Mode int
 const (
 	DiffView Mode = iota // the changes, both sides interleaved
 	FileView             // the file as it is now
+	UsesView             // the file as it is now, its uses of a name marked and the rest folded
 )
 
 // foldContext is how many unchanged lines are kept around a change before the rest is folded.
@@ -81,7 +82,11 @@ type Viewer struct {
 	fullContext bool         // show every unchanged line instead of folding them
 	openedFolds map[int]bool // folds opened by hand, by where they start in the diff
 
-	rows  []workspace.Row // the diff's rows as shown
+	rows []workspace.Row // the diff's rows as shown
+	diff []git.DiffLine  // the diff the rows show: the file's, or the file unchanged for its uses
+	// Uses are where the file uses a name searched, by line from 1, as spans of characters: shown
+	// in the uses view; nil when the mode that is on searches none
+	Uses  map[int][]workspace.Span
 	Hunks []int
 	Added int
 	Gone  int
@@ -175,7 +180,10 @@ func (view *Viewer) Show(document *workspace.Document, showChanges bool) {
 	view.keepEditing()
 	if !keepPlace {
 		view.Mode = FileView
-		if document.Changed && showChanges {
+		switch {
+		case len(view.Uses) > 0:
+			view.Mode = UsesView
+		case document.Changed && showChanges:
 			view.Mode = DiffView
 		}
 	}
@@ -184,8 +192,19 @@ func (view *Viewer) Show(document *workspace.Document, showChanges bool) {
 		view.RevealLine(view.GoTo)
 		return
 	}
-	if !keepPlace && view.Mode == DiffView && len(view.Hunks) > 0 {
+	if !keepPlace && view.Mode != FileView && len(view.Hunks) > 0 {
 		view.List.RevealNearTop(view.Hunks[0])
+	}
+}
+
+// SetUses gives the uses of the file open, or none, and shows them when the uses view is on.
+func (view *Viewer) SetUses(uses map[int][]workspace.Span) {
+	view.Uses = uses
+	if view.Mode == UsesView && len(uses) == 0 {
+		view.Mode = FileView
+	}
+	if view.Document != nil {
+		view.layOut()
 	}
 }
 
@@ -198,7 +217,7 @@ func (view *Viewer) RevealLine(number int) {
 		view.Edit.Place(text.Position{Line: number - 1, Column: view.GoToColumn}, false)
 	}
 	view.GoToColumn = 0
-	if view.Mode != DiffView || !view.Document.Changed {
+	if !view.showsRows() {
 		view.List.RevealNearTop(max(min(number-1, view.RowCount()-1), 0))
 		return
 	}
@@ -215,7 +234,7 @@ func (view *Viewer) RevealLine(number int) {
 				continue
 			}
 			for offset := 0; offset < row.Folded; offset++ {
-				if line := view.Document.Diff[row.FoldStart+offset]; line.NewNumber == number {
+				if line := view.diff[row.FoldStart+offset]; line.NewNumber == number {
 					view.openedFolds[row.FoldStart] = true
 				}
 			}
@@ -239,9 +258,13 @@ func (view *Viewer) Reopen(path string, open func(file workspace.FileReference))
 // layOut works out the rows to show for the mode.
 func (view *Viewer) layOut() {
 	document := view.Document
-	view.rows, view.Hunks, view.Inline, view.Marks = nil, nil, nil, nil
+	view.rows, view.diff, view.Hunks, view.Inline, view.Marks = nil, nil, nil, nil, nil
 	defer func() { view.List.Count = view.RowCount() }()
 	if document == nil {
+		return
+	}
+	if view.Mode == UsesView {
+		view.layOutUses()
 		return
 	}
 	if document.Changed {
@@ -253,7 +276,7 @@ func (view *Viewer) layOut() {
 		if view.fullContext {
 			context = -1
 		}
-		view.rows = workspace.DiffRows(document.Diff, context, view.openedFolds)
+		view.rows, view.diff = workspace.DiffRows(document.Diff, context, view.openedFolds), document.Diff
 		view.Hunks = workspace.HunkStarts(view.rows)
 		view.Inline = workspace.InlineChanges(view.rows, func(line git.DiffLine) []rune {
 			if line.Kind == git.Removal {
@@ -271,6 +294,25 @@ func (view *Viewer) layOut() {
 	}
 }
 
+// layOutUses folds the lines away from the uses, as the diff folds the lines away from changes.
+func (view *Viewer) layOutUses() {
+	context := foldContext
+	if view.fullContext {
+		context = -1
+	}
+	focus := map[int]bool{}
+	for number := range view.Uses {
+		focus[number] = true
+	}
+	view.rows, view.diff = workspace.FocusRows(len(view.lines()), focus, context, view.openedFolds)
+	view.Hunks = workspace.FocusStarts(view.rows, focus)
+}
+
+// showsRows tells whether the view shows rows, folds among them, rather than the file's lines.
+func (view *Viewer) showsRows() bool {
+	return view.Mode == UsesView || (view.Mode == DiffView && view.Document != nil && view.Document.Changed)
+}
+
 // lines are the lines shown in the file view: as it is now, or as it was for a deleted file.
 func (view *Viewer) lines() []highlight.Line {
 	document := view.Document
@@ -285,7 +327,7 @@ func (view *Viewer) RowCount() int {
 	if view.Document == nil {
 		return 0
 	}
-	if view.Mode == DiffView && view.Document.Changed {
+	if view.showsRows() {
 		return len(view.rows)
 	}
 	return view.fileLineCount()
@@ -293,13 +335,14 @@ func (view *Viewer) RowCount() int {
 
 // SetMode shows the file as its changes or whole; only a changed file has changes to show.
 func (view *Viewer) SetMode(mode Mode) {
-	if view.Document == nil || mode == view.Mode || (mode == DiffView && !view.Document.Changed) {
+	if view.Document == nil || mode == view.Mode || (mode == DiffView && !view.Document.Changed) ||
+		(mode == UsesView && len(view.Uses) == 0) {
 		return
 	}
 	view.Mode = mode
 	view.layOut()
 	view.List.Offset = 0
-	if mode == DiffView && len(view.Hunks) > 0 {
+	if mode != FileView && len(view.Hunks) > 0 {
 		view.List.RevealNearTop(view.Hunks[0])
 	}
 }
@@ -422,7 +465,7 @@ func (view *Viewer) followInput(context *ui.Context, window Window) {
 	clicked := inside && !onBar
 	if clicked {
 		index := view.List.RowAt(x, y)
-		if index >= 0 && view.Mode == DiffView && index < len(view.rows) && view.rows[index].IsFold() {
+		if index >= 0 && view.showsRows() && index < len(view.rows) && view.rows[index].IsFold() {
 			view.openFold(index)
 		}
 	}
@@ -561,7 +604,7 @@ func (view *Viewer) buildChange(context *ui.Context, compact bool) {
 // buildViewButtons offers the ways to show a changed file: folding, the view and the mode's button.
 func (view *Viewer) buildViewButtons(context *ui.Context, window Window) {
 	context.Box(ui.Layout{Width: ui.Fixed(6)}, nil)
-	if view.Mode == DiffView {
+	if view.Mode != FileView {
 		icon, tip := "unfold-vertical", "Show every unchanged line (f)"
 		if view.fullContext {
 			icon, tip = "fold-vertical", "Fold the unchanged lines (f)"
@@ -570,15 +613,29 @@ func (view *Viewer) buildViewButtons(context *ui.Context, window Window) {
 			view.ToggleContext()
 		}
 	}
-	mode := int(view.Mode)
-	if theme.IconSwitch(context, "view mode", &mode, []theme.IconChoice{
-		{Icon: "file-diff", Name: "The changes (d)"}, {Icon: "file-code", Name: "The whole file (d)"},
-	}) {
-		view.SetMode(Mode(mode))
-	}
+	view.buildViewSwitch(context)
 	if button, shown := window.FileButton(view.Reference); shown {
 		if theme.ToolButton(context, button.Tip, button.Icon, button.On) {
 			window.PressFileButton(view.Reference)
+		}
+	}
+}
+
+// buildViewSwitch switches between the changes, or the uses, and the whole file.
+func (view *Viewer) buildViewSwitch(context *ui.Context) {
+	other, choice := DiffView, theme.IconChoice{Icon: "file-diff", Name: "The changes (d)"}
+	if len(view.Uses) > 0 {
+		other, choice = UsesView, theme.IconChoice{Icon: "file-search", Name: "The uses (d)"}
+	}
+	chosen := 0
+	if view.Mode == FileView {
+		chosen = 1
+	}
+	if theme.IconSwitch(context, "view mode", &chosen, []theme.IconChoice{choice, {Icon: "file-code", Name: "The whole file (d)"}}) {
+		if chosen == 1 {
+			view.SetMode(FileView)
+		} else {
+			view.SetMode(other)
 		}
 	}
 }
@@ -640,11 +697,14 @@ func (view *Viewer) paint(context *ui.Context, window Window, drawing *draw2d.Li
 	for index := first; index < last; index++ {
 		top := view.List.RowTop(index)
 		baseline := top + (view.rowHeight+view.codeAscent-view.codeDescent)/2
-		if !painter.diff {
+		switch {
+		case !view.showsRows():
 			view.paintFileLine(painter, index, top, baseline)
-		} else if row := view.rows[index]; row.IsFold() {
-			view.paintFold(painter, row, top, baseline)
-		} else {
+		case view.rows[index].IsFold():
+			view.paintFold(painter, view.rows[index], top, baseline)
+		case view.Mode == UsesView:
+			view.paintUseLine(painter, index, top, baseline)
+		default:
 			view.paintDiffLine(painter, index, top, baseline)
 		}
 	}
@@ -714,6 +774,9 @@ func (view *Viewer) paintFold(painter painting, row workspace.Row, top, baseline
 	painter.drawing.Rectangle(rowArea, 0, painter.look.Hover.WithAlpha(0.6), draw2d.Color{}, 0)
 	painter.drawing.Icon("unfold-vertical", area.X+painter.gutter-20, top+(view.rowHeight-12)/2, 12, palette.InkQuiet)
 	label := fmt.Sprintf("%d unchanged lines", row.Folded)
+	if view.Mode == UsesView {
+		label = fmt.Sprintf("%d lines without uses", row.Folded)
+	}
 	painter.drawing.Text(label, painter.codeArea.X, baseline, palette.SmallTextSize, draw2d.Regular, palette.InkQuiet)
 }
 
@@ -766,6 +829,35 @@ func (view *Viewer) paintDiffLine(painter painting, index int, top, baseline flo
 	view.paintCode(drawing, painter.window, style.code, painter.codeArea, baseline)
 }
 
+// paintUseLine paints a line of the uses view: its number and code, washed when it uses the name,
+// more strongly behind each use.
+func (view *Viewer) paintUseLine(painter painting, index int, top, baseline float32) {
+	look, area, drawing := painter.look, painter.area, painter.drawing
+	number := view.rows[index].Line.NewNumber
+	rowArea := draw2d.Rectangle{X: area.X, Y: top, Width: area.Width, Height: view.rowHeight}
+	numberInk := look.LineNumber
+	if spans := view.Uses[number]; len(spans) > 0 {
+		drawing.Rectangle(rowArea, 0, look.Theme.PrimaryTint, draw2d.Color{}, 0)
+		drawing.Rectangle(draw2d.Rectangle{X: area.X, Y: top, Width: gutterMarkWidth, Height: view.rowHeight}, 0, look.Theme.Primary, draw2d.Color{}, 0)
+		numberInk = look.ActiveLineNumber
+		line := lineAt(view.lines(), number).Text()
+		drawing.PushClip(painter.codeArea)
+		for _, span := range spans {
+			start, end := highlight.Column(line, span.Start), highlight.Column(line, span.End)
+			x := painter.codeArea.X + float32(start)*view.charWidth - view.List.OffsetX
+			word := draw2d.Rectangle{X: x, Y: top + 2, Width: float32(end-start) * view.charWidth, Height: view.rowHeight - 4}
+			drawing.Rectangle(word, 3, look.Theme.Selection, draw2d.Color{}, 0)
+		}
+		drawing.PopClip()
+	}
+	if number == view.MarkedLine && view.MarkedLine > 0 {
+		drawing.Rectangle(rowArea, 0, look.Hover.WithAlpha(0.8), draw2d.Color{}, 0)
+		numberInk = look.ActiveLineNumber
+	}
+	view.paintNumber(drawing, number, area.X, painter.numberWidth, baseline, numberInk)
+	view.paintCode(drawing, painter.window, lineAt(view.lines(), number), painter.codeArea, baseline)
+}
+
 // paintWash paints a changed line's background, its edge, and a stronger wash behind the words that
 // changed.
 func (view *Viewer) paintWash(painter painting, index int, style lineStyle, rowArea draw2d.Rectangle) {
@@ -804,6 +896,14 @@ func (view *Viewer) paintChangeMarks(drawing *draw2d.List, look theme.Look) {
 	mark := func(index, count int, colour draw2d.Color) {
 		y := bar.Y + float32(index)/float32(count)*bar.Height
 		drawing.Rectangle(draw2d.Rectangle{X: bar.X - 3, Y: y, Width: 3, Height: max(bar.Height/float32(count), 2)}, 0, colour, draw2d.Color{}, 0)
+	}
+	if view.Mode == UsesView {
+		for index, row := range view.rows {
+			if !row.IsFold() && len(view.Uses[row.Line.NewNumber]) > 0 {
+				mark(index, len(view.rows), look.Theme.Primary)
+			}
+		}
+		return
 	}
 	if view.Mode == DiffView {
 		for index, row := range view.rows {

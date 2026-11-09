@@ -24,9 +24,13 @@ func (application *Window) usesAsked() {
 	if !ready {
 		return
 	}
-	at := application.positionOf(place)
 	name := wordAt(application.viewer.LineText(place.Line), place.Column)
-	search := &usesSearch{name: name, home: application.viewer.Reference.Project, asked: asked, at: at}
+	application.searchUses(asked, application.positionOf(place), name, application.viewer.Reference.Project)
+}
+
+// searchUses searches the uses of a name at a place of a file its server reads.
+func (application *Window) searchUses(asked asking, at lsp.Position, name string, home int) {
+	search := &usesSearch{name: name, home: home, asked: asked, at: at}
 	projects, options := application.inSightPaths(), application.wordSearch()
 	application.waitFor(asked.client)
 	application.work.run("references", func(stop cancellation) func() {
