@@ -51,6 +51,9 @@ type languageServers struct {
 	// queued are the servers waiting for another to have imported the projects, by name, with
 	// the other's
 	queued map[string]string
+	// stopping are the servers stopped that have not ended yet, by key: one starts again only once
+	// the other has, as jdtls saves its workspace in the data folder they share as it stops
+	stopping map[string]bool
 }
 
 // startWait is how long a server gets to start and answer initialize.
@@ -64,7 +67,7 @@ func newLanguageServers(table []lsp.Server, writtenPath string) languageServers 
 		told: map[string]told{}, missing: map[string]bool{}, failed: map[string]string{}, crashes: map[string]int{}, snapshots: map[string]*workspace.Snapshot{},
 		written: workspace.OpenWritten(writtenPath), adding: map[string]bool{}, roots: map[string]string{},
 		inSight: map[string][]string{}, restarting: map[string]string{}, resting: map[string]string{}, rest: serverRest, usage: map[string]serverUsage{},
-		queued: map[string]string{}}
+		queued: map[string]string{}, stopping: map[string]bool{}}
 }
 
 // serverKey names a server running in a root ("" for one per window).
@@ -156,8 +159,9 @@ func (application *Window) textNow() (told, string) {
 // noted; once it answers, the next frame tells it the file.
 func (application *Window) startServer(server lsp.Server, root, key, project string) {
 	servers := &application.servers
-	if other := application.importingBefore(server); other != "" {
-		servers.queued[server.Name] = other // started on a later frame, once the other is ready
+	if other := application.importingBefore(server); servers.stopping[key] || other != "" {
+		// started on a later frame, once the one before has ended or the other is ready
+		servers.queued[server.Name] = other // "" while the one before ends: the status shows no wait
 		return
 	}
 	delete(servers.queued, server.Name)
@@ -382,6 +386,13 @@ func (application *Window) dataFolder(server lsp.Server) string {
 		folder = filepath.Join(config, "code-review", "servers")
 	}
 	return filepath.Join(folder, server.Name)
+}
+
+// stopServer stops a server in the background, and notes it stopping until its process has ended.
+func (application *Window) stopServer(key string, client *lsp.Client) {
+	application.servers.stopping[key] = true
+	go client.Stop()
+	application.work.whenDone(client.Exited(), func() { delete(application.servers.stopping, key) })
 }
 
 // stopServers stops every server, together, and waits for them.

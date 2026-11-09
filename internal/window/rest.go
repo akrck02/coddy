@@ -52,7 +52,7 @@ func (application *Window) restServer(key string, client *lsp.Client) {
 		}
 	}
 	servers.resting[key] = client.Server.Name
-	go client.Stop()
+	application.stopServer(key, client)
 }
 
 // wakeServer lets a resting server start again, as it is asked something.

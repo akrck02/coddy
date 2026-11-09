@@ -75,5 +75,5 @@ func (application *Window) restartServer(server lsp.Server, key string, client *
 		}
 	}
 	application.toast = server.Name + " starts again to read the " + strconv.Itoa(len(wanted)) + " projects in sight"
-	go client.Stop()
+	application.stopServer(key, client)
 }

@@ -17,6 +17,8 @@
 //   - FAKE_JVM_OPTIONS: logged at initialize, with its arguments and initializationOptions.
 //   - FAKE_LSP_READY: a language/status type it sends a moment after it is initialized, as jdtls
 //     sends ServiceReady once it has read the projects; it answers every request at once meanwhile.
+//   - FAKE_LSP_SLOW_EXIT: milliseconds it takes to end after exit, as jdtls saves its workspace;
+//     it logs "saved" just before it ends.
 //   - FAKE_LSP_BLANK: when set, it answers every request with nothing until it sends FAKE_LSP_READY.
 //   - FAKE_LSP_JARS: when set, a name declared in no workspace folder but imported
 //     ("import org.lighthouse.Lamp") is declared in a jar, answered as kotlin-lsp answers it.
@@ -83,7 +85,7 @@ func (fake *server) handle(method string, params json.RawMessage) (any, error) {
 	case "shutdown":
 		return nil, nil
 	case "exit":
-		close(fake.stopped)
+		go fake.exit()
 	}
 	return nil, nil
 }
@@ -131,6 +133,17 @@ func (fake *server) work(milliseconds string) {
 }
 
 // logLine appends a line to the log, when the test asked for one.
+// exit ends the fake, after the time it was asked to take.
+func (fake *server) exit() {
+	if slow := os.Getenv("FAKE_LSP_SLOW_EXIT"); slow != "" {
+		var length int
+		_, _ = fmt.Sscan(slow, &length)
+		time.Sleep(time.Duration(length) * time.Millisecond)
+		logLine("saved")
+	}
+	close(fake.stopped)
+}
+
 func logLine(line string) {
 	path := os.Getenv("FAKE_LSP_LOG")
 	if path == "" {

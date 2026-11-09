@@ -210,3 +210,22 @@ func TestTheDeclarationAroundAPlaceIsFound(test *testing.T) {
 		test.Error("the name of a declaration is taken as inside it")
 	}
 }
+
+func TestAServerStoppedGetsTheTimeItTakesToSaveItsWork(test *testing.T) {
+	folder := project(test, map[string]string{"lamp.go": "package lamp\n\nfunc Beam() int { return 2 }\n"})
+	server, log := fake(test, false, "FAKE_LSP_SLOW_EXIT=2500")
+	client, err := Start(within(test), server, folder, nil, "")
+	if err != nil {
+		test.Fatal(err)
+	}
+	client.Stop()
+	content, _ := os.ReadFile(log)
+	if !strings.Contains(string(content), "saved") {
+		test.Errorf("the server was ended before it saved its work: it logged %q", content)
+	}
+	select {
+	case <-client.Exited():
+	default:
+		test.Error("the server's process still runs once stopped")
+	}
+}

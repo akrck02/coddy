@@ -21,7 +21,8 @@ type Client struct {
 	Root    string // its root, or "" for one per window
 	conn    *Conn
 	command *exec.Cmd
-	data    string // its data folder
+	exited  chan struct{} // closed once its process has ended
+	data    string        // its data folder
 
 	lock      sync.Mutex
 	telling   sync.Mutex     // held while a document's text is sent, so texts go out in order
@@ -61,14 +62,17 @@ func Start(ctx context.Context, server Server, root string, folders []string, da
 	if err := command.Start(); err != nil {
 		return nil, failure.Wrap(ServerNotFound, server.Name, err)
 	}
-	client := &Client{Server: server, Root: root, command: command, data: dataFolder, versions: map[string]int{}, folders: map[string]bool{},
+	client := &Client{Server: server, Root: root, command: command, exited: make(chan struct{}), data: dataFolder, versions: map[string]int{}, folders: map[string]bool{},
 		ready: make(chan struct{}), working: map[string]*work{}, started: time.Now(), statusSince: time.Now(),
 		imported: map[string]time.Time{}, changes: make(chan struct{}, 1)}
 	if server.ReadyStatus == "" {
 		client.becomeReady()
 	}
 	client.conn = NewConn(output, input, client.handle)
-	go func() { _ = command.Wait() }()
+	go func() {
+		_ = command.Wait()
+		close(client.exited)
+	}()
 	if err := client.initialize(ctx, root, folders); err != nil {
 		client.kill()
 		return nil, err
@@ -453,6 +457,9 @@ func hoverText(raw json.RawMessage) string {
 	return strings.Join(parts, "\n\n")
 }
 
+// Exited is closed once the server's process has ended.
+func (client *Client) Exited() <-chan struct{} { return client.exited }
+
 // Done is closed once the server has stopped.
 func (client *Client) Done() <-chan struct{} { return client.conn.Done() }
 
@@ -464,7 +471,7 @@ func (client *Client) Stop() {
 		_ = client.conn.Notify("exit", nil)
 	}
 	select {
-	case <-client.conn.Done():
+	case <-client.exited:
 	case <-ctx.Done():
 	}
 	client.kill()
@@ -473,8 +480,9 @@ func (client *Client) Stop() {
 	}
 }
 
-// stopWait is how long a server gets to stop on its own.
-const stopWait = 2 * time.Second
+// stopWait is how long a server gets to stop on its own: jdtls saves its workspace as it stops
+// (2.4 s on the big workspace), and one killed before it is done imports every Gradle project again next time.
+const stopWait = 30 * time.Second
 
 // kill ends the server's process, if it still runs.
 func (client *Client) kill() {

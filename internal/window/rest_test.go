@@ -1,6 +1,7 @@
 package window
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -66,5 +67,26 @@ func TestTheServersPanelShowsWhatAServerTakesAndStopsIt(test *testing.T) {
 	}
 	if application.serverStatus() != "fakels resting" {
 		test.Errorf("the status bar says %q", application.serverStatus())
+	}
+}
+
+func TestAServerWokenWhileTheOneBeforeSavesStartsOnceItHasEnded(test *testing.T) {
+	log := filepath.Join(test.TempDir(), "log")
+	servers := fakeGo(test, log)
+	servers[0].Environment = append(servers[0].Environment, "FAKE_LSP_SLOW_EXIT=800")
+	application := readerWithServers(test, "lighthouse/src/lamp.go", servers)
+	window := newWindow(test, application)
+	key := "fakels " + application.projects[0].Path
+	first := application.servers.running[key]
+	application.restServer(key, first)
+	application.GoToDefinition(viewer.Place{Line: 2, Column: 5})
+	for attempt := 0; attempt < 300 && application.servers.running[key] == nil; attempt++ {
+		time.Sleep(10 * time.Millisecond)
+		window.Frames(1)
+	}
+	content, _ := os.ReadFile(log)
+	saved, again := strings.Index(string(content), "saved"), strings.LastIndex(string(content), "initialize")
+	if application.servers.running[key] == nil || saved < 0 || again < saved {
+		test.Errorf("the server woke before the one resting had saved: it logged %q", content)
 	}
 }
