@@ -6,8 +6,8 @@
 
 Trying proposals 4 and 5 on the big workspace (44 repositories, 22 with changes) showed three things:
 
-- **Uses stop at the repository.** `⇧F12` on a Kotlin class of `dal.mariadb` listed 1 use, its own
-  declaration. The class is also used in a Java file of `harbour.api.order`. Each repository of the big workspace is
+- **Uses stop at the repository.** `⇧F12` on a Kotlin class of `lighthouse.store` listed 1 use, its own
+  declaration. The class is also used in a Java file of `harbour.api`. Each repository of the big workspace is
   a Gradle build of its own, and the others see it as a jar, so no server links that use to the
   source: kotlin-lsp does not read Java files of other builds, and jdtls sees the jar's class. A
   review needs those uses: who calls what changed.
@@ -25,7 +25,7 @@ Trying proposals 4 and 5 on the big workspace (44 repositories, 22 with changes)
 | R1 | Uses of a name include those in other projects in sight, in any language a server reads: a Java file using a Kotlin class of another repository, through its jar. | A window test with two projects whose servers answer a jar location (fake server), and a test on the big workspace by hand. |
 | R2 | A list of uses taken while a server is still reading says so, and fills in by itself once the servers are done. | A window test with the fake server busy. |
 | R3 | Filtering to the changed files leaves out, in the sidebar and the finder, the projects with no changes; it does not open folders. | A sidebar test. |
-| R4 | Servers read the projects in sight only. When that set changes, a server that follows workspace folders is told; one that does not (kotlin-lsp) is started again on the new set. | Window tests with the fake server, with and without workspace folders. |
+| R4 | Servers read the projects in sight only. When that set changes, a server that follows workspace folders is told; one that does not is started again on the new set (kotlin-lsp does follow them: proposal 8). | Window tests with the fake server, with and without workspace folders. |
 | R5 | The status bar says, per server, what it is doing: the phase (starting, importing, indexing, ready), the project, how far (a count or a percentage, as the server says), and for how long. | Client tests on `$/progress`, `language/status` and `intellij/importLog`; a window test of the status text. |
 | R6 | Clicking a server in the status bar opens a panel: each project it reads with its state, the time each took, and the server's last messages and errors. | A window test. |
 | R7 | A question asked while a server reads says what it waits for ("waiting for kotlin-lsp: indexing 45 %") instead of nothing. | A window test. |
@@ -64,7 +64,7 @@ whatever it answered.
   opened as they are now when a file is revealed, not all at once.
 - One-per-window servers get the projects in sight as workspace folders. A project that comes into
   sight is added (`didChangeWorkspaceFolders`, as now); one that leaves is removed. A server that
-  does not announce `workspace.workspaceFolders` (kotlin-lsp) is stopped and started again on the
+  does not announce `workspace.workspaceFolders` is stopped and started again on the
   new set, a moment after the last change, so a few clicks restart it once. Its index stays in its
   data folder, so a restart reads only what it has not read.
 
@@ -79,7 +79,7 @@ it started, and the last 50 messages. It reads:
   errors.
 
 The status bar shows one short line per server that is not ready, e.g.
-`kotlin-lsp · importing harbour.api.order (7 of 22) · 3:12` or `jdtls · indexing 45 % · 0:40`,
+`kotlin-lsp · importing harbour.api (7 of 22) · 3:12` or `jdtls · indexing 45 % · 0:40`,
 and `kotlin-lsp ✓` once ready. Clicking it opens the servers panel (R6). A request waiting on a
 server toasts what it waits for (R7), and the toast goes when the answer comes.
 
@@ -91,4 +91,4 @@ server toasts what it waits for (R7), and the toast goes when the answer comes.
 - [x] T4 The servers panel. (R6)
 - [x] T5 Uses across projects: candidates from the content search, checked by definition, grouped by project, with the footer. (R1)
 - [x] T6 Lists taken while busy say so and fill in. (R2)
-- [ ] T7 Try it on the big workspace: the `TideTableStore` case, timings and memory with the filter on and off; README and Result.
+- [ ] T7 Try it on the big workspace: the `LampStore` case, timings and memory with the filter on and off; README and Result.

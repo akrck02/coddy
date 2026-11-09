@@ -79,7 +79,7 @@ func (application *Window) buildServerStatus(context *ui.Context, small ui.TextS
 	}
 }
 
-// statusOf says what one server is doing: "kotlin-lsp · importing harbour.api.order (7 of 22) ·
+// statusOf says what one server is doing: "kotlin-lsp · importing harbour.api (7 of 22) ·
 // 3:12", "jdtls · indexing 45 % · 0:40", or "gopls ready".
 func statusOf(name string, progress lsp.Progress, now time.Time) string {
 	if progress.Phase == "ready" {

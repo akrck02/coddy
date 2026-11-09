@@ -228,7 +228,5 @@ are ready.
 - Long lines are not wrapped: scroll sideways (Shift+wheel, ←/→ in the editor).
 - One typeface for code at a time: SF Mono by default, or the one `-code-font` names (a `.ttf`;
   collections such as `Menlo.ttc` are not read).
-- `kotlin-lsp` does not follow projects coming into sight while it runs: the reader starts it
-  again for them, which may build another index.
 - Language servers only follow names: no rename, formatting, completion or diagnostics yet, and
   not on the old side of a diff, which is not on disk.

@@ -46,8 +46,8 @@ var Servers = []Server{
 	// JetBrains' server, still a preview. It imports each Gradle build first (minutes, cold) and
 	// answers with nothing meanwhile, telling its work by $/progress; a name in a jar answers
 	// jar:///…!/package/Class.class. Its index goes in the system path; Gradle's import writes
-	// .gradle/ and build/ in the project, as a build does. It does not say it follows workspace
-	// folders: it reads the projects open when it starts.
+	// .gradle/ and build/ in the project, as a build does. It follows workspace folders added and
+	// removed, keeping the index of the set it started with.
 	{Name: "kotlin-lsp", Command: "kotlin-lsp", Arguments: []string{"--stdio"}, DataFlag: "--system-path",
 		Languages: []string{"kotlin"}, OnePerWindow: true, Install: "brew install JetBrains/utils/kotlin-lsp",
 		// an index per set of projects, about 5 GB for the big workspace's 44: keep two

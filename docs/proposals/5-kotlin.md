@@ -64,9 +64,8 @@ repositories as SNAPSHOT jars):
 
 Left as they are:
 
-- It does not say it follows workspace folders (`workspace.workspaceFolders` is absent from its
-  capabilities), so a Kotlin project opened after it started may not be read until the window is
-  opened again.
+- It says it follows workspace folders (`workspace.workspaceFolders.supported`); an early probe
+  read its capabilities wrong and said otherwise (corrected on 9 November 2026, proposal 8).
 - It is a preview build: version 263.7084.0-EAP has an EAP licence that ends on 13 November 2026,
   though `kotlin-lsp license status` also says the build needs none. If it stops starting after
   that date, `brew upgrade jetbrains/utils/kotlin-lsp` gets a newer build (a cask of the same name now exists, so the bare name means the cask).

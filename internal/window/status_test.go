@@ -16,8 +16,8 @@ func TestTheStatusBarSaysWhatAServerDoes(test *testing.T) {
 		progress lsp.Progress
 		want     string
 	}{
-		{lsp.Progress{Phase: "importing", Detail: "harbour.api.order", Percent: -1, Done: 7, Total: 22, Started: started},
-			"kotlin-lsp · importing harbour.api.order (7 of 22) · 3:12"},
+		{lsp.Progress{Phase: "importing", Detail: "harbour.api", Percent: -1, Done: 7, Total: 22, Started: started},
+			"kotlin-lsp · importing harbour.api (7 of 22) · 3:12"},
 		{lsp.Progress{Phase: "indexing", Detail: "45%", Percent: 45, Started: started}, "kotlin-lsp · indexing 45 % · 3:12"},
 		{lsp.Progress{Phase: "starting", Detail: "Importing Gradle project(s)", Percent: -1, Started: started},
 			"kotlin-lsp · starting Importing Gradle project(s) · 3:12"},
