@@ -28,6 +28,7 @@ func (application *Window) buildServers(context *ui.Context) {
 	if !application.serversOpen {
 		return
 	}
+	application.measureServers(time.Now())
 	dismissed := context.Sheet("Language servers", ui.SheetOptions{Width: ui.Fixed(serversPanelWidth)}, func() {
 		_, windowHeight := context.Size()
 		context.ScrollArea("servers", ui.Layout{Width: ui.Grow(), Height: ui.Fixed(max(windowHeight-serversRoomAround, 200))}, func() {
@@ -56,7 +57,7 @@ func (application *Window) buildServerList(context *ui.Context) {
 	}
 	sort.Strings(keys)
 	for _, key := range keys {
-		application.buildServerCard(context, servers.running[key])
+		application.buildServerCard(context, key, servers.running[key])
 	}
 	for _, part := range application.serverParts() {
 		switch {
@@ -64,6 +65,8 @@ func (application *Window) buildServerList(context *ui.Context) {
 			application.buildServerNote(context, part.text, "Install it with: "+application.installOf(part.name))
 		case servers.failed[part.name] != "":
 			application.buildServerNote(context, part.text, servers.failed[part.name])
+		case strings.HasSuffix(part.text, " resting"):
+			application.buildServerNote(context, part.text, "Stopped while nobody asks it anything: following a name or asking its uses starts it again.")
 		case strings.HasSuffix(part.text, " · starting"):
 			application.buildServerNote(context, part.text, "Answering its first message.")
 		}
@@ -92,13 +95,23 @@ func (application *Window) buildServerNote(context *ui.Context, title, why strin
 }
 
 // buildServerCard is one running server: what it does, its projects and its last messages.
-func (application *Window) buildServerCard(context *ui.Context, client *lsp.Client) {
+func (application *Window) buildServerCard(context *ui.Context, key string, client *lsp.Client) {
 	progress, now := client.Progress(), time.Now()
 	palette := context.Theme
 	small := ui.TextStyle{Size: palette.SmallTextSize, Color: palette.InkSoft}
 	context.Box(ui.Layout{Direction: ui.Vertical, Width: ui.Grow(), Gap: 6}, func() {
-		context.Text(statusOf(client.Server.Name, progress, now), ui.TextStyle{Weight: draw2d.Bold})
-		context.Text("started at "+progress.Started.Format("15:04:05")+" · "+plural(len(progress.Projects), "project"), small)
+		context.Row(func() {
+			context.Text(statusOf(client.Server.Name, progress, now), ui.TextStyle{Weight: draw2d.Bold})
+			context.Spacer()
+			if context.Button("Stop##" + key) {
+				application.restServer(key, client) // the next question starts it again
+			}
+		})
+		started := "started at " + progress.Started.Format("15:04:05") + " · " + plural(len(progress.Projects), "project")
+		if usage := application.usageOf(key); usage != "" {
+			started += " · " + usage
+		}
+		context.Text(started, small)
 		for _, project := range progress.Projects {
 			context.Box(ui.Layout{Gap: 12}, func() {
 				context.Box(ui.Layout{Width: ui.Fixed(300)}, func() { context.Text(filepath.Base(project.Path), ui.TextStyle{}) })

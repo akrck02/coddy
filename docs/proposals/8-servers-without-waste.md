@@ -1,6 +1,6 @@
 # 8. Language servers without waste
 
-> Status: approved · Author's approval: proposal ☑ plan ☑
+> Status: in progress · Author's approval: proposal ☑ plan ☑
 
 ## Why
 
@@ -64,12 +64,29 @@ Marked **seen** (in docs, code, logs or on disk) or **not tried**.
 
 ## Tasks
 
-- [ ] T1 jdtls's settings and `-Xmx`; the real-server test asserts it writes nothing. (R6, R7)
-- [ ] T2 kotlin-lsp's own Gradle user home, daemons timed out and stopped. (R5, R7)
-- [ ] T3 Free space checked; one index kept. (R2, R3)
-- [ ] T4 Idle servers stop and start again. (R4)
-- [ ] T5 The start set from changes and their dependencies (needs proposal 7's T5). (R1)
-- [ ] T6 Memory, index size and a stop button in the panel. (R8)
+- [x] T1 jdtls's settings and `-Xmx`; the real-server test asserts it writes nothing. (R6, R7)
+- [x] T2 kotlin-lsp's own Gradle user home, daemons timed out and stopped. (R5, R7)
+- [x] T3 Free space checked; one index kept. (R2, R3)
+- [x] T4 Idle servers stop and start again. (R4)
+- [ ] T5 The start set from changes and their dependencies (needs proposal 7's T5). (R1) —
+  waits for proposal 7.
+- [x] T6 Memory, index size and a stop button in the panel. (R8)
 - [ ] T7 Try it on the big workspace for a day of reviews: disk and processes before and after; Result.
 
 [671baec]: the commit that removes old indexes
+
+## Notes while building
+
+- **T1**: the setting `java.import.generatesMetadataFilesAtProjectRoot` alone did not stop jdtls:
+  it reads it as a JVM property (`-Djava.import.generatesMetadataFilesAtProjectRoot=false`) before
+  it imports. The real-server test now imports a Maven project and asserts nothing new is in it;
+  with the old settings it found `.project`, `.classpath`, `.settings/` and `target/classes/`.
+  Projects where jdtls wrote them already keep them: they are listed as the server's (proposal 4).
+- **T2**: kotlin-lsp honours `GRADLE_USER_HOME` (seen: its daemons log in the reader's Gradle home).
+  The wrapper folder is a link to the person's, so no Gradle version is downloaded twice. A daemon
+  is known by the log it writes, `daemon/<version>/daemon-<process>.out.log`, and stopped only when
+  that process is a Gradle daemon. Its first import with the new home reindexes once, as jar paths
+  change.
+- **T3**: `-keep-indexes` and `-server-memory` change the table's values from the command line.
+- **T4**: pointing at a name does not wake a resting server (hovering would start 2 GB by
+  accident); following a name and asking its uses do.

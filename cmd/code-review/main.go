@@ -14,6 +14,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/akrck02/code-review/internal/files"
@@ -56,7 +57,8 @@ type commandLine struct {
 	base, open, find, codeFont               *string
 	committed, light, reviewing, allProjects *bool
 	readOnly                                 *bool
-	serverData                               *string
+	serverData, serverMemory                 *string
+	keepIndexes                              *int
 }
 
 // registerFlags declares the reader's own flags, beside the platform's.
@@ -73,6 +75,8 @@ func registerFlags() commandLine {
 		readOnly:    flag.Bool("read-only", false, "start read-only: files are only read, not edited (the choice is remembered otherwise)"),
 		serverData: flag.String("server-data", "", "keep the language servers' indexes in this folder, another disk say "+
 			"(default: the reader's own folder; the choice is remembered)"),
+		serverMemory: flag.String("server-memory", "2g", "the most memory each Java language server may take (jdtls, kotlin-lsp)"),
+		keepIndexes:  flag.Int("keep-indexes", 1, "how many of kotlin-lsp's indexes to keep, one per set of projects, about 5 GB each"),
 	}
 	flag.Usage = func() {
 		fmt.Fprintln(flag.CommandLine.Output(), "usage: code-review [flags] [repository or folder of repositories …]")
@@ -101,7 +105,7 @@ func settingsOf(asked commandLine, options platform.Options) window.Settings {
 		Mode:        startMode(*asked.reviewing),
 		Synchronous: options.CapturePath != "",
 		ReadOnly:    readOnly(*asked.readOnly),
-		Servers:     serversFor(options.CapturePath),
+		Servers:     serversFor(options.CapturePath, *asked.serverMemory, *asked.keepIndexes),
 		// what language servers wrote stays theirs after a restart
 		ServersWrote: workspace.DefaultWrittenPath(),
 		ServerData:   serverData(*asked.serverData),
@@ -109,12 +113,22 @@ func settingsOf(asked commandLine, options platform.Options) window.Settings {
 }
 
 // serversFor are the language servers to run: none for a capture, which shows one frame and
-// should start no program; nil, every server found on the PATH, otherwise.
-func serversFor(capturePath string) []lsp.Server {
+// should start no program; every server of the table otherwise, found on the PATH, with the
+// memory and the indexes the flags ask for.
+func serversFor(capturePath, memory string, keep int) []lsp.Server {
 	if capturePath != "" {
 		return []lsp.Server{}
 	}
-	return nil
+	servers := slices.Clone(lsp.Servers)
+	for index := range servers {
+		if servers[index].Memory != "" && memory != "" {
+			servers[index].Memory = memory
+		}
+		if servers[index].Indexes != "" && keep > 0 {
+			servers[index].KeepIndexes = keep
+		}
+	}
+	return servers
 }
 
 // run shows the window until it is closed, and keeps the folders open and the projects shown for

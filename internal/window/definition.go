@@ -54,16 +54,20 @@ func (asked asking) tellFirst() { _ = asked.client.Tell(asked.path, asked.text, 
 // readyServer is the running server of the file open, to ask it about the file; otherwise it says
 // why there is none.
 func (application *Window) readyServer() (asking, bool) {
-	asked, why := application.runningServer()
+	asked, why := application.runningServer(true)
 	if why != "" {
 		application.toast = why
 	}
 	return asked, why == ""
 }
 
-// runningServer is readyServer without a word: why there is no server, if there is none.
-func (application *Window) runningServer() (asking, string) {
-	server, _, path, found := application.serverOfOpenFile()
+// runningServer is readyServer without a word: why there is no server, if there is none. A
+// resting server starts again when waking, as for a question asked; not for a pointer resting.
+func (application *Window) runningServer(waking bool) (asking, string) {
+	server, root, path, found := application.serverOfOpenFile()
+	if found && waking {
+		application.wakeServer(serverKey(server, root))
+	}
 	servers := &application.servers
 	switch {
 	case !found:
@@ -76,6 +80,9 @@ func (application *Window) runningServer() (asking, string) {
 	client, told, text := application.serveOpenFile()
 	if client == nil && application.Loading() {
 		return asking{}, server.Name + " starts once the projects are read"
+	}
+	if client == nil && servers.resting[serverKey(server, root)] != "" {
+		return asking{}, server.Name + " is resting: follow a name to wake it"
 	}
 	if client == nil {
 		return asking{}, server.Name + " is starting: try again in a moment"

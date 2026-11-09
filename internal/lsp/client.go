@@ -3,6 +3,7 @@ package lsp
 import (
 	"context"
 	"encoding/json"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -20,6 +21,7 @@ type Client struct {
 	Root    string // its root, or "" for one per window
 	conn    *Conn
 	command *exec.Cmd
+	data    string // its data folder
 
 	lock      sync.Mutex
 	telling   sync.Mutex     // held while a document's text is sent, so texts go out in order
@@ -38,6 +40,7 @@ type Client struct {
 	log         []Message
 	readyAt     time.Time
 	idleAt      time.Time // when the work it reported last ended
+	askedAt     time.Time // when it was last asked something, or answered
 	changes     chan struct{}
 	// followsFolders tells whether the server says it follows workspace folders added and removed
 	// while it runs; one that does not reads those it started with.
@@ -51,19 +54,14 @@ func Start(ctx context.Context, server Server, root string, folders []string, da
 	if err != nil {
 		return nil, failure.Wrap(ServerNotFound, server.Name, err)
 	}
-	arguments := append([]string(nil), server.Arguments...)
-	if server.DataFlag != "" && dataFolder != "" {
-		arguments = append(arguments, server.DataFlag, dataFolder)
-	}
-	command := exec.Command(path, arguments...)
+	command := commandOf(path, server, dataFolder)
 	command.Dir = firstOf(root, folders)
-	command.Env = append(os.Environ(), server.Environment...)
 	input, _ := command.StdinPipe()
 	output, _ := command.StdoutPipe()
 	if err := command.Start(); err != nil {
 		return nil, failure.Wrap(ServerNotFound, server.Name, err)
 	}
-	client := &Client{Server: server, Root: root, command: command, versions: map[string]int{}, folders: map[string]bool{},
+	client := &Client{Server: server, Root: root, command: command, data: dataFolder, versions: map[string]int{}, folders: map[string]bool{},
 		ready: make(chan struct{}), working: map[string]*work{}, started: time.Now(), statusSince: time.Now(),
 		imported: map[string]time.Time{}, changes: make(chan struct{}, 1)}
 	if server.ReadyStatus == "" {
@@ -76,6 +74,28 @@ func Start(ctx context.Context, server Server, root string, folders []string, da
 		return nil, err
 	}
 	return client, nil
+}
+
+// commandOf is the command that runs a server: its arguments, its data folder, its memory and its
+// Gradle home.
+func commandOf(path string, server Server, dataFolder string) *exec.Cmd {
+	arguments := append([]string(nil), server.Arguments...)
+	if server.DataFlag != "" && dataFolder != "" {
+		arguments = append(arguments, server.DataFlag, dataFolder)
+	}
+	environment := append(os.Environ(), server.Environment...)
+	if server.OwnGradle && dataFolder != "" {
+		environment = append(environment, prepareGradleHome(dataFolder)...)
+	}
+	switch {
+	case server.Memory != "" && server.MemoryFlag != "":
+		arguments = append(arguments, server.MemoryFlag+server.Memory)
+	case server.Memory != "" && server.MemoryVariable != "":
+		environment = append(environment, server.MemoryVariable+"=-Xmx"+server.Memory)
+	}
+	command := exec.Command(path, arguments...)
+	command.Env = environment
+	return command
 }
 
 // firstOf is the root, or the first folder when there is no root.
@@ -103,8 +123,8 @@ func (client *Client) initialize(ctx context.Context, root string, folders []str
 		"workspaceFolders": workspaceFolders,
 		"capabilities":     capabilities,
 	}
-	if client.Server.Options != nil {
-		params["initializationOptions"] = client.Server.Options
+	if options := client.initializationOptions(); options != nil {
+		params["initializationOptions"] = options
 	}
 	var answer struct {
 		Capabilities struct {
@@ -120,6 +140,20 @@ func (client *Client) initialize(ctx context.Context, root string, folders []str
 	}
 	client.followsFolders = answer.Capabilities.Workspace.WorkspaceFolders.Supported
 	return client.conn.Notify("initialized", struct{}{})
+}
+
+// initializationOptions are the server's own options, with its settings when it has some.
+func (client *Client) initializationOptions() map[string]any {
+	server := client.Server
+	if server.Settings == nil {
+		return server.Options
+	}
+	options := maps.Clone(server.Options)
+	if options == nil {
+		options = map[string]any{}
+	}
+	options["settings"] = server.Settings
+	return options
 }
 
 // capabilities are what the reader asks of a server: definitions, references, hover as Markdown,
@@ -151,10 +185,16 @@ func (client *Client) handle(method string, params json.RawMessage) (any, error)
 		client.noteLog(params)
 	case "workspace/configuration":
 		var asked struct {
-			Items []json.RawMessage `json:"items"`
+			Items []struct {
+				Section string `json:"section"`
+			} `json:"items"`
 		}
 		_ = json.Unmarshal(params, &asked)
-		return make([]any, len(asked.Items)), nil // no settings: each server's defaults
+		answers := make([]any, len(asked.Items)) // null: the server's defaults
+		for index, item := range asked.Items {
+			answers[index] = client.Server.setting(item.Section)
+		}
+		return answers, nil
 	}
 	return nil, nil // registrations, progress and messages need no more than a reply
 }
@@ -416,6 +456,9 @@ func (client *Client) Stop() {
 	case <-ctx.Done():
 	}
 	client.kill()
+	if client.Server.OwnGradle && client.data != "" {
+		StopGradleDaemons(client.data)
+	}
 }
 
 // stopWait is how long a server gets to stop on its own.

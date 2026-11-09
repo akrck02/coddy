@@ -76,6 +76,9 @@ func TestGoplsFollowsANameInThisRepository(test *testing.T) {
 func TestJdtlsFollowsANameAcrossFiles(test *testing.T) {
 	server := realServer(test, "jdtls")
 	folder := project(test, map[string]string{
+		// a Maven project, as an imported one is where jdtls would write .project and .classpath
+		"pom.xml": "<project><modelVersion>4.0.0</modelVersion><groupId>lamp</groupId><artifactId>lamp</artifactId>" +
+			"<version>1</version><build><sourceDirectory>src</sourceDirectory></build></project>\n",
 		"src/lamp/Lamp.java":     "package lamp;\n\npublic class Lamp {\n    public static int beam() { return 2; }\n}\n",
 		"src/keeper/Keeper.java": "package keeper;\n\nimport lamp.Lamp;\n\npublic class Keeper {\n    int light = Lamp.beam();\n}\n",
 	})
@@ -94,7 +97,9 @@ func TestJdtlsFollowsANameAcrossFiles(test *testing.T) {
 	if err != nil || len(declared) == 0 || filepath.Base(PathOf(declared[0].URI)) != "Lamp.java" {
 		test.Errorf("beam is declared at %+v (%v), want Lamp.java", declared, err)
 	}
-	test.Logf("jdtls wrote: %v", newFiles(before, filesIn(test, folder)))
+	if written := newFiles(before, filesIn(test, folder)); len(written) > 0 {
+		test.Errorf("jdtls wrote in the project: %v", written)
+	}
 }
 
 // kotlin-lsp follows a name across the files of a Gradle project, once it has imported it.
@@ -109,11 +114,12 @@ func TestKotlinLspFollowsANameAcrossFiles(test *testing.T) {
 	before := filesIn(test, folder)
 	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Minute)
 	defer cancel()
-	client, err := Start(ctx, server, "", []string{folder}, test.TempDir())
+	data := test.TempDir()
+	client, err := Start(ctx, server, "", []string{folder}, data)
 	if err != nil {
 		test.Fatal(err)
 	}
-	defer client.Stop()
+	defer theDaemonsStopped(test, client, data)
 	use := filepath.Join(folder, "src", "main", "kotlin", "keeper", "Keeper.kt")
 	content, _ := os.ReadFile(use)
 	client.Tell(use, string(content), 1)
@@ -122,6 +128,19 @@ func TestKotlinLspFollowsANameAcrossFiles(test *testing.T) {
 		test.Errorf("beam is declared at %+v (%v), want Lamp.kt", declared, err)
 	}
 	test.Logf("kotlin-lsp wrote: %v", newFiles(before, filesIn(test, folder)))
+}
+
+// theDaemonsStopped stops a server and checks it imported with its own Gradle home, whose daemons
+// stopped with it.
+func theDaemonsStopped(test *testing.T, client *Client, data string) {
+	client.Stop()
+	logs, _ := filepath.Glob(filepath.Join(data, "gradle", "daemon", "*", "daemon-*.out.log"))
+	if len(logs) == 0 {
+		test.Error("no Gradle daemon ran in the server's own Gradle home")
+	}
+	if stopped := len(runningDaemons(data)); stopped > 0 {
+		test.Errorf("%d Gradle daemons outlived the server", stopped)
+	}
 }
 
 // filesIn lists every file under some folders.

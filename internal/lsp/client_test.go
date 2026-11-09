@@ -137,3 +137,37 @@ func TestApplyEditIsRefused(test *testing.T) {
 	heard, _ := os.ReadFile(log)
 	test.Fatalf("the server's edit was not answered \"not applied\":\n%s", heard)
 }
+
+func TestAServerIsGivenItsSettingsAndItsMemory(test *testing.T) {
+	folder := project(test, map[string]string{"go.mod": "module lamp\n"})
+	server, log := fake(test, true, "FAKE_LSP_ASKS=java.import")
+	server.Settings = map[string]any{"java": map[string]any{"import": map[string]any{"generatesMetadataFilesAtProjectRoot": false}}}
+	server.Memory, server.MemoryVariable = "2g", "FAKE_JVM_OPTIONS"
+	client, err := Start(within(test), server, "", []string{folder}, "")
+	if err != nil {
+		test.Fatal(err)
+	}
+	time.Sleep(300 * time.Millisecond)
+	client.Stop()
+	content, _ := os.ReadFile(log)
+	for _, want := range []string{`"settings":{"java":{"import":{"generatesMetadataFilesAtProjectRoot":false}}}`,
+		"jvm options -Xmx2g", `configuration [{"generatesMetadataFilesAtProjectRoot":false}]`} {
+		if !strings.Contains(string(content), want) {
+			test.Errorf("the server heard no %s:\n%s", want, content)
+		}
+	}
+}
+
+func TestAServerOfAMemoryFlagHasItOnItsCommandLine(test *testing.T) {
+	folder := project(test, map[string]string{"go.mod": "module lamp\n"})
+	server, log := fake(test, false)
+	server.Memory, server.MemoryFlag = "2g", "--jvm-arg=-Xmx"
+	client, err := Start(within(test), server, folder, nil, "")
+	if err != nil {
+		test.Fatal(err)
+	}
+	client.Stop()
+	if content, _ := os.ReadFile(log); !strings.Contains(string(content), "arguments --jvm-arg=-Xmx2g") {
+		test.Errorf("the server heard:\n%s", content)
+	}
+}

@@ -82,14 +82,25 @@ It has two modes, chosen on the rail at the far left (or with `1`, `2`, `c`):
   source when it is open. While a server reads the projects (`kotlin-lsp` imports each Gradle
   build, minutes the first time) the status bar says so, and a question waits for it. Servers
   start once the projects are read, and read only the projects in sight.
-- **Server indexes kept in check**: servers keep their indexes in the reader's own folder, or in
-  the one `-server-data` names (another disk; the choice is remembered). `kotlin-lsp` builds one
-  index per set of projects, about 5 GB for 44 repositories: the reader keeps the two used last
-  and removes older ones when it starts the server.
-- **What a server writes is not your change**: `jdtls` writes `.project`, `.classpath` and
-  `.settings/`. The reader notes what each project held before a server started in it, and a file
+- **Servers that leave nothing behind**:
+  - Indexes go in the reader's own folder, or in the one `-server-data` names (another disk; the
+    choice is remembered). `kotlin-lsp` builds one index per set of projects, about 5 GB for 44
+    repositories: the reader keeps the one used last (`-keep-indexes` keeps more), and does not
+    start it on a disk with less than 10 GB free, saying why.
+  - `jdtls` writes nothing in the repositories: its `.project`, `.classpath` and `.settings/` go in
+    its data folder, and it builds nothing into `bin/` or `target/`.
+  - `kotlin-lsp` imports with a Gradle home of its own, in its data folder, reading the
+    dependencies and Gradle versions you already downloaded: its Gradle daemons stop two minutes
+    after their last build, and with the server, never touching yours.
+  - Each Java server takes at most 2 GB of memory (`-server-memory` changes it).
+  - A server nobody asks anything for 15 minutes rests, giving its memory back; following a name
+    or asking its uses starts it again, from its index. The servers panel shows what each takes,
+    memory and index, and stops one.
+- **What a server writes is not your change**: `kotlin-lsp`'s Gradle import writes `.gradle/` and
+  `build/`, as a build does, and `jdtls` wrote `.project` and `.classpath` before it was told not
+  to. The reader notes what each project held before a server started in it, and a file
   that appears or changes afterwards, which you did not save in the reader, leaves the review, the
-  counts and the progress. A dashed badge on the project, `jdtls · 4`, lists those files to open
+  counts and the progress. A dashed badge on the project, `kotlin-lsp · 4`, lists those files to open
   them, and the reader remembers them after a restart. Edits a server asks to make
   (`workspace/applyEdit`) are refused.
 - **A read-only mode**: the lock in the title bar, `⌘⇧L` or `-read-only` turn editing off, and

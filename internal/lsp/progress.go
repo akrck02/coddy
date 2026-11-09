@@ -309,6 +309,8 @@ const askTries = 3
 // ask sends a request once the server is ready. An answer with nothing from a server that was busy
 // is asked again once it is idle: kotlin-lsp, still importing, answers every request empty.
 func (client *Client) ask(ctx context.Context, method string, params any, empty func(json.RawMessage) bool) (json.RawMessage, error) {
+	client.noteAsked()
+	defer client.noteAsked()
 	if err := client.waitReady(ctx); err != nil {
 		return nil, err
 	}
@@ -325,4 +327,25 @@ func (client *Client) ask(ctx context.Context, method string, params any, empty 
 			return nil, err
 		}
 	}
+}
+
+// noteAsked notes that the server was asked something, or answered.
+func (client *Client) noteAsked() {
+	client.lock.Lock()
+	client.askedAt = time.Now()
+	client.lock.Unlock()
+}
+
+// QuietSince is when the server was last asked something, answered, or ended the work it
+// reported; when it started, if none of that happened since.
+func (client *Client) QuietSince() time.Time {
+	client.lock.Lock()
+	defer client.lock.Unlock()
+	quiet := client.started
+	for _, moment := range []time.Time{client.readyAt, client.idleAt, client.askedAt} {
+		if moment.After(quiet) {
+			quiet = moment
+		}
+	}
+	return quiet
 }

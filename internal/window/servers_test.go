@@ -236,3 +236,24 @@ func TestAProjectWhereOnlyAServerWroteStaysListed(test *testing.T) {
 		test.Error("a project with only a server's files is hidden, and its badge with it")
 	}
 }
+
+func TestAServerThatNeedsMoreFreeSpaceThanTheDiskHasDoesNotStart(test *testing.T) {
+	asked := freeSpace
+	freeSpace = func(string) (uint64, error) { return 3 << 30, nil }
+	test.Cleanup(func() { freeSpace = asked })
+	log := filepath.Join(test.TempDir(), "log")
+	servers := fakeGo(test, log)
+	servers[0].DataFlag, servers[0].NeedsFree = "--data", 10<<30
+	application := newReader(Settings{Folders: []string{makeRepository(test)}, WorkingTree: true, Synchronous: true,
+		Open: "lighthouse/src/lamp.go", Servers: servers, ServerData: test.TempDir()})
+	test.Cleanup(application.stopServers)
+	window := newWindow(test, application)
+	window.Frames(1)
+	if len(application.servers.running) != 0 {
+		test.Fatal("the server started on a disk too full for it")
+	}
+	why := application.servers.failed["fakels"]
+	if !strings.Contains(why, "it needs 10.0 GB free") || !strings.Contains(why, "which has 3.0 GB") || !strings.Contains(why, "-server-data") {
+		test.Errorf("the reader says %q", why)
+	}
+}

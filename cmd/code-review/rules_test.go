@@ -63,6 +63,8 @@ func TestOnlyTheSaveWritesInARepository(test *testing.T) {
 		filepath.Join(moduleRoot, "internal/workspace/written.go"): true,
 		// old indexes of servers, in their data folder: the reader's own, never a repository
 		filepath.Join(moduleRoot, "internal/lsp/indexes.go"): true,
+		// the Gradle home of a server that imports Gradle builds, in its data folder
+		filepath.Join(moduleRoot, "internal/lsp/gradle.go"): true,
 	}
 	writers := []string{"os.WriteFile(", "os.Create(", "os.CreateTemp(", "os.OpenFile(", "os.Rename(",
 		"os.Remove(", "os.RemoveAll(", "os.Mkdir(", "os.MkdirAll(", "os.Chmod(", "os.Truncate(",

@@ -13,6 +13,8 @@
 //   - FAKE_LSP_WRITES: a file name it writes at the top of each workspace folder, as jdtls writes
 //     .classpath.
 //   - FAKE_LSP_APPLY_EDIT: when set, it asks the client to apply an edit once initialized.
+//   - FAKE_LSP_ASKS: a section of settings it asks the client for once initialized, logging the answer.
+//   - FAKE_JVM_OPTIONS: logged at initialize, with its arguments and initializationOptions.
 //   - FAKE_LSP_READY: a language/status type it sends a moment after it is initialized, as jdtls
 //     sends ServiceReady once it has read the projects.
 //   - FAKE_LSP_JARS: when set, a name declared in no workspace folder but imported
@@ -144,12 +146,15 @@ type folder struct {
 
 func (fake *server) initialize(params json.RawMessage) (any, error) {
 	var asked struct {
-		RootURI          string   `json:"rootUri"`
-		WorkspaceFolders []folder `json:"workspaceFolders"`
+		RootURI          string          `json:"rootUri"`
+		WorkspaceFolders []folder        `json:"workspaceFolders"`
+		Options          json.RawMessage `json:"initializationOptions"`
 	}
 	if err := json.Unmarshal(params, &asked); err != nil {
 		return nil, err
 	}
+	logLine("arguments " + strings.Join(os.Args[1:], " ") + " · options " + string(asked.Options) +
+		" · jvm options " + os.Getenv("FAKE_JVM_OPTIONS"))
 	folders := asked.WorkspaceFolders
 	if len(folders) == 0 && asked.RootURI != "" {
 		folders = []folder{{URI: asked.RootURI}}
@@ -212,6 +217,14 @@ func (fake *server) afterInitialized() {
 		go func() {
 			time.Sleep(300 * time.Millisecond)
 			_ = fake.conn.Notify("language/status", map[string]string{"type": ready, "message": "ready"})
+		}()
+	}
+	if section := os.Getenv("FAKE_LSP_ASKS"); section != "" {
+		go func() {
+			var answer json.RawMessage
+			_ = fake.conn.Call(context.Background(), "workspace/configuration",
+				map[string]any{"items": []map[string]string{{"section": section}}}, &answer)
+			logLine("configuration " + string(answer))
 		}()
 	}
 	if os.Getenv("FAKE_LSP_APPLY_EDIT") == "" {

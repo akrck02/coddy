@@ -231,6 +231,7 @@ func (application *Window) clientOf(place candidate) (*lsp.Client, string, strin
 		servers.roots[place.path] = root
 	}
 	key := serverKey(server, root)
+	application.wakeServer(key)
 	client := servers.running[key]
 	if client == nil && !servers.starting[key] && !application.Loading() {
 		application.startServer(server, root, key, place.project)

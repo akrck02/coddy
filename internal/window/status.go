@@ -47,6 +47,9 @@ func (application *Window) serverParts() []statusPart {
 		name := strings.Fields(key)[0]
 		parts = append(parts, statusPart{name, statusOf(name, client.Progress(), time.Now())})
 	}
+	for _, name := range servers.resting {
+		parts = append(parts, statusPart{name, name + " resting"})
+	}
 	for name := range servers.missing {
 		parts = append(parts, statusPart{name, name + " not installed"})
 	}

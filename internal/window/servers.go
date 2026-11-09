@@ -3,6 +3,7 @@ package window
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -38,6 +39,15 @@ type languageServers struct {
 	// when the projects change; restarting is the set a server is started again for, by key
 	inSight    map[string][]string
 	restarting map[string]string
+	// resting are the servers stopped for going unasked, by key with their name (rest.go); rest
+	// is how long that takes, and watchingRest tells whether a check is due
+	resting      map[string]string
+	rest         time.Duration
+	watchingRest bool
+	// usage is what each running server takes, by key, measured while the panel is open (usage.go)
+	usage      map[string]serverUsage
+	measuring  bool
+	measuredAt time.Time
 }
 
 // startWait is how long a server gets to start and answer initialize.
@@ -50,7 +60,7 @@ func newLanguageServers(table []lsp.Server, writtenPath string) languageServers 
 	return languageServers{table: table, running: map[string]*lsp.Client{}, starting: map[string]bool{},
 		told: map[string]told{}, missing: map[string]bool{}, failed: map[string]string{}, crashes: map[string]int{}, snapshots: map[string]*workspace.Snapshot{},
 		written: workspace.OpenWritten(writtenPath), adding: map[string]bool{}, roots: map[string]string{},
-		inSight: map[string][]string{}, restarting: map[string]string{}}
+		inSight: map[string][]string{}, restarting: map[string]string{}, resting: map[string]string{}, rest: serverRest, usage: map[string]serverUsage{}}
 }
 
 // serverKey names a server running in a root ("" for one per window).
@@ -104,7 +114,7 @@ func (application *Window) serveOpenFile() (*lsp.Client, told, string) {
 	if client == nil {
 		// not while the projects are read: a file shown a moment then would start a server for
 		// nothing, and one for the whole window would start without the projects still unread
-		if !servers.starting[key] && !application.Loading() {
+		if !servers.starting[key] && servers.resting[key] == "" && !application.Loading() {
 			application.startServer(server, root, key, application.viewer.Project.Path)
 		}
 		return nil, told{}, ""
@@ -152,6 +162,13 @@ func (application *Window) startServer(server lsp.Server, root, key, project str
 	options := application.optionsOf(projects)
 	application.work.run("start "+key, func(cancellation) func() {
 		removed, _ := lsp.PruneIndexes(data, server, time.Now()) // an index it cannot remove stays
+		if why := roomFor(server, data); why != "" {
+			return func() {
+				delete(servers.starting, key)
+				servers.failed[server.Name] = why
+				application.toast = server.Name + " did not start: " + why
+			}
+		}
 		snapshots := takeSnapshots(server.Name, options)
 		ctx, cancel := context.WithTimeout(context.Background(), startWait)
 		defer cancel()
@@ -165,6 +182,36 @@ func (application *Window) startServer(server lsp.Server, root, key, project str
 			}
 		}
 	})
+}
+
+// freeSpace is how many bytes are free on a folder's disk; a test gives another.
+var freeSpace = lsp.FreeSpace
+
+// roomFor says why a server that asks for free space on its data folder's disk cannot start there;
+// "" when it can.
+func roomFor(server lsp.Server, data string) string {
+	if server.NeedsFree == 0 || data == "" {
+		return ""
+	}
+	free, err := freeSpace(data)
+	if err != nil || free >= server.NeedsFree {
+		return "" // a disk it cannot measure is not kept from it
+	}
+	return fmt.Sprintf("it needs %s free on the disk of %s, which has %s (its index takes %s): "+
+		"free some, or keep its index on another disk with -server-data", bytesOf(int64(server.NeedsFree)), data,
+		bytesOf(int64(free)), bytesOf(lsp.IndexesSize(data, server)))
+}
+
+// bytesOf writes a size as a person reads it: "4.1 GB", "300 MB".
+func bytesOf(size int64) string {
+	switch {
+	case size >= 1<<30:
+		return strconv.FormatFloat(float64(size)/(1<<30), 'f', 1, 64) + " GB"
+	case size >= 1<<20:
+		return strconv.Itoa(int(size>>20)) + " MB"
+	default:
+		return strconv.Itoa(int(size>>10)) + " KB"
+	}
 }
 
 // optionsOf are how each of some projects is read, worked out on the interface's goroutine for a job.
@@ -228,6 +275,7 @@ func (application *Window) serverStarted(server lsp.Server, key string, client *
 		servers.running[key] = client
 		application.work.whenDone(client.Done(), func() { application.serverEnded(server.Name, key, client) })
 		go watchProgress(client)
+		application.watchRest()
 		return true
 	}
 	return false

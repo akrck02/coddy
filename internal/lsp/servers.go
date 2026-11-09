@@ -3,6 +3,7 @@ package lsp
 import (
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // Server is a language server the reader knows how to run.
@@ -26,23 +27,46 @@ type Server struct {
 	ReadyStatus string
 	// Options are the server's own initializationOptions, as it documents them.
 	Options map[string]any
+	// Settings are the server's settings, by section as workspace/configuration asks them
+	// ({"java": {"autobuild": …}}): given at initialize and to each question for a section.
+	Settings map[string]any
+	// Memory is the most memory the server's JVM may take ("2g"), given with MemoryFlag on its
+	// command line, or in MemoryVariable, an environment variable of JVM options.
+	Memory         string
+	MemoryFlag     string
+	MemoryVariable string
 	// Indexes, when set, is the folder of its data folder where the server builds one index per
 	// set of workspace folders (kotlin-lsp's workspaces); the reader keeps the KeepIndexes used
 	// last and removes the others before it starts the server.
 	Indexes     string
 	KeepIndexes int
+	// OwnGradle gives a server that imports Gradle builds a Gradle home of its own, in its data
+	// folder, whose daemons stop soon after it and with it (gradle.go).
+	OwnGradle bool
+	// NeedsFree is how many bytes must be free on its data folder's disk for it to start: an index
+	// that fills the disk breaks the server, and whatever else writes there.
+	NeedsFree uint64
 }
 
 // Servers are the language servers the reader runs, found on the PATH.
 var Servers = []Server{
 	{Name: "gopls", Command: "gopls", Languages: []string{"go"}, RootMarkers: []string{"go.mod"},
 		Install: "go install golang.org/x/tools/gopls@latest"},
-	// jdtls reads Java only: Kotlin has kotlin-lsp, below
+	// jdtls reads Java only: Kotlin has kotlin-lsp, below. It writes nothing in the repositories: .project, .classpath and .settings go in its data
+	// folder (a JVM property, read before the setting is), and no build fills bin/ or target/; a
+	// build file changed is not imported again on its own.
 	{Name: "jdtls", Command: "jdtls", Languages: []string{"java"}, OnePerWindow: true, DataFlag: "-data",
-		Install: "brew install jdtls", ReadyStatus: "ServiceReady",
+		Arguments: []string{"--jvm-arg=-Djava.import.generatesMetadataFilesAtProjectRoot=false"},
+		Install:   "brew install jdtls", ReadyStatus: "ServiceReady",
 		// a name declared in a jar (another repository of the big workspace, as a dependency) answers with a
 		// jdt:// location, which the reader maps to that repository's source when it is open
-		Options: map[string]any{"extendedClientCapabilities": map[string]any{"classFileContentsSupport": true}}},
+		Options: map[string]any{"extendedClientCapabilities": map[string]any{"classFileContentsSupport": true}},
+		Settings: map[string]any{"java": map[string]any{
+			"import":        map[string]any{"generatesMetadataFilesAtProjectRoot": false},
+			"autobuild":     map[string]any{"enabled": false},
+			"configuration": map[string]any{"updateBuildConfiguration": "disabled"},
+		}},
+		Memory: "2g", MemoryFlag: "--jvm-arg=-Xmx"},
 	// JetBrains' server, still a preview. It imports each Gradle build first (minutes, cold) and
 	// answers with nothing meanwhile, telling its work by $/progress; a name in a jar answers
 	// jar:///…!/package/Class.class. Its index goes in the system path; Gradle's import writes
@@ -50,8 +74,22 @@ var Servers = []Server{
 	// removed, keeping the index of the set it started with.
 	{Name: "kotlin-lsp", Command: "kotlin-lsp", Arguments: []string{"--stdio"}, DataFlag: "--system-path",
 		Languages: []string{"kotlin"}, OnePerWindow: true, Install: "brew install JetBrains/utils/kotlin-lsp",
-		// an index per set of projects, about 5 GB for the big workspace's 44: keep two
-		Indexes: "workspaces", KeepIndexes: 2},
+		// an index per set of projects, about 5 GB for the big workspace's 44: keep the one used last
+		Indexes: "workspaces", KeepIndexes: 1, OwnGradle: true, NeedsFree: 10 << 30,
+		Memory: "2g", MemoryVariable: "IJ_JAVA_OPTIONS"},
+}
+
+// setting is the value of a section of settings, "java" or "java.import", if there is one.
+func (server Server) setting(section string) any {
+	var found any = server.Settings
+	for _, name := range strings.Split(section, ".") {
+		level, nested := found.(map[string]any)
+		if !nested {
+			return nil
+		}
+		found = level[name]
+	}
+	return found
 }
 
 // ServerFor is the server of a language among those given, if one reads it.

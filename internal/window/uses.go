@@ -100,7 +100,7 @@ func (application *Window) Hover(place viewer.Place, resting bool) {
 		application.hover = hoverCard{}
 		return
 	}
-	asked, why := application.runningServer()
+	asked, why := application.runningServer(false)
 	if why != "" {
 		return
 	}
