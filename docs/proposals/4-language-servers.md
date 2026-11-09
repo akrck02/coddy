@@ -1,6 +1,6 @@
 # 4. Language servers: definition, references and hover
 
-> Status: built against a fake server; T9 waits for gopls and jdtls to be installed · Author's approval: proposal ☑ plan ☑
+> Status: done, Kotlin left out (see Result) · Author's approval: proposal ☑ plan ☑
 
 ## Why
 
@@ -57,7 +57,7 @@ never counted as the person's change in the review.
 | Language | Server | One per | Settings |
 |---|---|---|---|
 | Go | `gopls` | module root | none |
-| Java, Kotlin | `jdtls` | window | every Java project as a workspace folder; its data folder in the reader's own folder |
+| Java (Kotlin: see Result) | `jdtls` | window | every Java project as a workspace folder; its data folder in the reader's own folder |
 
 One `jdtls` holds every Java project open, because a definition in the big workspace usually crosses repositories
 and each `jdtls` takes hundreds of megabytes. A server starts the first time a file of its language
@@ -113,20 +113,37 @@ than hidden.
 - [x] T6 — What servers write: the list before, the comparison, the record on disk · serves R6 · test: `TestFilesWrittenByAServerAreNotChanges`
 - [x] T7 — The badge and the list of a server's files · serves R7 · test: `TestFilesWrittenByAServerAreListed`
 - [x] T8 — Refusing `applyEdit` · serves R8 · test: `TestApplyEditIsRefused`
-- [ ] T9 — Trying it on the real servers: `gopls` on this repository, `jdtls` on the big workspace · serves R1–R7 · test: an integration test that skips when the server is not installed, and a note of what `jdtls` wrote in the big workspace
+- [x] T9 — Trying it on the real servers: `gopls` on this repository, `jdtls` on the big workspace · serves R1–R7 · test: an integration test that skips when the server is not installed, and a note of what `jdtls` wrote in the big workspace
 
 ## Result
 
-T1–T8 are built and tested against the fake server. T9 has its integration tests
-(`TestGoplsFollowsANameInThisRepository`, `TestJdtlsFollowsANameAcrossProjects`), which skip
-because neither server is installed on this machine yet; the note of what `jdtls` writes in the big workspace is
-still to take.
+T1–T8 are built and tested against the fake server. T9 ran on the real servers, gopls 0.24.0 and
+jdtls 1.63.0: `TestGoplsFollowsANameInThisRepository` and `TestJdtlsFollowsANameAcrossFiles` pass
+(they skip where a server is not installed), and jdtls was tried on two repositories of the big workspace, a web API
+and the common library it uses.
+
+What T9 found on the big workspace:
+
+- **jdtls takes about 75 seconds** to read two repositories the first time, and 3 with its index
+  kept. Until it says `ServiceReady` it answers nothing, so requests now wait for it and the status
+  bar says "jdtls reading the projects…". The plan had promised this; the first build had not done it.
+- **Another repository is a jar.** Each repository of the big workspace is its own Gradle build, and uses the others
+  as published jars, so a name declared in the common library is found in its jar, not in its
+  folder. jdtls is now asked for jar locations (`classFileContentsSupport`), and the reader opens
+  the class's source when its repository is open in the window, at the line where the name is
+  declared there (the jar's lines need not be the source's). A class whose repository is not open
+  is named in a toast.
+- **What jdtls wrote**: `.project`, `.classpath` and `.settings/` in the web API, which git does
+  not ignore, and `bin/`, which it does; nothing in the library. The first three are what R6 and R7
+  are for.
+- **A third of the big workspace is Kotlin, and jdtls does not read Kotlin.** The table now gives jdtls Java only;
+  Kotlin needs a server of its own, a proposal of its own.
 
 | Id | Met | How |
 |---|---|---|
-| R1 | yes, on the fake server | F12 on the caret or the place clicked, or ⌘-click; across projects with one server for the window |
-| R2 | yes, on the fake server | ⇧F12 lists the uses in the finder's panel, the development's files first; typing narrows them |
-| R3 | yes, on the fake server | half a second at rest on a name; the card closes when the pointer leaves |
+| R1 | yes; in the big workspace through the jar's class | F12 on the caret or the place clicked, or ⌘-click; across projects with one server for the window |
+| R2 | yes | ⇧F12 lists the uses in the finder's panel, the development's files first; typing narrows them |
+| R3 | yes | half a second at rest on a name; the card closes when the pointer leaves |
 | R4 | yes | ⌃- and ⌃⇧-, a hundred places back, kept by path on disk |
 | R5 | yes | started on the first file of its language, stopped with the window; one that stops on its own starts again, three times at most |
 | R6 | yes | below |
