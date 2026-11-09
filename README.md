@@ -86,7 +86,9 @@ It has two modes, chosen on the rail at the far left (or with `1`, `2`, `c`):
   the files that use it, by project, the name's own first, then those with changes, each with its
   count. A file opens with its uses marked and the lines away from them folded, still editable
   (`d` shows it whole). `n` and `⇧N` go from use to use across files, `v` ticks one as seen, and
-  the header counts them; `r` searches again. Over the viewer, three views (`⇧1` `⇧2` `⇧3`):
+  the header counts them; `r` searches again. While a server still imports the projects, a place
+  whose file imports the name, or its package, shows at once as a probable use, counted apart
+  (`2+1?`), until the server confirms it or not. Over the viewer, three views (`⇧1` `⇧2` `⇧3`):
   - the list of uses, in the files;
   - the graph of the name: the name in the middle, the projects that use it on either side, each
     file with its count. A click opens the file at its use; a `⌘`-click asks that file's server
