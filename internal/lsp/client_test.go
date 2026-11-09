@@ -72,7 +72,7 @@ func TestAServersRootIsTheFolderOfItsMarker(test *testing.T) {
 	}
 }
 
-func TestARequestWaitsForTheServerToReadTheProjects(test *testing.T) {
+func TestARequestIsAnsweredByAServerStillReadingTheProjects(test *testing.T) {
 	folder := project(test, map[string]string{"lamp.go": "package lamp\n\nfunc Beam() int { return 2 }\n"})
 	server, _ := fake(test, false, "FAKE_LSP_READY=ServiceReady")
 	server.ReadyStatus = "ServiceReady"
@@ -84,6 +84,21 @@ func TestARequestWaitsForTheServerToReadTheProjects(test *testing.T) {
 	if client.Ready() || client.Progress().Phase != "starting" {
 		test.Errorf("the server is ready before it said so: %+v", client.Progress())
 	}
+	declared, err := client.Definition(within(test), filepath.Join(folder, "lamp.go"), Position{Line: 2, Character: 6})
+	if err != nil || len(declared) != 1 || client.Ready() {
+		test.Errorf("asked while it read, the server declared Beam at %+v (%v), ready %t", declared, err, client.Ready())
+	}
+}
+
+func TestARequestAnsweredWithNothingWhileTheServerReadsWaitsForItToBeReady(test *testing.T) {
+	folder := project(test, map[string]string{"lamp.go": "package lamp\n\nfunc Beam() int { return 2 }\n"})
+	server, _ := fake(test, false, "FAKE_LSP_READY=ServiceReady", "FAKE_LSP_BLANK=1")
+	server.ReadyStatus = "ServiceReady"
+	client, err := Start(within(test), server, folder, nil, "")
+	if err != nil {
+		test.Fatal(err)
+	}
+	defer client.Stop()
 	declared, err := client.Definition(within(test), filepath.Join(folder, "lamp.go"), Position{Line: 2, Character: 6})
 	if err != nil || len(declared) != 1 || !client.Ready() {
 		test.Errorf("asked while it read, the server declared Beam at %+v (%v)", declared, err)

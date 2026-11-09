@@ -16,7 +16,8 @@
 //   - FAKE_LSP_ASKS: a section of settings it asks the client for once initialized, logging the answer.
 //   - FAKE_JVM_OPTIONS: logged at initialize, with its arguments and initializationOptions.
 //   - FAKE_LSP_READY: a language/status type it sends a moment after it is initialized, as jdtls
-//     sends ServiceReady once it has read the projects.
+//     sends ServiceReady once it has read the projects; it answers every request at once meanwhile.
+//   - FAKE_LSP_BLANK: when set, it answers every request with nothing until it sends FAKE_LSP_READY.
 //   - FAKE_LSP_JARS: when set, a name declared in no workspace folder but imported
 //     ("import org.lighthouse.Lamp") is declared in a jar, answered as kotlin-lsp answers it.
 //   - FAKE_LSP_NO_FOLDERS: when set, it does not say it follows workspace folders, as kotlin-lsp.
@@ -49,6 +50,7 @@ type server struct {
 	conn      *lsp.Conn
 	stopped   chan struct{}
 	busy      bool
+	blank     bool // answering nothing until it says it is ready
 }
 
 func main() {
@@ -89,7 +91,7 @@ func (fake *server) handle(method string, params json.RawMessage) (any, error) {
 // request answers a question about a document, or nothing while the fake reports work running.
 func (fake *server) request(method string, params json.RawMessage) (any, error) {
 	fake.lock.Lock()
-	busy := fake.busy
+	busy := fake.busy || fake.blank
 	fake.lock.Unlock()
 	switch {
 	case busy:
@@ -216,8 +218,14 @@ func (fake *server) afterInitialized() {
 		fake.work(busy)
 	}
 	if ready := os.Getenv("FAKE_LSP_READY"); ready != "" {
+		fake.lock.Lock()
+		fake.blank = os.Getenv("FAKE_LSP_BLANK") != ""
+		fake.lock.Unlock()
 		go func() {
 			time.Sleep(300 * time.Millisecond)
+			fake.lock.Lock()
+			fake.blank = false
+			fake.lock.Unlock()
 			_ = fake.conn.Notify("language/status", map[string]string{"type": ready, "message": "ready"})
 		}()
 	}

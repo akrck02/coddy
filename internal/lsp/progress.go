@@ -306,13 +306,21 @@ func (client *Client) waitIdle(ctx context.Context) error {
 // askTries is how many times a request answered with nothing by a busy server is asked again.
 const askTries = 3
 
-// ask sends a request once the server is ready. An answer with nothing from a server that was busy
-// is asked again once it is idle: kotlin-lsp, still importing, answers every request empty.
+// ask sends a request at once: a server still reading answers what it has read already (jdtls on
+// the big workspace answers minutes before it says it is ready). An answer with nothing before the server is
+// ready is asked again once it is; one from a server that was busy, once it is idle: kotlin-lsp,
+// still importing, answers every request empty.
 func (client *Client) ask(ctx context.Context, method string, params any, empty func(json.RawMessage) bool) (json.RawMessage, error) {
 	client.noteAsked()
 	defer client.noteAsked()
-	if err := client.waitReady(ctx); err != nil {
-		return nil, err
+	if !client.isReady() {
+		var raw json.RawMessage
+		if err := client.conn.Call(ctx, method, params, &raw); err == nil && !empty(raw) {
+			return raw, nil
+		}
+		if err := client.waitReady(ctx); err != nil {
+			return nil, err
+		}
 	}
 	for try := 1; ; try++ {
 		busy := client.Busy()
