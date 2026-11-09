@@ -1,7 +1,6 @@
 package uses
 
 import (
-	"fmt"
 	"sort"
 
 	"github.com/akrck02/code-review/internal/builds"
@@ -65,8 +64,8 @@ func (uses *Mode) placeProject(graph *scene, project, side int, top float32, out
 	for row, file := range files {
 		indexes := uses.byFile[file]
 		graph.boxes = append(graph.boxes, box{x: x + 10, y: top + groupTop + float32(row)*(fileHeight+6),
-			width: width - 20, height: fileHeight, label: uses.fileLabel(file), detail: fmt.Sprint(len(indexes)),
-			kind: litBox, target: indexes[0]})
+			width: width - 20, height: fileHeight, label: uses.fileLabel(file), detail: uses.fileCount(file),
+			kind: uses.fileKind(file), target: indexes[0]})
 		graph.arrows = append(graph.arrows, arrow{from: len(graph.boxes) - 1, to: 0})
 		uses.placeCallers(graph, len(graph.boxes)-1, side, outer)
 	}
@@ -128,4 +127,26 @@ func (uses *Mode) buildNameGraph(context *ui.Context) {
 	}
 	context.Caption("A click opens the file at its first use · ⌘-click: who uses the method or class the use is in · " +
 		"the wheel zooms · drag to move · 0 fits it in again")
+}
+
+// fileCount is a file's count of uses, those not confirmed yet apart.
+func (uses *Mode) fileCount(file workspace.FileReference) string {
+	probable := 0
+	for _, index := range uses.byFile[file] {
+		if uses.uses[index].Probable {
+			probable++
+		}
+	}
+	return countText(len(uses.byFile[file])-probable, probable)
+}
+
+// fileKind is how a file's box is drawn: lit when a server confirmed a use of it, plain when all
+// its uses are probable.
+func (uses *Mode) fileKind(file workspace.FileReference) boxKind {
+	for _, index := range uses.byFile[file] {
+		if !uses.uses[index].Probable {
+			return litBox
+		}
+	}
+	return plainBox
 }

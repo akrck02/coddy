@@ -22,7 +22,7 @@ import (
 var _ uses.Host = (*Window)(nil)
 
 // readerOfUses opens two repositories, harbour using lighthouse's Lamp through a jar, with the
-// uses mode, and asks the uses of Lamp where it is declared.
+// uses mode, and asks the uses of Lamp where it is declared. Kotlin's server is not installed.
 func readerOfUses(test *testing.T) (*Window, *uitest.Window) {
 	folder := test.TempDir()
 	javaRepository(test, filepath.Join(folder, "lighthouse"), map[string]string{
@@ -32,8 +32,11 @@ func readerOfUses(test *testing.T) (*Window, *uitest.Window) {
 		"src/main/java/org/harbour/Quay.java":  "package org.harbour;\n\nimport org.lighthouse.Lamp;\n\npublic class Quay {\n    Lamp lamp = new Lamp();\n}\n",
 		"src/main/java/org/harbour/Other.java": "package org.harbour;\n\npublic class Other {\n}\n",
 		"src/main/java/org/harbour/Dock.java":  "package org.harbour;\n\npublic class Dock {\n    Quay quay = new Quay();\n}\n",
+		// Kotlin's server is not installed: its use of Lamp is never confirmed
+		"src/main/kotlin/org/harbour/Pier.kt": "package org.harbour\n\nimport org.lighthouse.Lamp\n\nval lamp = Lamp()\n",
 	})
-	servers := []lsp.Server{{Name: "fakels", Command: fakeServer(test), Languages: []string{"java"}, Environment: []string{"FAKE_LSP_JARS=1"}}}
+	servers := []lsp.Server{{Name: "fakels", Command: fakeServer(test), Languages: []string{"java"}, Environment: []string{"FAKE_LSP_JARS=1"}},
+		{Name: "kotlinls", Command: "kotlinls-not-installed", Languages: []string{"kotlin"}}}
 	application, err := New(Settings{Folders: []string{folder}, WorkingTree: true, Synchronous: true,
 		Open: "lighthouse/src/main/java/org/lighthouse/Lamp.java", Servers: servers}, files.New(), review.New(""), uses.New())
 	if err != nil {
@@ -72,7 +75,7 @@ func TestUsesOpenTheirModeListingOnlyTheFilesWithUses(test *testing.T) {
 	if listed := listedFiles(application); !strings.Contains(listed, "Quay.java") || strings.Contains(listed, "Other.java") {
 		test.Errorf("the sidebar lists %q", listed)
 	}
-	if shown := strings.Join(window.Texts(), " "); !strings.Contains(shown, "uses in 2 files") {
+	if shown := strings.Join(window.Texts(), " "); !strings.Contains(shown, "uses in 3 files") {
 		test.Errorf("the bar over the viewer says %q", shown)
 	}
 }
@@ -163,5 +166,34 @@ func TestANoteStaysLongEnoughToReadAndThenGoes(test *testing.T) {
 	window.Frames(1)
 	if shown := strings.Join(window.Texts(), " "); strings.Contains(shown, "No one else uses Quay") {
 		test.Error("the note did not go in its time")
+	}
+}
+
+func TestAUseNoServerConfirmsIsShownAsProbable(test *testing.T) {
+	application, _ := readerOfUses(test)
+	holder, _ := application.usesHolder()
+	pier, found := lastUseIn(application, "Pier.kt")
+	if !found || !strings.Contains(application.mode.Header(), "probable") {
+		test.Fatalf("Pier.kt's use is not listed as probable; the header says %q", application.mode.Header())
+	}
+	if spans := holder.UsesIn(pier.File); len(spans[5]) != 1 {
+		test.Errorf("Pier.kt marks %v, want Lamp() on line 5", spans)
+	}
+	if header := application.mode.Header(); !strings.HasSuffix(header, "· 2 probable") {
+		test.Errorf("the header says %q: the uses a server confirmed are still probable", header)
+	}
+}
+
+func TestAFileNamesADeclarationByItsImportOrItsPackage(test *testing.T) {
+	for text, want := range map[string]bool{
+		"package org.harbour;\nimport org.lighthouse.Lamp;\n":      true,
+		"package org.harbour\nimport org.lighthouse.*\n":           true,
+		"package org.lighthouse;\n":                                true,
+		"package org.harbour;\nimport org.lighthouse.LampStore;\n": false,
+		"package org.harbour;\nimport org.quay.Lamp;\n":            false,
+	} {
+		if got := namesDeclaration(text, "org.lighthouse", "Lamp"); got != want {
+			test.Errorf("%q names Lamp: %t, want %t", text, got, want)
+		}
 	}
 }

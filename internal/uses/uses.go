@@ -72,7 +72,22 @@ func (uses *Mode) Header() string {
 	if len(uses.uses) == 0 {
 		return ""
 	}
-	return fmt.Sprintf("%d of %d seen", uses.seenCount(), len(uses.uses))
+	header := fmt.Sprintf("%d of %d seen", uses.seenCount(), len(uses.uses))
+	if probable := uses.probableCount(); probable > 0 {
+		header += fmt.Sprintf(" · %d probable", probable)
+	}
+	return header
+}
+
+// probableCount is how many uses no server confirmed yet.
+func (uses *Mode) probableCount() int {
+	count := 0
+	for _, use := range uses.uses {
+		if use.Probable {
+			count++
+		}
+	}
+	return count
 }
 
 // Progress is none: the status bar counts the review's files, not uses.
@@ -173,10 +188,10 @@ func (uses *Mode) ProjectOrder() []int {
 	return order
 }
 
-// Decorate counts the uses of each file, folder and project, and marks a file whose uses were all
-// seen.
+// Decorate counts the uses of each file, folder and project, those not confirmed yet apart ("2+1?"),
+// and marks a file whose uses were all seen.
 func (uses *Mode) Decorate(row sidebar.Row) sidebar.Decoration {
-	count, seen := uses.countUnder(row)
+	count, seen, probable := uses.countUnder(row)
 	if count == 0 {
 		return sidebar.Decoration{}
 	}
@@ -184,7 +199,7 @@ func (uses *Mode) Decorate(row sidebar.Row) sidebar.Decoration {
 	if seen == count {
 		ink = sidebar.PositiveInk
 	}
-	decoration := sidebar.Decoration{Words: []sidebar.Word{{Text: fmt.Sprint(count), Ink: ink}}}
+	decoration := sidebar.Decoration{Words: []sidebar.Word{{Text: countText(count-probable, probable), Ink: ink}}}
 	if row.Kind == sidebar.FileRow {
 		decoration.Mark = sidebar.OpenMark
 		if seen == count {
@@ -194,8 +209,9 @@ func (uses *Mode) Decorate(row sidebar.Row) sidebar.Decoration {
 	return decoration
 }
 
-// countUnder counts the uses in a row's file, or under its folder or project, and those seen.
-func (uses *Mode) countUnder(row sidebar.Row) (count, seen int) {
+// countUnder counts the uses in a row's file, or under its folder or project, those seen, and
+// those not confirmed yet.
+func (uses *Mode) countUnder(row sidebar.Row) (count, seen, probable int) {
 	for file, indexes := range uses.byFile {
 		if file.Project != row.Project || !under(row, file.Path) {
 			continue
@@ -205,9 +221,23 @@ func (uses *Mode) countUnder(row sidebar.Row) (count, seen int) {
 			if uses.seen[uses.uses[index]] {
 				seen++
 			}
+			if uses.uses[index].Probable {
+				probable++
+			}
 		}
 	}
-	return count, seen
+	return count, seen, probable
+}
+
+// countText writes a count of uses, those not confirmed yet apart: "3", "2+1?", "1?".
+func countText(sure, probable int) string {
+	switch {
+	case probable == 0:
+		return fmt.Sprint(sure)
+	case sure == 0:
+		return fmt.Sprint(probable, "?")
+	}
+	return fmt.Sprint(sure, "+", probable, "?")
 }
 
 // under tells whether a file's path is the row's file, or inside its folder or project.

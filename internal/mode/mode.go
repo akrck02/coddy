@@ -51,6 +51,8 @@ type Use struct {
 	File       workspace.FileReference
 	Line       int
 	Start, End int
+	// Probable is a place no server confirmed yet, whose file names the declaration for sure
+	Probable bool
 }
 
 // UsesHolder is a mode that shows the uses of a name the window searches (⇧F12): the window gives

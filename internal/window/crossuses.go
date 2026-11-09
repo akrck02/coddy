@@ -31,14 +31,19 @@ type usesSearch struct {
 	declaration lsp.Location
 	known       bool
 	found       map[string]lsp.Location // the uses, by path and line
-	pending     []candidate
-	checking    map[string]bool // the servers asked about some places now, by key
-	checked     int
-	total       int
-	projects    map[string]bool // the projects the places are in
-	left        int             // places past the limit, not checked
-	unchecked   int             // places no server reads
-	noted       string          // the note shown last
+	// probable are the places not checked yet whose file names the declaration for sure
+	probable  map[string]lsp.Location
+	pending   []candidate
+	checking  map[string]bool // the servers asked about some places now, by key
+	checked   int
+	total     int
+	projects  map[string]bool // the projects the places are in
+	left      int             // places past the limit, not checked
+	unchecked int             // places no server reads
+	noted     string          // the note shown last
+	// waitingFor is a server still reading the projects that places wait for: asked now, it would
+	// answer nothing, and a use be lost
+	waitingFor *lsp.Client
 }
 
 // candidate is a place of another file that holds the name, to check.
@@ -52,7 +57,8 @@ const (
 	usesCheckLimit = 300
 	// usesBatch is how many places one job asks a server about, so the list grows as it goes
 	usesBatch = 20
-	// checkWait is how long one place's question may take once its server is ready
+	// checkWait is how long one place's question may take: it is asked only once its server has
+	// read the projects, as one importing them for minutes would let it run out, answering nothing
 	checkWait = 30 * time.Second
 )
 
@@ -189,6 +195,7 @@ func (application *Window) addCandidates(search *usesSearch, hits map[string][]g
 	for _, place := range places {
 		search.projects[place.project] = true
 	}
+	markProbable(search)
 }
 
 // projectRanks orders the projects for checking: the home one, those with changes, the others.
@@ -234,11 +241,14 @@ func (application *Window) advanceUses() {
 	}
 	var waiting []candidate
 	batches, clients := map[string][]candidate{}, map[string]*lsp.Client{}
+	search.waitingFor = nil
 	for _, place := range search.pending {
 		client, key, state := application.clientOf(place)
 		switch {
 		case state == "none":
 			search.unchecked++
+		case client != nil && !client.Ready():
+			waiting, search.waitingFor = append(waiting, place), client
 		case client == nil || search.checking[key] || len(batches[key]) == usesBatch:
 			waiting = append(waiting, place)
 		default:
@@ -356,13 +366,12 @@ func (application *Window) keepChecked(search *usesSearch, places []candidate, a
 	declaration := lsp.PathOf(search.declaration.URI)
 	for index, place := range places {
 		search.checked++
+		delete(search.probable, placeKey(placeLocation(place, search.name)))
 		for _, answer := range answers[index] {
 			mapped, fromJar := application.fromJar(answer, search.name)
 			sameLine := mapped.Range.Start.Line == search.declaration.Range.Start.Line
 			if lsp.PathOf(mapped.URI) == declaration && (sameLine || fromJar) {
-				end := place.at
-				end.Character += len([]rune(search.name))
-				use := lsp.Location{URI: lsp.FileURI(place.path), Range: lsp.Range{Start: place.at, End: end}}
+				use := placeLocation(place, search.name)
 				search.found[placeKey(use)] = use
 				break
 			}
@@ -400,9 +409,15 @@ func (application *Window) usesNote(search *usesSearch) string {
 	if search.busy {
 		words = append(words, "more once "+statusOf(search.asked.client.Server.Name, search.asked.client.Progress(), time.Now()))
 	}
+	if waiting := search.waitingFor; waiting != nil && waiting != search.asked.client {
+		words = append(words, "some wait for "+statusOf(waiting.Server.Name, waiting.Progress(), time.Now()))
+	}
 	if search.checked < search.total-search.unchecked {
 		words = append(words, fmt.Sprintf("checking %d of %d places in %s", search.checked, search.total-search.unchecked,
 			plural(len(search.projects), "project")))
+	}
+	if probable := len(search.probable); probable > 0 {
+		words = append(words, plural(probable, "probable use")+" not confirmed yet, marked ?")
 	}
 	if search.left > 0 {
 		words = append(words, fmt.Sprintf("%d more places not checked", search.left))

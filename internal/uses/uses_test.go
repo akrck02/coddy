@@ -194,3 +194,21 @@ func hasLabel(graph scene, label string) bool {
 	}
 	return false
 }
+
+func TestUsesNoServerConfirmedAreCountedApart(test *testing.T) {
+	uses, _ := lamps()
+	found := append([]mode.Use{}, uses.uses...)
+	found = append(found, mode.Use{File: workspace.FileReference{Project: 2, Path: "Pier.kt"}, Line: 5, Start: 10, End: 14, Probable: true})
+	uses.SetUses("Lamp", 1, found, "")
+	harbour := uses.Decorate(sidebar.Row{Kind: sidebar.ProjectRow, Project: 2})
+	if len(harbour.Words) == 0 || harbour.Words[0].Text != "2+1?" {
+		test.Errorf("harbour is counted %+v, want 2+1?", harbour.Words)
+	}
+	if header := uses.Header(); header != "0 of 5 seen · 1 probable" {
+		test.Errorf("the header says %q", header)
+	}
+	pier := workspace.FileReference{Project: 2, Path: "Pier.kt"}
+	if uses.fileCount(pier) != "1?" || uses.fileKind(pier) != plainBox {
+		test.Errorf("Pier.kt's box says %q, drawn as %d", uses.fileCount(pier), uses.fileKind(pier))
+	}
+}

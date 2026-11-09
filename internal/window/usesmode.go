@@ -47,11 +47,20 @@ func (application *Window) noteUses(search *usesSearch) {
 	}
 }
 
-// modeUses are the uses found, as the uses mode keeps them.
+// modeUses are the uses found, as the uses mode keeps them, and the probable ones not checked yet.
 func (application *Window) modeUses(search *usesSearch) []mode.Use {
 	var found []mode.Use
 	for _, location := range search.found {
 		if use, known := application.modeUseOf(location); known {
+			found = append(found, use)
+		}
+	}
+	for key, location := range search.probable {
+		if _, confirmed := search.found[key]; confirmed {
+			continue
+		}
+		if use, known := application.modeUseOf(location); known {
+			use.Probable = true
 			found = append(found, use)
 		}
 	}
