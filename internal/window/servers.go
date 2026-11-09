@@ -310,8 +310,12 @@ func (application *Window) serverStatus() string {
 	for key := range servers.starting {
 		parts = append(parts, strings.Fields(key)[0]+" starting…")
 	}
-	for key := range servers.running {
-		parts = append(parts, strings.Fields(key)[0])
+	for key, client := range servers.running {
+		name := strings.Fields(key)[0]
+		if !client.Ready() {
+			name += " reading the projects…"
+		}
+		parts = append(parts, name)
 	}
 	for name := range servers.missing {
 		parts = append(parts, name+" not installed")

@@ -71,6 +71,24 @@ func TestAServersRootIsTheFolderOfItsMarker(test *testing.T) {
 	}
 }
 
+func TestARequestWaitsForTheServerToReadTheProjects(test *testing.T) {
+	folder := project(test, map[string]string{"lamp.go": "package lamp\n\nfunc Beam() int { return 2 }\n"})
+	server, _ := fake(test, false, "FAKE_LSP_READY=ServiceReady")
+	server.ReadyStatus = "ServiceReady"
+	client, err := Start(within(test), server, folder, nil, "")
+	if err != nil {
+		test.Fatal(err)
+	}
+	defer client.Stop()
+	if client.Ready() {
+		test.Error("the server is ready before it said so")
+	}
+	declared, err := client.Definition(within(test), filepath.Join(folder, "lamp.go"), Position{Line: 2, Character: 6})
+	if err != nil || len(declared) != 1 || !client.Ready() {
+		test.Errorf("asked while it read, the server declared Beam at %+v (%v)", declared, err)
+	}
+}
+
 func TestApplyEditIsRefused(test *testing.T) {
 	folder := project(test, map[string]string{"go.mod": "module lamp\n", "lamp.go": "package lamp\n"})
 	server, log := fake(test, false, "FAKE_LSP_APPLY_EDIT=1")

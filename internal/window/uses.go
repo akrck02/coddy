@@ -3,6 +3,7 @@ package window
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
 	"unicode"
 
@@ -119,14 +120,19 @@ func (application *Window) Hover(place viewer.Place, resting bool) {
 	})
 }
 
+// markdownLink is a Markdown link, of which the card keeps the words.
+var markdownLink = regexp.MustCompile(`\[([^\]]*)\]\([^)]*\)`)
+
 // hoverLines are the lines of a hover's Markdown worth showing in a small card: no code fences,
-// no emphasis marks, and no more than a few.
+// rules or emphasis marks, links as their words, and no more than a few.
+
 func hoverLines(markdown string) []string {
 	var lines []string
 	for _, line := range strings.Split(markdown, "\n") {
-		if strings.HasPrefix(strings.TrimSpace(line), "```") {
-			continue
+		if trimmed := strings.TrimSpace(line); strings.HasPrefix(trimmed, "```") || trimmed == "---" {
+			continue // fences and rules: the card shows the words alone
 		}
+		line = markdownLink.ReplaceAllString(line, "$1")
 		line = strings.ReplaceAll(strings.ReplaceAll(line, "**", ""), "`", "")
 		if line == "" && (len(lines) == 0 || lines[len(lines)-1] == "") {
 			continue

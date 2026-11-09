@@ -20,6 +20,10 @@ type Server struct {
 	RootMarkers  []string
 	Install      string   // what to run to install it, said when it is missing
 	Environment  []string // added to the reader's own, as "NAME=value"
+	// ReadyStatus, when set, is the language/status type the server sends once it has read the
+	// projects (jdtls's ServiceReady); until then requests wait. Without it, a server is ready
+	// once initialized.
+	ReadyStatus string
 }
 
 // Servers are the language servers the reader runs, found on the PATH.
@@ -27,7 +31,7 @@ var Servers = []Server{
 	{Name: "gopls", Command: "gopls", Languages: []string{"go"}, RootMarkers: []string{"go.mod"},
 		Install: "go install golang.org/x/tools/gopls@latest"},
 	{Name: "jdtls", Command: "jdtls", Languages: []string{"java", "kotlin"}, OnePerWindow: true, DataFlag: "-data",
-		Install: "brew install jdtls"},
+		Install: "brew install jdtls", ReadyStatus: "ServiceReady"},
 }
 
 // ServerFor is the server of a language among those given, if one reads it.

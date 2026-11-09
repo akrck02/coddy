@@ -13,6 +13,8 @@
 //   - FAKE_LSP_WRITES: a file name it writes at the top of each workspace folder, as jdtls writes
 //     .classpath.
 //   - FAKE_LSP_APPLY_EDIT: when set, it asks the client to apply an edit once initialized.
+//   - FAKE_LSP_READY: a language/status type it sends a moment after it is initialized, as jdtls
+//     sends ServiceReady once it has read the projects.
 package main
 
 import (
@@ -25,6 +27,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"time"
 	"unicode"
 
 	"github.com/akrck02/code-review/internal/lsp"
@@ -138,6 +141,12 @@ func (fake *server) addFolderList(folders []folder) {
 
 // afterInitialized asks the client to apply an edit, when the test asked for it, and logs the answer.
 func (fake *server) afterInitialized() {
+	if ready := os.Getenv("FAKE_LSP_READY"); ready != "" {
+		go func() {
+			time.Sleep(300 * time.Millisecond)
+			_ = fake.conn.Notify("language/status", map[string]string{"type": ready, "message": "ready"})
+		}()
+	}
 	if os.Getenv("FAKE_LSP_APPLY_EDIT") == "" {
 		return
 	}

@@ -66,31 +66,35 @@ func TestGoplsFollowsANameInThisRepository(test *testing.T) {
 	if err != nil || len(used) < 3 {
 		test.Errorf("PathOf is used at %d places (%v), want several", len(used), err)
 	}
-	if hover, _ := client.Hover(ctx, use, placeOf(test, use, "PathOf(")); !strings.Contains(hover, "func PathOf") {
+	if hover, _ := client.Hover(ctx, use, placeOf(test, use, "PathOf(")); !strings.Contains(hover, "PathOf(uri string) string") {
 		test.Errorf("the hover of PathOf says %q", hover)
 	}
 }
 
-func TestJdtlsFollowsANameAcrossProjects(test *testing.T) {
+// jdtls follows a name across the files of a project. Across projects it needs a build that links
+// them (Gradle's, in the big workspace): two plain folders are two projects that know nothing of each other.
+func TestJdtlsFollowsANameAcrossFiles(test *testing.T) {
 	server := realServer(test, "jdtls")
-	lamp := project(test, map[string]string{"src/lamp/Lamp.java": "package lamp;\n\npublic class Lamp {\n    public static int beam() { return 2; }\n}\n"})
-	keeper := project(test, map[string]string{"src/keeper/Keeper.java": "package keeper;\n\nimport lamp.Lamp;\n\npublic class Keeper {\n    int light = Lamp.beam();\n}\n"})
-	before := filesIn(test, lamp, keeper)
+	folder := project(test, map[string]string{
+		"src/lamp/Lamp.java":     "package lamp;\n\npublic class Lamp {\n    public static int beam() { return 2; }\n}\n",
+		"src/keeper/Keeper.java": "package keeper;\n\nimport lamp.Lamp;\n\npublic class Keeper {\n    int light = Lamp.beam();\n}\n",
+	})
+	before := filesIn(test, folder)
 	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
 	defer cancel()
-	client, err := Start(ctx, server, "", []string{lamp, keeper}, test.TempDir())
+	client, err := Start(ctx, server, "", []string{folder}, test.TempDir())
 	if err != nil {
 		test.Fatal(err)
 	}
 	defer client.Stop()
-	use := filepath.Join(keeper, "src", "keeper", "Keeper.java")
+	use := filepath.Join(folder, "src", "keeper", "Keeper.java")
 	content, _ := os.ReadFile(use)
 	client.Tell(use, string(content), 1)
 	declared, err := client.Definition(ctx, use, placeOf(test, use, "beam("))
 	if err != nil || len(declared) == 0 || filepath.Base(PathOf(declared[0].URI)) != "Lamp.java" {
 		test.Errorf("beam is declared at %+v (%v), want Lamp.java", declared, err)
 	}
-	test.Logf("jdtls wrote: %v", newFiles(before, filesIn(test, lamp, keeper)))
+	test.Logf("jdtls wrote: %v", newFiles(before, filesIn(test, folder)))
 }
 
 // filesIn lists every file under some folders.

@@ -20,10 +20,12 @@ type Client struct {
 	conn    *Conn
 	command *exec.Cmd
 
-	lock     sync.Mutex
-	telling  sync.Mutex     // held while a document's text is sent, so texts go out in order
-	versions map[string]int // the documents opened, by URI, with the version last sent
-	folders  map[string]bool
+	lock      sync.Mutex
+	telling   sync.Mutex     // held while a document's text is sent, so texts go out in order
+	versions  map[string]int // the documents opened, by URI, with the version last sent
+	ready     chan struct{}  // closed once the server has read the projects
+	readyOnce sync.Once
+	folders   map[string]bool
 }
 
 // Start runs a server in a root (or, with folders, for those workspace folders) and initializes
@@ -45,7 +47,11 @@ func Start(ctx context.Context, server Server, root string, folders []string, da
 	if err := command.Start(); err != nil {
 		return nil, failure.Wrap(ServerNotFound, server.Name, err)
 	}
-	client := &Client{Server: server, Root: root, command: command, versions: map[string]int{}, folders: map[string]bool{}}
+	client := &Client{Server: server, Root: root, command: command, versions: map[string]int{}, folders: map[string]bool{},
+		ready: make(chan struct{})}
+	if server.ReadyStatus == "" {
+		client.becomeReady()
+	}
 	client.conn = NewConn(output, input, client.handle)
 	go func() { _ = command.Wait() }()
 	if err := client.initialize(ctx, root, folders); err != nil {
@@ -105,6 +111,13 @@ func (client *Client) handle(method string, params json.RawMessage) (any, error)
 	switch method {
 	case "workspace/applyEdit":
 		return map[string]any{"applied": false, "failureReason": "code-review does not let a language server edit files"}, nil
+	case "language/status":
+		var status struct {
+			Type string `json:"type"`
+		}
+		if json.Unmarshal(params, &status) == nil && status.Type == client.Server.ReadyStatus {
+			client.becomeReady()
+		}
 	case "workspace/configuration":
 		var asked struct {
 			Items []json.RawMessage `json:"items"`
@@ -113,6 +126,32 @@ func (client *Client) handle(method string, params json.RawMessage) (any, error)
 		return make([]any, len(asked.Items)), nil // no settings: each server's defaults
 	}
 	return nil, nil // registrations, progress and messages need no more than a reply
+}
+
+// becomeReady marks the server as having read the projects.
+func (client *Client) becomeReady() { client.readyOnce.Do(func() { close(client.ready) }) }
+
+// Ready tells whether the server has read the projects, and answers requests in full.
+func (client *Client) Ready() bool {
+	select {
+	case <-client.ready:
+		return true
+	default:
+		return false
+	}
+}
+
+// waitReady waits for the server to have read the projects, as a request asked before would be
+// answered with nothing; it gives up with the request's context, or when the server stops.
+func (client *Client) waitReady(ctx context.Context) error {
+	select {
+	case <-client.ready:
+		return nil
+	case <-ctx.Done():
+		return failure.Wrap(RequestFailed, "waiting for "+client.Server.Name+" to read the projects", ctx.Err())
+	case <-client.conn.Done():
+		return failure.Wrap(ServerStopped, client.Server.Name, client.conn.Err())
+	}
 }
 
 // Tell tells the server a document's text as the reader has it, edits included, at a version
@@ -181,6 +220,9 @@ func (client *Client) locations(ctx context.Context, method, path string, at Pos
 		params["context"] = context
 	}
 	var raw json.RawMessage
+	if err := client.waitReady(ctx); err != nil {
+		return nil, err
+	}
 	if err := client.conn.Call(ctx, method, params, &raw); err != nil {
 		return nil, err
 	}
@@ -220,6 +262,9 @@ func (client *Client) Hover(ctx context.Context, path string, at Position) (stri
 	params := TextDocumentPositionParams{TextDocument: TextDocumentIdentifier{URI: FileURI(path)}, Position: at}
 	var answer struct {
 		Contents json.RawMessage `json:"contents"`
+	}
+	if err := client.waitReady(ctx); err != nil {
+		return "", err
 	}
 	if err := client.conn.Call(ctx, "textDocument/hover", params, &answer); err != nil {
 		return "", err
