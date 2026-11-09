@@ -264,6 +264,10 @@ func (uses *Mode) Commands() []mode.Command {
 		{Description: "Search the uses again", OnlyWhenOn: true,
 			Keys: []pane.Press{pane.Key(input.KeyR, "r")}, Do: func(int) { uses.searchAgain() }},
 	}
+	commands = append(commands, mode.Command{Description: "Fit the graph in the window", OnlyWhenOn: true,
+		Keys: []pane.Press{pane.Key(input.Key0, "0")}, Do: func(int) {
+			uses.graphs.name.fitted, uses.graphs.projects.fitted = false, false
+		}})
 	for index, name := range viewNames {
 		chosen := view(index)
 		commands = append(commands, mode.Command{Description: "Show the uses as " + name, OnlyWhenOn: true,

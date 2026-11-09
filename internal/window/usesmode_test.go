@@ -87,3 +87,22 @@ func TestNGoesThroughTheUsesAndVTicksThem(test *testing.T) {
 		test.Errorf("after v the header says %q", header)
 	}
 }
+
+func TestTheUsesShowAsGraphsInTheViewerPlace(test *testing.T) {
+	application, window := readerOfUses(test)
+	application.focus = sidebarPane
+	press(window, input.Key2, input.KeyShift)
+	if shown := strings.Join(window.Texts(), " "); !strings.Contains(shown, "A click opens the file at its first use") ||
+		!strings.Contains(shown, "harbour") {
+		test.Errorf("⇧2 shows %q", shown)
+	}
+	press(window, input.Key3, input.KeyShift)
+	window.Frames(2)
+	if shown := strings.Join(window.Texts(), " "); !strings.Contains(shown, "lit: uses Lamp") {
+		test.Errorf("⇧3 shows %q", shown)
+	}
+	press(window, input.Key1, input.KeyShift)
+	if application.mode.Name() != "Uses" || !application.viewer.IsOpen() {
+		test.Error("⇧1 did not bring the list back")
+	}
+}

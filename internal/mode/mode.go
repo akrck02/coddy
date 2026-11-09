@@ -5,6 +5,8 @@
 package mode
 
 import (
+	"context"
+
 	"github.com/akrck02/code-review/internal/pane"
 	"github.com/akrck02/code-review/internal/sidebar"
 	"github.com/akrck02/code-review/internal/theme"
@@ -92,4 +94,9 @@ type Window interface {
 	RevealLine(file workspace.FileReference, line int)
 	// Relist lists the files again, as what the mode lists changed.
 	Relist()
+	// Keys are the frame's keys and pointer, for a mode that draws something of its own.
+	Keys() pane.Keys
+	// Run starts background work under a key, replacing the work under that key still running;
+	// what it returns runs on the interface's goroutine.
+	Run(key string, do func(stop context.Context) func())
 }
