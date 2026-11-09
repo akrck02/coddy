@@ -50,3 +50,14 @@ func TestColumnsCountTabsToTheirStop(test *testing.T) {
 		}
 	}
 }
+
+func TestAPlaceInACommentIsKnown(test *testing.T) {
+	lines := Lines("Keeper.java", "class Keeper {\n\t/** keeps the Lamp lit */\n\tLamp lamp; // the Lamp\n}\n")
+	second, third := lines[1], lines[2]
+	if !second.InComment(Column("\t/** keeps the Lamp lit */", 14)) {
+		test.Error("Lamp in the Javadoc is not in a comment")
+	}
+	if third.InComment(Column("\tLamp lamp; // the Lamp", 1)) || !third.InComment(Column("\tLamp lamp; // the Lamp", 19)) {
+		test.Error("the field's type is taken for a comment, or the line comment is not")
+	}
+}

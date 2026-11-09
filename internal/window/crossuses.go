@@ -13,6 +13,7 @@ import (
 
 	"github.com/akrck02/code-review/internal/finder"
 	"github.com/akrck02/code-review/internal/git"
+	"github.com/akrck02/code-review/internal/highlight"
 	"github.com/akrck02/code-review/internal/lsp"
 )
 
@@ -244,11 +245,14 @@ func (application *Window) clientOf(place candidate) (*lsp.Client, string, strin
 func (application *Window) checkPlaces(search *usesSearch, key string, client *lsp.Client, places []candidate) {
 	application.work.run("uses "+key, func(stop cancellation) func() {
 		answers := make([][]lsp.Location, len(places))
+		comments := commentReader{}
 		for index, place := range places {
 			if stop.Err() != nil {
 				return nil
 			}
-			answers[index] = askDeclaration(stop, client, place)
+			if !comments.mentionOnly(place) {
+				answers[index] = askDeclaration(stop, client, place)
+			}
 		}
 		return func() {
 			if application.uses != search {
@@ -258,6 +262,46 @@ func (application *Window) checkPlaces(search *usesSearch, key string, client *l
 			application.keepChecked(search, places, answers)
 		}
 	})
+}
+
+// commentReader tells which places of files are in comments, colouring each file once.
+type commentReader map[string]commented
+
+// commented is a file read, as text and as coloured lines.
+type commented struct {
+	text     []string
+	coloured []highlight.Line
+}
+
+// references are what comes before a name in a comment that links to it, as a use does: Javadoc's
+// {@link Name} and @see, KDoc's [Name].
+var references = []string{"{@link ", "{@linkplain ", "@see ", "@throws ", "@exception ", "["}
+
+// mentionOnly tells whether a place is in a comment that only mentions the name, in words: a
+// server may answer where a word of a comment is declared, but a word is not a use.
+func (reader commentReader) mentionOnly(place candidate) bool {
+	file, read := reader[place.path]
+	if !read {
+		content, _ := os.ReadFile(place.path)
+		text := strings.ReplaceAll(string(content), "\r\n", "\n")
+		file = commented{text: strings.Split(text, "\n"), coloured: highlight.Lines(place.path, text)}
+		reader[place.path] = file
+	}
+	if place.at.Line >= len(file.text) || place.at.Line >= len(file.coloured) {
+		return false
+	}
+	line := file.text[place.at.Line]
+	characters := lsp.CharacterColumn(line, place.at.Character)
+	if !file.coloured[place.at.Line].InComment(highlight.Column(line, characters)) {
+		return false
+	}
+	before := string([]rune(line)[:characters])
+	for _, reference := range references {
+		if strings.HasSuffix(before, reference) {
+			return false
+		}
+	}
+	return true
 }
 
 // askDeclaration asks a server where the name at a place is declared, telling it the file when it

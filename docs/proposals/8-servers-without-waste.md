@@ -110,4 +110,5 @@ Marked **seen** (in docs, code, logs or on disk) or **not tried**.
 - Not seen yet: a cold import with the reader's own Gradle home on the big workspace, and a server resting after
   15 minutes; the window was closed first. The real-server test covers the first on a small build.
 - Seen in passing (proposal 6): a word in a Javadoc comment, not a `{@link}`, counted as a use, as
-  jdtls answers its definition. Places in comments should be left out of the uses checked.
+  jdtls answers its definition. Fixed: a place in a comment is a use only when a link names it
+  (`{@link Name}`, `@see`, `@throws`, KDoc's `[Name]`).

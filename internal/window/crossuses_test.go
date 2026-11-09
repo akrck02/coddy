@@ -35,6 +35,15 @@ func javaRepository(test *testing.T, folder string, files map[string]string) {
 	}
 }
 
+// usesListedIn are the uses the finder lists, as "project/path:line".
+func usesListedIn(application *Window) string {
+	var listed []string
+	for _, use := range application.finder.Hits {
+		listed = append(listed, filepath.Base(application.projects[use.Project()].Path)+"/"+use.Path+":"+strconv.Itoa(use.Line))
+	}
+	return strings.Join(listed, " ")
+}
+
 // Two repositories, each its own build as in the big workspace: harbour uses lighthouse's Lamp through a jar,
 // and a server of its own, which knows nothing of lighthouse's sources.
 func TestUsesAreFoundInOtherProjectsThroughTheirJars(test *testing.T) {
@@ -45,6 +54,9 @@ func TestUsesAreFoundInOtherProjectsThroughTheirJars(test *testing.T) {
 	javaRepository(test, filepath.Join(folder, "harbour"), map[string]string{
 		"src/main/java/org/harbour/Quay.java":  "package org.harbour;\n\nimport org.lighthouse.Lamp;\n\npublic class Quay {\n    Lamp lamp = new Lamp();\n}\n",
 		"src/main/java/org/harbour/Other.java": "package org.harbour;\n\npublic class Other {\n    // a Lamp in words only\n}\n",
+		// the server answers where a word of a comment is declared: only the link is a use
+		"src/main/java/org/harbour/Buoy.java": "package org.harbour;\n\nimport org.lighthouse.Lamp;\n\n" +
+			"/** Lit as a Lamp is.\n * @see Lamp\n */\npublic class Buoy {\n}\n",
 	})
 	servers := []lsp.Server{{Name: "fakels", Command: fakeServer(test), Languages: []string{"java"}, Environment: []string{"FAKE_LSP_JARS=1"}}}
 	application := newReader(Settings{Folders: []string{folder}, WorkingTree: true, Synchronous: true,
@@ -59,15 +71,15 @@ func TestUsesAreFoundInOtherProjectsThroughTheirJars(test *testing.T) {
 	for frame := 0; frame < 20 && application.uses != nil && application.finder.Note != ""; frame++ {
 		window.Frames(1)
 	}
-	var listed []string
-	for _, use := range application.finder.Hits {
-		listed = append(listed, filepath.Base(application.projects[use.Project()].Path)+"/"+use.Path+":"+strconv.Itoa(use.Line))
-	}
-	got := strings.Join(listed, " ")
-	for _, want := range []string{"harbour/src/main/java/org/harbour/Quay.java:3", "harbour/src/main/java/org/harbour/Quay.java:6"} {
+	got := usesListedIn(application)
+	for _, want := range []string{"harbour/src/main/java/org/harbour/Quay.java:3", "harbour/src/main/java/org/harbour/Quay.java:6",
+		"harbour/src/main/java/org/harbour/Buoy.java:6"} {
 		if !strings.Contains(got, want) {
 			test.Errorf("the uses are %q, want %s among them (note %q)", got, want, application.finder.Note)
 		}
+	}
+	if strings.Contains(got, "Buoy.java:5") {
+		test.Errorf("a word in a Javadoc is listed as a use: %q", got)
 	}
 	if strings.Contains(got, "Other.java") {
 		test.Errorf("a word in a comment, whose declaration is not Lamp's, is listed: %q", got)

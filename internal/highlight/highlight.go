@@ -207,3 +207,14 @@ func CharacterAt(line string, place float32) int {
 	}
 	return characters
 }
+
+// InComment tells whether the character at a column of a coloured line is in a comment.
+func (line Line) InComment(column int) bool {
+	for _, span := range line.Spans {
+		if column >= span.Column && column < span.Column+len([]rune(span.Text)) {
+			role := RoleOf(span.Kind)
+			return role == Comment || role == DocComment
+		}
+	}
+	return false
+}
