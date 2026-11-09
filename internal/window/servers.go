@@ -103,7 +103,7 @@ func (application *Window) serveOpenFile() (*lsp.Client, told, string) {
 	client := servers.running[key]
 	if client == nil {
 		if !servers.starting[key] {
-			application.startServer(server, root, key)
+			application.startServer(server, root, key, application.viewer.Project.Path)
 		}
 		return nil, told{}, ""
 	}
@@ -136,15 +136,15 @@ func (application *Window) textNow() (told, string) {
 	return now, view.Edit.Text()
 }
 
-// startServer starts a server in the background, once what its projects hold is noted; once it
-// answers, the next frame tells it the file.
-func (application *Window) startServer(server lsp.Server, root, key string) {
+// startServer starts a server in the background for a project, once what its projects hold is
+// noted; once it answers, the next frame tells it the file.
+func (application *Window) startServer(server lsp.Server, root, key, project string) {
 	servers := &application.servers
 	servers.starting[key] = true
 	folders := application.foldersFor(server)
 	projects := folders
 	if !server.OnePerWindow {
-		projects = []string{application.viewer.Project.Path}
+		projects = []string{project}
 	}
 	data := dataFolder(server)
 	options := application.optionsOf(projects)

@@ -224,6 +224,29 @@ func (client *Client) Tell(path, text string, version int) error {
 	}})
 }
 
+// IsOpen tells whether a document was told to the server.
+func (client *Client) IsOpen(path string) bool {
+	client.lock.Lock()
+	defer client.lock.Unlock()
+	_, open := client.versions[FileURI(path)]
+	return open
+}
+
+// Close tells the server a document told to it is no longer open: it reads it from disk again.
+func (client *Client) Close(path string) error {
+	uri := FileURI(path)
+	client.telling.Lock()
+	defer client.telling.Unlock()
+	client.lock.Lock()
+	_, open := client.versions[uri]
+	delete(client.versions, uri)
+	client.lock.Unlock()
+	if !open {
+		return nil
+	}
+	return client.conn.Notify("textDocument/didClose", map[string]any{"textDocument": map[string]any{"uri": uri}})
+}
+
 // AddFolder adds a workspace folder to a server that runs for the whole window.
 func (client *Client) AddFolder(folder string) error { return client.changeFolder(folder, true) }
 

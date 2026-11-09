@@ -22,6 +22,10 @@ type GrepOptions struct {
 	WorkingTree bool
 	// PerFile keeps at most this many lines of each file; 0 keeps them all.
 	PerFile int
+	// Word matches the text as a whole word only; Files, when set, are the only files searched,
+	// as git pathspecs ("*.java").
+	Word  bool
+	Files []string
 }
 
 // Grep finds the lines of a repository's text files that hold a text, as written: ignoring case
@@ -37,11 +41,14 @@ func Grep(repository, text string, options GrepOptions) ([]Hit, error) {
 	if options.WorkingTree {
 		arguments = append(arguments, "--untracked")
 	}
+	if options.Word {
+		arguments = append(arguments, "-w")
+	}
 	arguments = append(arguments, "-e", text)
 	if !options.WorkingTree {
 		arguments = append(arguments, "HEAD")
 	}
-	output, err := run(repository, append(arguments, "--")...)
+	output, err := run(repository, append(append(arguments, "--"), options.Files...)...)
 	if err != nil && len(output) == 0 {
 		return nil, nil // git grep fails when nothing matches
 	}

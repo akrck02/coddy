@@ -76,6 +76,10 @@ type Finder struct {
 	// what they are ("uses of Keeper"); Hits are those the query keeps
 	Name       string
 	references []ContentHit
+	// Home is the project listed first among uses, the one of the name asked; Note says how the
+	// list is still being made ("checking 40 of 120 places in 6 projects")
+	Home int
+	Note string
 }
 
 // ContentHit is a line found by the content search.
@@ -86,6 +90,9 @@ type ContentHit struct {
 	git.Hit
 	length int // how many characters were found, for a use of a name; 0 is the query's length
 }
+
+// Project is the place of the hit's project in the window.
+func (hit ContentHit) Project() int { return hit.project }
 
 const (
 	finderLimit       = 200
@@ -365,6 +372,9 @@ func (finder *Finder) buildFooter(context *ui.Context) {
 			context.Text("Type two letters or more; a capital makes it match case", quiet)
 		case finder.Scope == ReferencesScope:
 			context.Text(fmt.Sprintf("%d of %d %s", len(finder.Hits), len(finder.references), finder.Name), quiet)
+			if finder.Note != "" {
+				context.Text("· "+finder.Note, ui.TextStyle{Size: palette.SmallTextSize, Color: palette.Primary})
+			}
 		case finder.Scope == ContentScope:
 			words := fmt.Sprintf("%d lines", len(finder.Hits))
 			if finder.truncated {

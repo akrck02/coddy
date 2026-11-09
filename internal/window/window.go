@@ -96,7 +96,9 @@ type Window struct {
 	toast       string
 	// waiting is the server a question asked waits for, still reading the projects, to say so
 	// until the answer comes
-	waiting   *lsp.Client
+	waiting *lsp.Client
+	// uses is the list of uses being made, checked place by place across projects
+	uses      *usesSearch
 	themeSet  bool
 	questions questions
 	servers   languageServers

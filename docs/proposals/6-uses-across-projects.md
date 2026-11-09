@@ -89,6 +89,6 @@ server toasts what it waits for (R7), and the toast goes when the answer comes.
 - [x] T2 Servers read the projects in sight: add and remove folders; restart a server without workspace folders. (R4)
 - [x] T3 `Progress` in the client from `$/progress`, `language/status`, `intellij/importLog`, logs; the status bar line. (R5, R7)
 - [x] T4 The servers panel. (R6)
-- [ ] T5 Uses across projects: candidates from the content search, checked by definition, grouped by project, with the footer. (R1)
-- [ ] T6 Lists taken while busy say so and fill in. (R2)
+- [x] T5 Uses across projects: candidates from the content search, checked by definition, grouped by project, with the footer. (R1)
+- [x] T6 Lists taken while busy say so and fill in. (R2)
 - [ ] T7 Try it on the big workspace: the `TideTableStore` case, timings and memory with the filter on and off; README and Result.

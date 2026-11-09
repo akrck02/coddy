@@ -2,7 +2,6 @@ package window
 
 import (
 	"context"
-	"fmt"
 	"regexp"
 	"strings"
 	"unicode"
@@ -13,7 +12,8 @@ import (
 	ui "github.com/akrck02/go-ui"
 )
 
-// usesAsked lists every use of the name at the caret, or clicked last, in the finder's panel.
+// usesAsked lists every use of the name at the caret, or clicked last, in the finder's panel: those
+// the file's server knows, then those in other projects in sight, checked one by one.
 func (application *Window) usesAsked() {
 	place, found := application.viewer.PlaceAsked()
 	if !found {
@@ -26,49 +26,46 @@ func (application *Window) usesAsked() {
 	}
 	at := application.positionOf(place)
 	name := wordAt(application.viewer.LineText(place.Line), place.Column)
+	search := &usesSearch{name: name, home: application.viewer.Reference.Project, asked: asked, at: at}
+	projects, options := application.inSightPaths(), application.wordSearch()
 	application.waitFor(asked.client)
 	application.work.run("references", func(stop cancellation) func() {
 		ctx, cancel := context.WithTimeout(stop, requestWait)
 		defer cancel()
 		asked.tellFirst()
+		busy := !asked.client.Ready()
 		locations, err := asked.client.References(ctx, asked.path, at)
+		declared, _ := asked.client.Definition(ctx, asked.path, at)
+		hits := application.grepAll(stop, projects, name, options)
 		return func() {
 			application.waiting = nil
 			if err != nil {
 				application.toast = "The uses could not be found: " + err.Error()
 				return
 			}
-			application.showUses(name, locations)
+			search.busy = busy
+			application.startUses(search, locations, declared, hits)
 		}
 	})
 }
 
-// showUses opens the finder on the uses a server found, those in the projects open.
-func (application *Window) showUses(name string, locations []lsp.Location) {
-	var uses []finder.Use
-	outside := 0
-	for _, location := range locations {
-		path := lsp.PathOf(location.URI)
-		reference, found := application.referenceOf(path)
-		if !found {
-			outside++
-			continue
-		}
-		start, end := location.Range.Start, location.Range.End
-		text := lineOf(path, start.Line, application)
-		column := lsp.CharacterColumn(text, start.Character)
-		length := 0
-		if end.Line == start.Line {
-			length = lsp.CharacterColumn(text, end.Character) - column
-		}
-		byteColumn := len(string([]rune(text)[:min(column, len([]rune(text)))]))
-		uses = append(uses, finder.Use{Project: reference.Project, Path: reference.Path, Line: start.Line + 1,
-			Column: byteColumn, Length: length, Text: text})
+// useOf is a place a server gave as a use listed in the finder, when it is in a project open.
+func (application *Window) useOf(location lsp.Location) (finder.Use, bool) {
+	path := lsp.PathOf(location.URI)
+	reference, found := application.referenceOf(path)
+	if !found {
+		return finder.Use{}, false
 	}
-	application.finder.ShowUses(application, "uses of "+name, uses)
-	if outside > 0 {
-		application.toast = fmt.Sprintf("%d more outside the projects open", outside)
+	start, end := location.Range.Start, location.Range.End
+	text := lineOf(path, start.Line, application)
+	column := lsp.CharacterColumn(text, start.Character)
+	length := 0
+	if end.Line == start.Line {
+		length = lsp.CharacterColumn(text, end.Character) - column
 	}
+	byteColumn := len(string([]rune(text)[:min(column, len([]rune(text)))]))
+	return finder.Use{Project: reference.Project, Path: reference.Path, Line: start.Line + 1,
+		Column: byteColumn, Length: length, Text: text}, true
 }
 
 // wordAt is the name a character of a line is in: letters, digits and _.

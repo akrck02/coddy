@@ -15,6 +15,8 @@
 //   - FAKE_LSP_APPLY_EDIT: when set, it asks the client to apply an edit once initialized.
 //   - FAKE_LSP_READY: a language/status type it sends a moment after it is initialized, as jdtls
 //     sends ServiceReady once it has read the projects.
+//   - FAKE_LSP_JARS: when set, a name declared in no workspace folder but imported
+//     ("import org.lighthouse.Lamp") is declared in a jar, answered as kotlin-lsp answers it.
 //   - FAKE_LSP_NO_FOLDERS: when set, it does not say it follows workspace folders, as kotlin-lsp.
 //   - FAKE_LSP_BUSY: milliseconds of work it reports with $/progress once initialized, answering
 //     every request with nothing meanwhile, as kotlin-lsp does while Gradle imports the projects:
@@ -306,7 +308,23 @@ func (fake *server) definition(params json.RawMessage) (any, error) {
 		return []lsp.Location{}, nil
 	}
 	declaration := regexp.MustCompile(`\b(func|type|class|interface|const|var)\s+(\([^)]*\)\s*)?` + regexp.QuoteMeta(word) + `\b`)
-	return fake.find(declaration, word), nil
+	found := fake.find(declaration, word)
+	if len(found) > 0 || os.Getenv("FAKE_LSP_JARS") == "" {
+		return found, nil
+	}
+	return fake.inJar(params, word), nil
+}
+
+// inJar is where a name imported by the document is declared, in a jar of its package.
+func (fake *server) inJar(params json.RawMessage, word string) []lsp.Location {
+	var asked lsp.TextDocumentPositionParams
+	_ = json.Unmarshal(params, &asked)
+	imported := regexp.MustCompile(`import\s+([\w.]+)\.` + regexp.QuoteMeta(word) + `\b`).FindStringSubmatch(fake.text(asked.TextDocument.URI))
+	if imported == nil {
+		return []lsp.Location{}
+	}
+	uri := "jar:///cache/lighthouse.jar!/" + strings.ReplaceAll(imported[1], ".", "/") + "/" + word + ".class"
+	return []lsp.Location{{URI: uri, Range: lsp.Range{Start: lsp.Position{Line: 3}, End: lsp.Position{Line: 3}}}}
 }
 
 func (fake *server) references(params json.RawMessage) (any, error) {

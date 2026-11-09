@@ -3,6 +3,7 @@
 package lsp
 
 import (
+	"maps"
 	"net/url"
 	"path/filepath"
 	"strings"
@@ -113,6 +114,9 @@ func CharacterColumn(line string, units int) int {
 
 // languageIDs are the protocol's names of the languages the reader asks servers about, by extension.
 var languageIDs = map[string]string{".go": "go", ".java": "java", ".kt": "kotlin", ".kts": "kotlin"}
+
+// LanguageIDs are the languages the reader tells servers of, by file extension.
+func LanguageIDs() map[string]string { return maps.Clone(languageIDs) }
 
 // LanguageOf is the protocol's name of a file's language, "" when no server is known for it.
 func LanguageOf(path string) string {

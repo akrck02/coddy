@@ -34,6 +34,7 @@ func (application *Window) Build(context *ui.Context) {
 	application.readClassKinds()
 	application.typeInTheFile(context, application.handleKeys(context))
 	application.serveOpenFile()
+	application.advanceUses()
 
 	context.Frame(ui.Layout{Direction: ui.Vertical, Width: ui.Grow(), Height: ui.Grow()}, ui.Look{Fill: context.Theme.Background}, func() {
 		application.buildTitleBar(context)
