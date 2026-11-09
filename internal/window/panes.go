@@ -187,8 +187,10 @@ func (application *Window) Target() (file workspace.FileReference, inViewer bool
 	return file, found && (application.focus == viewerPane || opened), found
 }
 
-// ToggleChangedFilter lists only the changed files in the sidebar, or every file again.
-func (application *Window) ToggleChangedFilter() { application.sidebar.ToggleChangedFilter() }
+// ToggleChangedFilter shows only the changes, projects and files, or everything again.
+func (application *Window) ToggleChangedFilter() {
+	application.setOnlyChanged(!application.onlyChanged)
+}
 
 // Toast shows a short note at the bottom of the window.
 func (application *Window) Toast(words string) { application.toast = words }

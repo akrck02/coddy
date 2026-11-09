@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -27,6 +28,9 @@ type Client struct {
 	readyOnce sync.Once
 	working   map[string]bool // the work the server reports running, by its token
 	folders   map[string]bool
+	// followsFolders tells whether the server says it follows workspace folders added and removed
+	// while it runs; one that does not reads those it started with.
+	followsFolders bool
 }
 
 // Start runs a server in a root (or, with folders, for those workspace folders) and initializes
@@ -90,9 +94,19 @@ func (client *Client) initialize(ctx context.Context, root string, folders []str
 	if client.Server.Options != nil {
 		params["initializationOptions"] = client.Server.Options
 	}
-	if err := client.conn.Call(ctx, "initialize", params, nil); err != nil {
+	var answer struct {
+		Capabilities struct {
+			Workspace struct {
+				WorkspaceFolders struct {
+					Supported bool `json:"supported"`
+				} `json:"workspaceFolders"`
+			} `json:"workspace"`
+		} `json:"capabilities"`
+	}
+	if err := client.conn.Call(ctx, "initialize", params, &answer); err != nil {
 		return err
 	}
+	client.followsFolders = answer.Capabilities.Workspace.WorkspaceFolders.Supported
 	return client.conn.Notify("initialized", struct{}{})
 }
 
@@ -189,18 +203,46 @@ func (client *Client) Tell(path, text string, version int) error {
 }
 
 // AddFolder adds a workspace folder to a server that runs for the whole window.
-func (client *Client) AddFolder(folder string) error {
+func (client *Client) AddFolder(folder string) error { return client.changeFolder(folder, true) }
+
+// RemoveFolder takes a workspace folder away from a server that runs for the whole window.
+func (client *Client) RemoveFolder(folder string) error { return client.changeFolder(folder, false) }
+
+// changeFolder adds or removes a workspace folder, when it is not so already.
+func (client *Client) changeFolder(folder string, add bool) error {
 	client.lock.Lock()
 	known := client.folders[folder]
-	client.folders[folder] = true
+	if add {
+		client.folders[folder] = true
+	} else {
+		delete(client.folders, folder)
+	}
 	client.lock.Unlock()
-	if known {
+	if known == add {
 		return nil
 	}
-	return client.conn.Notify("workspace/didChangeWorkspaceFolders", map[string]any{"event": map[string]any{
-		"added":   []map[string]string{{"uri": FileURI(folder), "name": filepath.Base(folder)}},
-		"removed": []map[string]string{},
-	}})
+	changed := []map[string]string{{"uri": FileURI(folder), "name": filepath.Base(folder)}}
+	event := map[string]any{"added": changed, "removed": []map[string]string{}}
+	if !add {
+		event = map[string]any{"added": []map[string]string{}, "removed": changed}
+	}
+	return client.conn.Notify("workspace/didChangeWorkspaceFolders", map[string]any{"event": event})
+}
+
+// FollowsFolders tells whether the server follows workspace folders added and removed while it
+// runs; one that does not must be started again to read others.
+func (client *Client) FollowsFolders() bool { return client.followsFolders }
+
+// Folders are the workspace folders the server reads, sorted.
+func (client *Client) Folders() []string {
+	client.lock.Lock()
+	defer client.lock.Unlock()
+	folders := make([]string, 0, len(client.folders))
+	for folder := range client.folders {
+		folders = append(folders, folder)
+	}
+	sort.Strings(folders)
+	return folders
 }
 
 // HasFolder tells whether a server already reads a workspace folder.

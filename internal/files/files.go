@@ -6,11 +6,9 @@ import (
 	"fmt"
 
 	"github.com/akrck02/code-review/internal/mode"
-	"github.com/akrck02/code-review/internal/pane"
 	"github.com/akrck02/code-review/internal/sidebar"
 	"github.com/akrck02/code-review/internal/viewer"
 	"github.com/akrck02/code-review/internal/workspace"
-	"github.com/akrck02/go-renderer/input"
 	ui "github.com/akrck02/go-ui"
 )
 
@@ -75,11 +73,5 @@ func (files *Mode) Progress() (done, total int) { return 0, 0 }
 // BuildInsteadOfAFile leaves the viewer's own page: how to start.
 func (files *Mode) BuildInsteadOfAFile(context *ui.Context) bool { return false }
 
-// Commands are the files mode's keys.
-func (files *Mode) Commands() []mode.Command {
-	return []mode.Command{{
-		Description: "Files mode: only the changed files, or every file",
-		Keys:        []pane.Press{pane.Key(input.KeyG, "g"), pane.CommandShiftKey(input.KeyG, "⌘⇧G")},
-		Do:          func(int) { files.window.ToggleChangedFilter() },
-	}}
-}
+// Commands are the files mode's keys: none of its own, as the filter of changes (g) is the window's.
+func (files *Mode) Commands() []mode.Command { return nil }

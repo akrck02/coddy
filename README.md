@@ -50,9 +50,10 @@ It has two modes, chosen on the rail at the far left (or with `1`, `2`, `c`):
   lines folded away (`f` shows them all, Enter or a click opens one fold), and a map of the changes
   along the scroll bar. Inside a replaced line the words that changed are washed stronger. `d`
   switches to the whole file.
-- **Only the projects with changes**, by default: the projects a development did not touch are left
-  out of the sidebar (both modes) and the finder. `h`, the *Only changed projects* button or
-  `-all` show every project; the choice is remembered.
+- **Only the changes**, by default: the projects a development did not touch are left out of the
+  sidebar, the finder and the language servers, and the *Files* mode lists only the changed files,
+  with its folders left as you opened them. `g` (or `h`), the button over the sidebar or `-all`
+  show every project and file; the choice is remembered.
 - **Every other file stays readable**: the *Files* mode lists them all, and the finder finds them.
 - **Enter a project** to see only its tree, from its top (Enter on its row, `e`, or the → that
   shows on its row under the pointer); `Esc` goes back to every project.
@@ -138,7 +139,6 @@ below, an F-key or `Esc`. `Esc` gives the keyboard back to the sidebar, where th
 | `1` / `2` (`⌘1` / `⌘2`; `c` or `⌘0` switches) | Files mode / Review mode |
 | `Enter` on a project, `e` (`⌘E`), or its → button | Enter the project: the sidebar lists only its tree, and `n`/`m`/`v` stay in it |
 | `Esc` / `Backspace` | Back to every project |
-| `g` (`⌘⇧G`) | Files mode: list only the changed files (they still open whole), or every file |
 | `v` (`⌘⇧V`) | Mark the file as viewed (or not); marking it opens the next file not viewed |
 | `d` (`⌘D`) | Diff, or the whole file |
 | `f` (`⌘U`) | Fold the unchanged lines, or show them all |
@@ -146,7 +146,7 @@ below, an F-key or `Esc`. `Esc` gives the keyboard back to the sidebar, where th
 | `↑ ↓ ← →`, `PgUp PgDn`, `Home End` | Move in the sidebar (←/→ close and open folders), or scroll the file |
 | `j` / `k`, `Space` | Scroll a line, a page |
 | `Enter` | Open a file or a folder (sidebar), open a fold (editor) |
-| `h` (`⌘⇧H`) | Only the projects with changes, or every project (sidebar and finder) |
+| `g`, `h` (`⌘⇧G`) | Only the changes, projects and files, or everything (sidebar, finder and servers) |
 | `b` (`⌘B`) | Compare against another branch, tag or commit |
 | `w` (`⌘⇧W`) | Count the changes not committed yet, or the commits only |
 | `r` (`⌘R`) | Read every project again |

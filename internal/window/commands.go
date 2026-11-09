@@ -150,7 +150,7 @@ var commands = []command{
 				application.viewer.ToggleContext()
 			}
 		}},
-	{description: "Only the projects with changes, or every project (sidebar and finder)", keys: []pane.Press{pane.Key(input.KeyH, "h"), pane.CommandShiftKey(input.KeyH, "⌘⇧H")},
+	{description: "Only the changes, projects and files, or everything (sidebar and finder)", keys: []pane.Press{pane.Key(input.KeyG, "g"), pane.Key(input.KeyH, "h"), pane.CommandShiftKey(input.KeyG, "⌘⇧G")},
 		do: func(application *Window, _ *ui.Context, _ int) { application.setOnlyChanged(!application.onlyChanged) }},
 	{description: "Count the changes not committed yet, or only commits", keys: []pane.Press{pane.Key(input.KeyW, "w"), pane.CommandShiftKey(input.KeyW, "⌘⇧W")},
 		do: func(application *Window, _ *ui.Context, _ int) {

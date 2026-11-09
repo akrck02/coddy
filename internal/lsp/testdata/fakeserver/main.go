@@ -15,6 +15,7 @@
 //   - FAKE_LSP_APPLY_EDIT: when set, it asks the client to apply an edit once initialized.
 //   - FAKE_LSP_READY: a language/status type it sends a moment after it is initialized, as jdtls
 //     sends ServiceReady once it has read the projects.
+//   - FAKE_LSP_NO_FOLDERS: when set, it does not say it follows workspace folders, as kotlin-lsp.
 //   - FAKE_LSP_BUSY: milliseconds of work it reports with $/progress once initialized, answering
 //     every request with nothing meanwhile, as kotlin-lsp does while Gradle imports the projects.
 package main
@@ -144,19 +145,37 @@ func (fake *server) initialize(params json.RawMessage) (any, error) {
 		folders = []folder{{URI: asked.RootURI}}
 	}
 	fake.addFolderList(folders)
-	return map[string]any{"capabilities": map[string]any{
+	capabilities := map[string]any{
 		"definitionProvider": true, "referencesProvider": true, "hoverProvider": true, "textDocumentSync": 1,
-	}}, nil
+	}
+	if os.Getenv("FAKE_LSP_NO_FOLDERS") == "" {
+		capabilities["workspace"] = map[string]any{"workspaceFolders": map[string]any{"supported": true, "changeNotifications": true}}
+	}
+	return map[string]any{"capabilities": capabilities}, nil
 }
 
 func (fake *server) addFolders(params json.RawMessage) {
 	var changed struct {
 		Event struct {
-			Added []folder `json:"added"`
+			Added   []folder `json:"added"`
+			Removed []folder `json:"removed"`
 		} `json:"event"`
 	}
-	if json.Unmarshal(params, &changed) == nil {
-		fake.addFolderList(changed.Event.Added)
+	if json.Unmarshal(params, &changed) != nil {
+		return
+	}
+	fake.addFolderList(changed.Event.Added)
+	fake.lock.Lock()
+	defer fake.lock.Unlock()
+	for _, each := range changed.Event.Removed {
+		path := lsp.PathOf(each.URI)
+		logLine("removed " + filepath.Base(path))
+		for index, kept := range fake.folders {
+			if kept == path {
+				fake.folders = append(fake.folders[:index], fake.folders[index+1:]...)
+				break
+			}
+		}
 	}
 }
 
@@ -166,6 +185,7 @@ func (fake *server) addFolderList(folders []folder) {
 	defer fake.lock.Unlock()
 	for _, each := range folders {
 		path := lsp.PathOf(each.URI)
+		logLine("reads " + filepath.Base(path))
 		fake.folders = append(fake.folders, path)
 		if name := os.Getenv("FAKE_LSP_WRITES"); name != "" {
 			_ = os.WriteFile(filepath.Join(path, name), []byte("written by the fake server\n"), 0o644)

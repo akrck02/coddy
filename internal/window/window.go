@@ -121,6 +121,7 @@ func New(settings Settings, modes ...mode.Mode) (*Window, error) {
 		classKinds:    map[workspace.FileReference]java.ClassKind{},
 	}
 	application.sidebar = sidebar.New()
+	application.sidebar.SetChangedFilter(settings.OnlyChanged)
 	application.startModes(modes, settings.Mode)
 	application.viewer = viewer.New()
 	if settings.Synchronous {
@@ -267,6 +268,7 @@ func (application *Window) baseFor(path string) string {
 // changed files and the sidebar's rows.
 func (application *Window) projectsChanged() {
 	application.servers.roots = map[string]string{} // a go.mod may have come or gone
+	application.servers.inSight = map[string][]string{}
 	application.candidates = application.candidates[:0]
 	application.changedOrder = application.changedOrder[:0]
 	for index, project := range application.projects {
@@ -439,11 +441,12 @@ func (application *Window) hidden(project *workspace.Project) bool {
 // setOnlyChanged shows only the projects with changes, or every project.
 func (application *Window) setOnlyChanged(only bool) {
 	application.onlyChanged = only
+	application.sidebar.SetChangedFilter(only)
 	application.projectsChanged()
 	if only {
-		application.toast = "Only the projects with changes"
+		application.toast = "Only the changes: projects and files"
 	} else {
-		application.toast = "Every project"
+		application.toast = "Every project and file"
 	}
 }
 

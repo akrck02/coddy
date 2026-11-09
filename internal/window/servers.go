@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -34,6 +35,10 @@ type languageServers struct {
 	written   *workspace.Written
 	adding    map[string]bool   // projects being added to a server for the whole window
 	roots     map[string]string // the root of each file asked, as finding it reads the disk
+	// inSight are, by server name, the projects in sight with a file it reads, worked out again
+	// when the projects change; restarting is the set a server is started again for, by key
+	inSight    map[string][]string
+	restarting map[string]string
 }
 
 // startWait is how long a server gets to start and answer initialize.
@@ -45,7 +50,8 @@ func newLanguageServers(table []lsp.Server, writtenPath string) languageServers 
 	}
 	return languageServers{table: table, running: map[string]*lsp.Client{}, starting: map[string]bool{},
 		told: map[string]told{}, missing: map[string]bool{}, failed: map[string]string{}, crashes: map[string]int{}, snapshots: map[string]*workspace.Snapshot{},
-		written: workspace.OpenWritten(writtenPath), adding: map[string]bool{}, roots: map[string]string{}}
+		written: workspace.OpenWritten(writtenPath), adding: map[string]bool{}, roots: map[string]string{},
+		inSight: map[string][]string{}, restarting: map[string]string{}}
 }
 
 // serverKey names a server running in a root ("" for one per window).
@@ -102,8 +108,8 @@ func (application *Window) serveOpenFile() (*lsp.Client, told, string) {
 		}
 		return nil, told{}, ""
 	}
-	if project := application.viewer.Project.Path; server.OnePerWindow && !servers.adding[project] && !client.HasFolder(project) {
-		application.addFolder(client, server.Name, project)
+	if server.OnePerWindow {
+		application.followSight(client, server, key)
 	}
 	now, text := application.textNow()
 	last := servers.told[key+"|"+path]
@@ -247,16 +253,24 @@ func (application *Window) serverEnded(name, key string, client *lsp.Client) {
 }
 
 // foldersFor are the workspace folders of a server that runs for the whole window: every project
-// with a file of its languages. A server with roots gets its root instead.
+// in sight with a file of its languages, and the project of the file open. A server with roots
+// gets its root instead.
 func (application *Window) foldersFor(server lsp.Server) []string {
 	if !server.OnePerWindow {
 		return nil
 	}
-	var folders []string
-	for _, project := range application.projects {
-		if hasFileOf(project, server) {
-			folders = append(folders, project.Path)
+	folders, worked := application.servers.inSight[server.Name]
+	if !worked {
+		for _, project := range application.projects {
+			if !application.hidden(project) && hasFileOf(project, server) {
+				folders = append(folders, project.Path)
+			}
 		}
+		application.servers.inSight[server.Name] = folders
+	}
+	view := &application.viewer
+	if view.IsOpen() && view.Project != nil && !slices.Contains(folders, view.Project.Path) {
+		folders = append(slices.Clip(folders), view.Project.Path)
 	}
 	return folders
 }

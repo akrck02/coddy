@@ -205,9 +205,6 @@ func (application *Window) buildSearchField(context *ui.Context) {
 // buildSettingButtons are the window's settings: the projects listed, the changes counted, the
 // base, and reading again.
 func (application *Window) buildSettingButtons(context *ui.Context) {
-	if theme.ToolButton(context, "Only the projects with changes (h)", "list-filter", application.onlyChanged) {
-		application.setOnlyChanged(!application.onlyChanged)
-	}
 	if theme.ToolButton(context, "Count the changes not committed yet (w)", "file-pen-line", application.settings.WorkingTree) {
 		application.keepingEdits(application.toggleWorkingTree)
 	}

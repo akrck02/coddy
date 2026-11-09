@@ -305,22 +305,31 @@ func TestEnteringAProjectListsOnlyItsTree(test *testing.T) {
 	}
 }
 
-func TestTheFilesModeCanListOnlyTheChangedFiles(test *testing.T) {
-	application := newReader(Settings{Folders: []string{makeRepository(test)}, WorkingTree: true, Synchronous: true})
+func TestTheFilterOfChangesLeavesOutProjectsAndFilesWithout(test *testing.T) {
+	folder := makeRepository(test)
+	addHarbour(test, folder) // a project with no changes
+	application := newReader(Settings{Folders: []string{folder}, WorkingTree: true, Synchronous: true})
 	window := newWindow(test, application)
-	if !sidebarShows(application, "src") {
-		test.Fatal("the project is not open in the files mode")
+	lighthouse := application.ProjectIndex(filepath.Join(folder, "lighthouse"))
+	application.sidebar.SetExpanded(sidebar.Row{Project: lighthouse, Path: ""}, true)
+	window.Frames(2)
+	if !sidebarShows(application, "src") || !sidebarShows(application, "harbour") {
+		test.Fatal("the projects are not open in the files mode")
 	}
 	window.PressKey(input.KeyG)
+	window.Frames(2)
+	if sidebarShows(application, "harbour") || sidebarShows(application, "lamp.go") {
+		test.Error("g left harbour, which has no changes, or opened src by itself")
+	}
+	application.sidebar.SetExpanded(sidebar.Row{Project: lighthouse, Path: "src"}, true)
 	window.Frames(2)
 	if !sidebarShows(application, "lamp.go") || sidebarShows(application, "keeper.go") {
 		test.Error("g did not list only the changed files")
 	}
 	window.PressKey(input.KeyG)
 	window.Frames(2)
-	application.sidebar.SetExpanded(sidebar.Row{Project: 0, Path: "src"}, true)
-	if !sidebarShows(application, "keeper.go") {
-		test.Error("g again did not list every file")
+	if !sidebarShows(application, "keeper.go") || !sidebarShows(application, "harbour") {
+		test.Error("g again did not list every project and file")
 	}
 }
 

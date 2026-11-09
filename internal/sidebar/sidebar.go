@@ -37,6 +37,8 @@ type Window interface {
 	// projects with changes are shown.
 	Hidden(project *workspace.Project) bool
 	ShowEveryProject()
+	// ToggleChangedFilter shows only the changes, projects and files, or everything again.
+	ToggleChangedFilter()
 	OpenFile(file workspace.FileReference)
 	// OpenedFile is the file the viewer shows, if any.
 	OpenedFile() (workspace.FileReference, bool)
@@ -91,7 +93,8 @@ type Sidebar struct {
 	// listed, from its top, as if it were the only project open. Empty lists every project.
 	Entered string
 	// onlyChanged lists, in a mode that lists every file, only the files the development changed,
-	// still opened as that mode opens them: a lighter way in than a mode of changes only.
+	// with the folders opened and closed as that mode has them: the window's filter of changes,
+	// which also leaves out the projects with none.
 	onlyChanged bool
 }
 
@@ -111,14 +114,14 @@ func (sidebar *Sidebar) Invalidate() {
 }
 
 func (sidebar *Sidebar) expandedKey(project int, path string) string {
-	return fmt.Sprintf("%s|%t|%d|%s", sidebar.Listing.Name(), sidebar.listsChangesOnly(), project, path)
+	return fmt.Sprintf("%s|%t|%d|%s", sidebar.Listing.Name(), sidebar.Listing.ChangesOnly(), project, path)
 }
 
 func (sidebar *Sidebar) isExpanded(window Window, project int, path string, isProject bool) bool {
 	if open, chosen := sidebar.expanded[sidebar.expandedKey(project, path)]; chosen {
 		return open
 	}
-	if sidebar.listsChangesOnly() {
+	if sidebar.Listing.ChangesOnly() {
 		return true
 	}
 	return isProject && len(window.Projects()) == 1
@@ -280,8 +283,8 @@ func (sidebar *Sidebar) RevealFile(window Window, reference workspace.FileRefere
 		sidebar.Entered = "" // a file of another project: back to every project to show it
 	}
 	_, changed := project.ChangeOf(reference.Path)
-	if !changed {
-		sidebar.onlyChanged = false
+	if !changed && sidebar.onlyChanged {
+		window.ShowEveryProject()
 	}
 	if sidebar.Listing.ChangesOnly() && !changed {
 		window.ListEveryFile()
@@ -466,7 +469,7 @@ func (sidebar *Sidebar) buildHeader(context *ui.Context, window Window) {
 		}
 	}
 	context.Spacer()
-	sidebar.buildChangedFilter(context)
+	sidebar.buildChangedFilter(context, window)
 	if theme.ToolButton(context, "Collapse all", "chevrons-down-up", false) {
 		sidebar.collapseAll(window)
 	}
@@ -529,7 +532,7 @@ func (sidebar *Sidebar) buildEnteredHeader(context *ui.Context, window Window) {
 	if count != "" {
 		context.Text(count, countStyle)
 	}
-	sidebar.buildChangedFilter(context)
+	sidebar.buildChangedFilter(context, window)
 }
 
 // enteredCount is what the mode counts in the project entered, and the style it is written in.
@@ -567,25 +570,22 @@ func (sidebar *Sidebar) listsChangesOnly() bool {
 	return sidebar.Listing.ChangesOnly() || sidebar.onlyChanged
 }
 
-// ToggleChangedFilter lists only the changed files, or every file again, in a mode that lists
-// every file.
-func (sidebar *Sidebar) ToggleChangedFilter() {
-	if sidebar.Listing.ChangesOnly() {
+// SetChangedFilter lists only the changed files, or every file again, in a mode that lists every
+// file; a mode of changes only lists them anyway.
+func (sidebar *Sidebar) SetChangedFilter(on bool) {
+	if sidebar.onlyChanged == on {
 		return
 	}
-	sidebar.onlyChanged = !sidebar.onlyChanged
+	sidebar.onlyChanged = on
 	sidebar.Stale = true
 	sidebar.list.Offset = 0
 }
 
-// buildChangedFilter is the button that lists only the changed files, in a mode that lists every
-// file.
-func (sidebar *Sidebar) buildChangedFilter(context *ui.Context) {
-	if sidebar.Listing.ChangesOnly() {
-		return
-	}
-	if theme.ToolButton(context, "Only the changed files (g)", "file-diff", sidebar.onlyChanged) {
-		sidebar.ToggleChangedFilter()
+// buildChangedFilter is the button that shows only the changes: the projects with some, and in a
+// mode that lists every file, the changed files.
+func (sidebar *Sidebar) buildChangedFilter(context *ui.Context, window Window) {
+	if theme.ToolButton(context, "Only the changes: projects and files (g)", "file-diff", sidebar.onlyChanged) {
+		window.ToggleChangedFilter()
 	}
 }
 
