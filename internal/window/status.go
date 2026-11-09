@@ -47,6 +47,13 @@ func (application *Window) serverParts() []statusPart {
 		name := strings.Fields(key)[0]
 		parts = append(parts, statusPart{name, statusOf(name, client.Progress(), time.Now())})
 	}
+	for name, other := range servers.queued {
+		if server, found := serverNamed(servers.table, name); found && application.importingBefore(server) == "" {
+			delete(servers.queued, name) // the other is done: the next frame that needs it starts it
+			continue
+		}
+		parts = append(parts, statusPart{name, name + " waits for " + other + " to import"})
+	}
 	for _, name := range servers.resting {
 		parts = append(parts, statusPart{name, name + " resting"})
 	}
@@ -105,4 +112,14 @@ func statusOf(name string, progress lsp.Progress, now time.Time) string {
 func clock(length time.Duration) string {
 	seconds := int(length.Seconds())
 	return fmt.Sprintf("%d:%02d", seconds/60, seconds%60)
+}
+
+// serverNamed is the server of a name in a table.
+func serverNamed(table []lsp.Server, name string) (lsp.Server, bool) {
+	for _, server := range table {
+		if server.Name == name {
+			return server, true
+		}
+	}
+	return lsp.Server{}, false
 }

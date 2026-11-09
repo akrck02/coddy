@@ -48,6 +48,9 @@ type languageServers struct {
 	usage      map[string]serverUsage
 	measuring  bool
 	measuredAt time.Time
+	// queued are the servers waiting for another to have imported the projects, by name, with
+	// the other's
+	queued map[string]string
 }
 
 // startWait is how long a server gets to start and answer initialize.
@@ -60,7 +63,8 @@ func newLanguageServers(table []lsp.Server, writtenPath string) languageServers 
 	return languageServers{table: table, running: map[string]*lsp.Client{}, starting: map[string]bool{},
 		told: map[string]told{}, missing: map[string]bool{}, failed: map[string]string{}, crashes: map[string]int{}, snapshots: map[string]*workspace.Snapshot{},
 		written: workspace.OpenWritten(writtenPath), adding: map[string]bool{}, roots: map[string]string{},
-		inSight: map[string][]string{}, restarting: map[string]string{}, resting: map[string]string{}, rest: serverRest, usage: map[string]serverUsage{}}
+		inSight: map[string][]string{}, restarting: map[string]string{}, resting: map[string]string{}, rest: serverRest, usage: map[string]serverUsage{},
+		queued: map[string]string{}}
 }
 
 // serverKey names a server running in a root ("" for one per window).
@@ -152,6 +156,11 @@ func (application *Window) textNow() (told, string) {
 // noted; once it answers, the next frame tells it the file.
 func (application *Window) startServer(server lsp.Server, root, key, project string) {
 	servers := &application.servers
+	if other := application.importingBefore(server); other != "" {
+		servers.queued[server.Name] = other // started on a later frame, once the other is ready
+		return
+	}
+	delete(servers.queued, server.Name)
 	servers.starting[key] = true
 	folders := application.foldersFor(server)
 	projects := folders
@@ -304,6 +313,23 @@ func (application *Window) serverEnded(name, key string, client *lsp.Client) {
 		return
 	}
 	application.toast = name + " stopped; it starts again when a file needs it"
+}
+
+// importingBefore is a server this one waits for that is starting, or importing the projects,
+// "" for none.
+func (application *Window) importingBefore(server lsp.Server) string {
+	servers := &application.servers
+	for key := range servers.starting {
+		if slices.Contains(server.After, strings.Fields(key)[0]) {
+			return strings.Fields(key)[0]
+		}
+	}
+	for key, client := range servers.running {
+		if slices.Contains(server.After, client.Server.Name) && !client.Ready() {
+			return strings.Fields(key)[0]
+		}
+	}
+	return ""
 }
 
 // foldersFor are the workspace folders of a server that runs for the whole window: every project

@@ -257,3 +257,26 @@ func TestAServerThatNeedsMoreFreeSpaceThanTheDiskHasDoesNotStart(test *testing.T
 		test.Errorf("the reader says %q", why)
 	}
 }
+
+func TestAServerWaitsForAnotherToHaveImportedTheProjects(test *testing.T) {
+	log := filepath.Join(test.TempDir(), "log")
+	first := fakeGo(test, log, "FAKE_LSP_READY=ServiceReady")[0]
+	first.ReadyStatus = "ServiceReady"
+	second := lsp.Server{Name: "second", Command: fakeServer(test), Languages: []string{"kotlin"}, After: []string{"fakels"}}
+	application := readerWithServers(test, "lighthouse/src/lamp.go", []lsp.Server{first, second})
+	window := newWindow(test, application)
+	window.Frames(1)
+	project := application.projects[0].Path
+	application.startServer(second, "", "second", project)
+	if application.servers.starting["second"] || !strings.Contains(application.serverStatus(), "second waits for fakels") {
+		test.Fatalf("second started while fakels imported; the status says %q", application.serverStatus())
+	}
+	for frame := 0; frame < 100 && strings.Contains(application.serverStatus(), "waits"); frame++ {
+		window.Frames(1)
+		time.Sleep(10 * time.Millisecond)
+	}
+	application.startServer(second, "", "second", project)
+	if !application.servers.starting["second"] && application.servers.running["second"] == nil {
+		test.Errorf("second did not start once fakels was ready; the status says %q", application.serverStatus())
+	}
+}

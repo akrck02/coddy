@@ -48,6 +48,9 @@ type Server struct {
 	// FoldersInOptions gives the workspace folders in initializationOptions too: jdtls reads them
 	// there, and from the parameters only the first.
 	FoldersInOptions bool
+	// After are the servers whose import of the projects it waits for before it starts: two
+	// imports at once, each with its Gradle daemons, take more memory than a laptop has.
+	After []string
 	// ReadsAll reads every project of the window with a file of its languages, not only those in
 	// sight: a server whose index is per set of projects (Indexes) would build another, cold, each
 	// time the filter changed what is in sight.
@@ -87,7 +90,7 @@ var Servers = []Server{
 		// an index per set of projects it starts with, about 5 GB for 44 repositories: it reads them all,
 		// whatever is in sight, so one index serves, and the reader keeps the one used last
 		Indexes: "workspaces", KeepIndexes: 1, ReadsAll: true, OwnGradle: true, NeedsFree: 10 << 30,
-		Memory: "2g", MemoryVariable: "IJ_JAVA_OPTIONS",
+		Memory: "2g", MemoryVariable: "IJ_JAVA_OPTIONS", After: []string{"jdtls"},
 		// it imports every Gradle build at once, each in a daemon of its own that no import
 		// uses again: told so, each daemon stops as its import ends, instead of idling
 		JVMOptions: []string{"-Dcom.jetbrains.ls.imports.gradle.daemon.no.idle.timeout=true"}},
