@@ -159,5 +159,24 @@ again on demand.
 
 - [x] T8 The Gradle home linked to the person's, the old caches removed. (R9)
 - [x] T9 kotlin-lsp reads every Kotlin project of the window; T5 dropped. (R10, R11)
-- [ ] T10 Try it on the big workspace: one index, nothing in the own home but `daemon/` and
+- [x] T10 Try it on the big workspace: one index, nothing in the own home but `daemon/` and
   `gradle.properties`; the free disk before and after.
+
+### Result of amendment 1 (T10, on the big workspace, 9 November 2026)
+
+| | Before | After |
+|---|---|---|
+| Free internal disk | 47 GB (50 once the window and runs were done) | 55 GB |
+| kotlin-lsp's indexes | 5.5 GB (the 23 in sight) + 2.2 GB (all) | 2.5 GB, one: all of them |
+| kotlin-lsp's Gradle home | 4.2 GB | 4 MB: `daemon/`, `gradle.properties`, links |
+| Gradle daemons after | 0 | 0 |
+
+- Started with every Kotlin project (19 of the 44), kotlin-lsp found the index of that set from
+  the run of the morning and reused it; the reader removed the other on starting it. Nothing had
+  to be deleted by hand.
+- The first start linked `caches`, `wrapper`, `jdks` and `native` to the person's Gradle home,
+  making the empty `jdks` and `native` there, and removed the 4.2 GB it had of its own; its import
+  then built in the person's caches, on the external disk (locks between the two not watched).
+- Uses of `LampStore` in 32 s, as before; the ⌘-click still found no other user of the test's
+  method while kotlin-lsp was importing. The Java use missed (proposal 7's Result) is still missed:
+  a matter of jdtls, not of the disk.
