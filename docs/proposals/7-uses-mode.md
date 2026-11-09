@@ -1,6 +1,6 @@
 # 7. A mode for uses, with their graph and the graph of repositories
 
-> Status: in progress · Author's approval: proposal ☑ plan ☑
+> Status: done · Author's approval: proposal ☑ plan ☑
 
 ## Why
 
@@ -66,7 +66,7 @@ layers, the projects nothing depends on at the top (Sugiyama-style, as small gra
 - [x] T3 The views and their keys; zoom and pan for graphs. (R8)
 - [x] T4 The graph of the name, its clicks, and opening a node a level further. (R6)
 - [x] T5 `internal/builds` and the graph of repositories. (R7)
-- [ ] T6 Try it on the big workspace: the `LampStore` case, a repository graph of the 44; README and Result.
+- [x] T6 Try it on the big workspace: the `LampStore` case, a repository graph of the 44; README and Result.
 
 ## Notes from building it
 
@@ -85,3 +85,31 @@ layers, the projects nothing depends on at the top (Sugiyama-style, as small gra
   rings: a column of boxes reads top to bottom, and labels do not turn.
 - The build reading, on the big workspace: 44 projects, 130 links, 7 declarations not understood (version
   catalogs and coordinates made in code).
+
+## Result (T6, on the big workspace, 9 November 2026)
+
+44 repositories, 23 with changes. The author tried the mode in the window; then a scripted run, with
+the real servers, searched the uses of a Kotlin class of a data-access repository (`LampStore`,
+declared in Kotlin, used by its test and by a Java configuration class of another repository).
+
+| | |
+|---|---|
+| Projects read | 11–15 s |
+| Uses of `LampStore` | 37–46 s, with jdtls reading and kotlin-lsp importing: 3 uses in 2 files, listed by project, counted, folded |
+| Graph of the name | the name, its project, its two files with their counts |
+| ⌘-click on the test file | `prepareLampStore` (the method the use is in), in 33 s; no other user (kotlin-lsp was still importing) |
+| Graph of the repositories | 44 projects, 130 links, 7 declarations not understood |
+| After the window closed (`⌃C`) | no server and no Gradle daemon left |
+
+- **A use missed**: the Java configuration class of another repository that builds a `LampStore`.
+  The candidate was found by the text search, but jdtls answers no definition there, though the
+  class is in the jar that repository depends on. Most likely jdtls (Buildship) puts the open
+  repository that publishes the jar in its place, and that repository's code is Kotlin, which
+  jdtls does not read; not checked. So a Kotlin name used from Java in another repository is lost.
+- **Disk** (proposal 8): kotlin-lsp's folder grew from 1.2 to 12 GB, and the disk's free space from
+  62 to 47 GB. Two indexes, 5.5 and 2.4 GB, one per set of projects: the window read the 23 with
+  changes, the run all 44, and each set is imported anew; and 4.2 GB of Gradle caches in its own
+  Gradle home (each Gradle version's generated API and transformed jars), which the read-only
+  dependency cache does not spare. The cold import of proposal 8 T7, seen at last.
+- Found by trying it: a note (toast) showed for one frame, gone with the next move of the mouse,
+  and a long signature ran out of the hover card and the window. Both fixed.
