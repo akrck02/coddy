@@ -143,3 +143,13 @@ func TestAFileURIRoundTrips(test *testing.T) {
 		test.Error("a jar's URI was taken for a file")
 	}
 }
+
+func TestAJarLocationNamesItsClass(test *testing.T) {
+	uri := "jdt://contents/lamp-1.0-SNAPSHOT.jar/org.lighthouse.lamp/Lamp.java?=keeper/%5C/home%5C/.m2%5C/lamp.jar=/%3Corg.lighthouse.lamp%28Lamp.class"
+	if pkg, file, found := ClassInJar(uri); !found || pkg != "org.lighthouse.lamp" || file != "Lamp.java" {
+		test.Errorf("the jar's class is %q %q (%t)", pkg, file, found)
+	}
+	if _, _, found := ClassInJar("file:///lamp/Lamp.java"); found {
+		test.Error("a file is taken for a class in a jar")
+	}
+}

@@ -86,6 +86,9 @@ func (client *Client) initialize(ctx context.Context, root string, folders []str
 		"workspaceFolders": workspaceFolders,
 		"capabilities":     capabilities,
 	}
+	if client.Server.Options != nil {
+		params["initializationOptions"] = client.Server.Options
+	}
 	if err := client.conn.Call(ctx, "initialize", params, nil); err != nil {
 		return err
 	}

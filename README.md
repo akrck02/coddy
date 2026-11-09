@@ -70,7 +70,7 @@ It has two modes, chosen on the rail at the far left (or with `1`, `2`, `c`):
   asks whether to keep yours or take theirs. A dot after the name marks edits not saved, and
   opening another file or quitting asks first. A saved file shows as changed at once. The diff
   stays for reading.
-- **Follows names with language servers**: `gopls` for Go, `jdtls` for Java and Kotlin, found on
+- **Follows names with language servers**: `gopls` for Go, `jdtls` for Java (not Kotlin yet), found on
   the `PATH` and started the first time a file of their language opens. `F12` or `⌘`-click goes
   to where a name is declared, even in another project, and `⌃-` comes back; `⇧F12` lists every
   use in the finder's panel, where typing narrows them; resting the pointer on a name shows its

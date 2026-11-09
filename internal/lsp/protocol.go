@@ -53,6 +53,25 @@ func PathOf(uri string) string {
 	return filepath.FromSlash(address.Path)
 }
 
+// ClassInJar reads a jdt:// location, a class jdtls found in a jar: its package and the name of
+// its source file, ("app.coast.lamp", "Lamp.java").
+func ClassInJar(uri string) (pkg, file string, found bool) {
+	rest, isJar := strings.CutPrefix(uri, "jdt://contents/")
+	if !isJar {
+		return "", "", false
+	}
+	rest, _, _ = strings.Cut(rest, "?")
+	parts := strings.Split(rest, "/")
+	if len(parts) < 3 || parts[len(parts)-2] == "" {
+		return "", "", false
+	}
+	file = strings.TrimSuffix(parts[len(parts)-1], ".class")
+	if !strings.HasSuffix(file, ".java") {
+		file += ".java"
+	}
+	return parts[len(parts)-2], file, true
+}
+
 // UTF16Column is a column counted in characters as the protocol counts it, in UTF-16 units.
 func UTF16Column(line string, characters int) int {
 	units := 0

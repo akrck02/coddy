@@ -94,6 +94,7 @@ func (application *Window) GoToDefinition(place viewer.Place) {
 		return
 	}
 	at := application.positionOf(place)
+	name := wordAt(application.viewer.LineText(place.Line), place.Column)
 	from, _ := application.here()
 	application.work.run("definition", func(stop cancellation) func() {
 		ctx, cancel := context.WithTimeout(stop, requestWait)
@@ -107,7 +108,8 @@ func (application *Window) GoToDefinition(place viewer.Place) {
 			case len(locations) == 0:
 				application.toast = "No declaration found"
 			default:
-				application.goToLocation(from, locations[0])
+				location, _ := application.fromJar(locations[0], name)
+				application.goToLocation(from, location)
 			}
 		}
 	})
@@ -129,7 +131,7 @@ func (application *Window) goToLocation(from spot, location lsp.Location) {
 	path := lsp.PathOf(location.URI)
 	reference, found := application.referenceOf(path)
 	if !found {
-		application.toast = "Outside the projects open: " + path
+		application.toast = "Outside the projects open: " + outsideName(location.URI, path)
 		return
 	}
 	start := location.Range.Start
@@ -216,4 +218,15 @@ func (application *Window) leavingFor(reference workspace.FileReference, going f
 		return
 	}
 	going()
+}
+
+// outsideName names a declaration outside the projects open: its file, or the class in a jar.
+func outsideName(uri, path string) string {
+	if pkg, file, isJar := lsp.ClassInJar(uri); isJar {
+		return pkg + "." + strings.TrimSuffix(file, ".java") + ", in a jar whose project is not open"
+	}
+	if path == "" {
+		return uri
+	}
+	return path
 }

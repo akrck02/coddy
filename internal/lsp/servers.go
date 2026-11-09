@@ -24,14 +24,20 @@ type Server struct {
 	// projects (jdtls's ServiceReady); until then requests wait. Without it, a server is ready
 	// once initialized.
 	ReadyStatus string
+	// Options are the server's own initializationOptions, as it documents them.
+	Options map[string]any
 }
 
 // Servers are the language servers the reader runs, found on the PATH.
 var Servers = []Server{
 	{Name: "gopls", Command: "gopls", Languages: []string{"go"}, RootMarkers: []string{"go.mod"},
 		Install: "go install golang.org/x/tools/gopls@latest"},
-	{Name: "jdtls", Command: "jdtls", Languages: []string{"java", "kotlin"}, OnePerWindow: true, DataFlag: "-data",
-		Install: "brew install jdtls", ReadyStatus: "ServiceReady"},
+	// jdtls reads Java only: Kotlin needs a server of its own (not in this table yet)
+	{Name: "jdtls", Command: "jdtls", Languages: []string{"java"}, OnePerWindow: true, DataFlag: "-data",
+		Install: "brew install jdtls", ReadyStatus: "ServiceReady",
+		// a name declared in a jar (another repository of the big workspace, as a dependency) answers with a
+		// jdt:// location, which the reader maps to that repository's source when it is open
+		Options: map[string]any{"extendedClientCapabilities": map[string]any{"classFileContentsSupport": true}}},
 }
 
 // ServerFor is the server of a language among those given, if one reads it.
