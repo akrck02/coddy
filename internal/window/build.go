@@ -48,6 +48,7 @@ func (application *Window) Build(context *ui.Context) {
 	application.finder.Build(context, application)
 	application.buildBaseDialog(context)
 	application.buildHelp(context)
+	application.buildServers(context)
 	application.buildPicker(context)
 	application.buildQuestions(context)
 	application.buildHover(context)
@@ -84,7 +85,7 @@ func (application *Window) applyTheme(context *ui.Context) {
 
 func (application *Window) ModalOpen() bool {
 	asked := application.questions
-	return application.finder.Open || application.base.open || application.helpOpen || application.pickerOpen ||
+	return application.finder.Open || application.base.open || application.helpOpen || application.pickerOpen || application.serversOpen ||
 		asked.unsavedOpen || asked.conflictOpen
 }
 
@@ -280,9 +281,7 @@ func (application *Window) buildStatusBar(context *ui.Context) {
 		if !application.settings.WorkingTree {
 			context.Text("commits only", ui.TextStyle{Size: palette.SmallTextSize, Color: palette.Warning})
 		}
-		if status := application.serverStatus(); status != "" {
-			context.Text(status, small)
-		}
+		application.buildServerStatus(context, small)
 		if application.settings.ReadOnly {
 			context.Text("read-only", small)
 		}

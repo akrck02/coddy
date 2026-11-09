@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -22,6 +23,16 @@ type Progress struct {
 	Since   time.Time // when the phase began
 	Started time.Time // when the server was started
 	Log     []Message // its last messages, oldest first
+	// Projects are the workspace folders it reads, with what it says of each
+	Projects []ProjectProgress
+}
+
+// ProjectProgress is how far a server is with one project: "waiting", "importing", "imported",
+// "reading" or "read", and how long it took, or takes so far.
+type ProjectProgress struct {
+	Path  string
+	State string
+	Took  time.Duration
 }
 
 // Message is a line a server logged or showed.
@@ -68,6 +79,9 @@ func (client *Client) noteProgress(params json.RawMessage) {
 		client.working[token] = &work{title: value.Title, message: value.Message, percent: -1, since: time.Now()}
 	case "end":
 		delete(client.working, token)
+		if len(client.working) == 0 {
+			client.idleAt = time.Now()
+		}
 		return
 	}
 	running := client.working[token]
@@ -131,7 +145,7 @@ func (client *Client) noteImport(params json.RawMessage) {
 	}
 	client.lock.Lock()
 	defer client.lock.Unlock()
-	client.imported[strings.TrimSpace(folder)] = true
+	client.imported[strings.TrimSpace(folder)] = time.Now()
 	client.importing = filepath.Base(strings.TrimSpace(folder))
 }
 
@@ -172,6 +186,7 @@ func (client *Client) Progress() Progress {
 	progress := Progress{Phase: "ready", Percent: -1, Started: client.started, Since: client.started,
 		Log: append([]Message(nil), client.log...)}
 	progress.Done, progress.Total = len(client.imported), len(client.folders)
+	progress.Projects = client.projectStates(time.Now())
 	if latest := client.latestWork(); latest != nil {
 		progress.Phase, progress.Detail = phaseOf(latest.title), latest.message
 		progress.Percent, progress.Since = latest.percent, latest.since
@@ -187,6 +202,54 @@ func (client *Client) Progress() Progress {
 		}
 	}
 	return progress
+}
+
+// projectStates says how far the server is with each of its folders. A server that tells which
+// project it imports (kotlin-lsp) is followed project by project; of another, all are read
+// together.
+func (client *Client) projectStates(now time.Time) []ProjectProgress {
+	busy, ready := len(client.working) > 0, client.isReady()
+	done := now
+	if ready && !busy {
+		done = later(client.readyAt, client.idleAt)
+	}
+	var states []ProjectProgress
+	for folder := range client.folders {
+		state := ProjectProgress{Path: folder, State: "reading", Took: done.Sub(client.started)}
+		if ready && !busy {
+			state.State = "read"
+		}
+		if began, imported := client.imported[folder]; imported {
+			state.State, state.Took = "imported", client.nextImport(began, done).Sub(began)
+			if busy && filepath.Base(folder) == client.importing && client.nextImport(began, done) == done {
+				state.State = "importing"
+			}
+		} else if len(client.imported) > 0 && busy {
+			state.State, state.Took = "waiting", 0
+		}
+		states = append(states, state)
+	}
+	sort.Slice(states, func(first, second int) bool { return states[first].Path < states[second].Path })
+	return states
+}
+
+// nextImport is when the import begun after one began, or done when it was the last.
+func (client *Client) nextImport(began, done time.Time) time.Time {
+	next := done
+	for _, other := range client.imported {
+		if other.After(began) && other.Before(next) {
+			next = other
+		}
+	}
+	return next
+}
+
+// later is the later of two times.
+func later(first, second time.Time) time.Time {
+	if second.After(first) {
+		return second
+	}
+	return first
 }
 
 // latestWork is the work begun last, of what the server reports running; nil for none.

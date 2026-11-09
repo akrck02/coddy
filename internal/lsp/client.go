@@ -33,9 +33,11 @@ type Client struct {
 	started     time.Time
 	status      string
 	statusSince time.Time
-	imported    map[string]bool
+	imported    map[string]time.Time // when each project began to be imported
 	importing   string
 	log         []Message
+	readyAt     time.Time
+	idleAt      time.Time // when the work it reported last ended
 	changes     chan struct{}
 	// followsFolders tells whether the server says it follows workspace folders added and removed
 	// while it runs; one that does not reads those it started with.
@@ -63,7 +65,7 @@ func Start(ctx context.Context, server Server, root string, folders []string, da
 	}
 	client := &Client{Server: server, Root: root, command: command, versions: map[string]int{}, folders: map[string]bool{},
 		ready: make(chan struct{}), working: map[string]*work{}, started: time.Now(), statusSince: time.Now(),
-		imported: map[string]bool{}, changes: make(chan struct{}, 1)}
+		imported: map[string]time.Time{}, changes: make(chan struct{}, 1)}
 	if server.ReadyStatus == "" {
 		client.becomeReady()
 	}
@@ -159,7 +161,12 @@ func (client *Client) handle(method string, params json.RawMessage) (any, error)
 
 // becomeReady marks the server as having read the projects.
 func (client *Client) becomeReady() {
-	client.readyOnce.Do(func() { close(client.ready) })
+	client.readyOnce.Do(func() {
+		client.lock.Lock()
+		client.readyAt = time.Now()
+		client.lock.Unlock()
+		close(client.ready)
+	})
 	client.changed()
 }
 

@@ -315,14 +315,3 @@ func (application *Window) stopServers() {
 	waiting.Wait()
 	servers.running = map[string]*lsp.Client{}
 }
-
-// unique drops the repeats of a sorted list.
-func unique(sorted []string) []string {
-	var kept []string
-	for index, each := range sorted {
-		if index == 0 || each != sorted[index-1] {
-			kept = append(kept, each)
-		}
-	}
-	return kept
-}

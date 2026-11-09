@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/akrck02/code-review/internal/lsp"
+	"github.com/akrck02/go-ui/uitest"
 )
 
 func TestTheStatusBarSaysWhatAServerDoes(test *testing.T) {
@@ -47,4 +48,38 @@ func TestAQuestionSaysWhatItWaitsFor(test *testing.T) {
 	if status := application.serverStatus(); !strings.HasPrefix(status, "fakels · importing") {
 		test.Errorf("the status bar says %q", status)
 	}
+}
+
+func TestAClickOnAServerOpensWhatItDoesProjectByProject(test *testing.T) {
+	log := filepath.Join(test.TempDir(), "log")
+	application := readerWithServers(test, "lighthouse/src/lamp.go", fakeGo(test, log, "FAKE_LSP_BUSY=3000"))
+	window := newWindow(test, application)
+	if err := window.Resize(1600, 800); err != nil {
+		test.Fatal(err)
+	}
+	window.Frames(2)
+	clickText(test, window, "fakels · ")
+	window.Frames(2)
+	shown := strings.Join(window.Texts(), " ")
+	if !application.serversOpen || !strings.Contains(shown, "Language servers") || !strings.Contains(shown, "lighthouse") ||
+		!strings.Contains(shown, "Importing with Gradle") {
+		test.Errorf("the servers panel shows %q", shown)
+	}
+}
+
+// clickText clicks the text the last frame drew that starts with some words.
+func clickText(test *testing.T, window *uitest.Window, start string) {
+	test.Helper()
+	for _, text := range window.Texts() {
+		if !strings.HasPrefix(text, start) {
+			continue
+		}
+		found, err := window.Element(text)
+		if err != nil {
+			test.Fatal(err)
+		}
+		window.ClickAt(found.Rect.X+found.Rect.Width/2, found.Rect.Y+found.Rect.Height/2)
+		return
+	}
+	test.Fatalf("no text starts with %q: %q", start, window.Texts())
 }

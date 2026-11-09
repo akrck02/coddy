@@ -2,12 +2,14 @@ package window
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/akrck02/code-review/internal/lsp"
+	ui "github.com/akrck02/go-ui"
 )
 
 // watchProgress redraws the window when what a server says of itself changes, and each second
@@ -29,25 +31,52 @@ func watchProgress(client *lsp.Client) {
 	}
 }
 
-// serverStatus is what the status bar says of the servers: for each, what it is doing, on what,
-// how far and for how long, until it is ready; those not installed, and those that failed.
-func (application *Window) serverStatus() string {
+// statusPart is what the status bar says of one server.
+type statusPart struct{ name, text string }
+
+// serverParts are what the status bar says of the servers, sorted: for each, what it is doing, on
+// what, how far and for how long, until it is ready; those not installed, and those that failed.
+func (application *Window) serverParts() []statusPart {
 	servers := &application.servers
-	var parts []string
+	var parts []statusPart
 	for key := range servers.starting {
-		parts = append(parts, strings.Fields(key)[0]+" · starting")
+		name := strings.Fields(key)[0]
+		parts = append(parts, statusPart{name, name + " · starting"})
 	}
 	for key, client := range servers.running {
-		parts = append(parts, statusOf(strings.Fields(key)[0], client.Progress(), time.Now()))
+		name := strings.Fields(key)[0]
+		parts = append(parts, statusPart{name, statusOf(name, client.Progress(), time.Now())})
 	}
 	for name := range servers.missing {
-		parts = append(parts, name+" not installed")
+		parts = append(parts, statusPart{name, name + " not installed"})
 	}
 	for name := range servers.failed {
-		parts = append(parts, name+" failed")
+		parts = append(parts, statusPart{name, name + " failed"})
 	}
-	sort.Strings(parts)
-	return strings.Join(unique(parts), "   ")
+	sort.Slice(parts, func(first, second int) bool { return parts[first].text < parts[second].text })
+	return slices.CompactFunc(parts, func(first, second statusPart) bool { return first.text == second.text })
+}
+
+// serverStatus is the status bar's words about the servers, together.
+func (application *Window) serverStatus() string {
+	var texts []string
+	for _, part := range application.serverParts() {
+		texts = append(texts, part.text)
+	}
+	return strings.Join(texts, "   ")
+}
+
+// buildServerStatus shows each server in the status bar; a click opens the servers panel.
+func (application *Window) buildServerStatus(context *ui.Context, small ui.TextStyle) {
+	hovered := ui.Look{Fill: application.look.Hover, Radius: 4}
+	looks := ui.Looks{Hovered: hovered, Pressed: hovered}
+	for _, part := range application.serverParts() {
+		if context.Clickable("server status "+part.name, ui.Layout{Padding: ui.PadXY(6, 2)}, looks, func() {
+			context.Text(part.text, small)
+		}) {
+			application.serversOpen = true
+		}
+	}
 }
 
 // statusOf says what one server is doing: "kotlin-lsp · importing harbour.api.order (7 of 22) ·
