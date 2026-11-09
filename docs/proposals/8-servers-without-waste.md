@@ -1,6 +1,6 @@
 # 8. Language servers without waste
 
-> Status: in progress · Author's approval: proposal ☑ plan ☑
+> Status: amended, waiting for approval · Author's approval: proposal ☑ plan ☑
 
 ## Why
 
@@ -112,3 +112,52 @@ Marked **seen** (in docs, code, logs or on disk) or **not tried**.
 - Seen in passing (proposal 6): a word in a Javadoc comment, not a `{@link}`, counted as a use, as
   jdtls answers its definition. Fixed: a place in a comment is a use only when a link names it
   (`{@link Name}`, `@see`, `@throws`, KDoc's `[Name]`).
+
+## Amendment 1: the disk after a cold import (9 November 2026)
+
+> Author's approval: amendment ☐ plan ☐
+
+### What was seen
+
+The first cold import on the big workspace (proposal 7's Result) took kotlin-lsp's folder from 1.2 to 12 GB, and
+the internal disk's free space from 62 to 47 GB:
+
+- **4.2 GB of Gradle caches in its own Gradle home**: each Gradle version's generated API
+  (`caches/8.14`, `caches/9.5.0`, …), the jars Gradle transforms (`jars-9`) and some modules. The
+  person's Gradle home, on the external disk, holds the same already (`caches/8.14` 758 MB there,
+  `jars-9` 1.2 GB). `GRADLE_RO_DEP_CACHE` only spares the downloaded modules, not these.
+- **Two indexes, 5.5 and 2.4 GB**, one per set of projects the server *started* with: the window,
+  filtered to the 23 with changes, made one; a run with all 44 made the other. kotlin-lsp follows
+  folders added later, but names its index by the set it started with, so each new set imports
+  again, cold, for minutes, and keeps another index. T5 (start with the changes and their
+  dependencies) would make the set change with every review: more indexes, more cold imports.
+
+### What
+
+| Id | Requirement | Check |
+|---|---|---|
+| R9 | kotlin-lsp's Gradle home keeps only what makes its daemons its own: `gradle.properties` (the idle timeout) and `daemon/`. `caches`, `wrapper`, `jdks` and `native` are links to the person's, so nothing Gradle makes is made twice, and it goes on the person's disk. | A test: a prepared home has links to the person's folders; a home of the old kind has its own caches removed and linked. |
+| R10 | kotlin-lsp starts with the same set of projects whatever is in sight: every Kotlin project of the window. The filter hides projects, it does not change what the server reads. One index per window's projects, imported once. | A window test: the filter on and off does not restart kotlin-lsp, and its folders stay the same. |
+| R11 | T5 is dropped: a start set made from the changes changes with each review, and each change costs an index and a cold import. | — |
+
+### Design
+
+`prepareGradleHome` links `caches`, `wrapper`, `jdks` and `native` to the person's Gradle home
+(made there if missing), and removes a folder of its own that a link should replace (the 4.2 GB
+now). `GRADLE_RO_DEP_CACHE` is not needed any more. Two homes using one `caches` is what Gradle
+expects of several builds at once: its caches are locked per file, across processes. kotlin-lsp's
+daemons stay apart, in its own `daemon/`, and keep stopping after two minutes idle; the person's
+`gradle.properties` and daemons are not touched.
+
+For R10, `foldersFor` gives kotlin-lsp every Kotlin project open, not those in sight; jdtls and
+gopls keep following the projects in sight, as they import fast and keep no index per set.
+
+Free now, once approved: the older index (2.4 GB) and the own home's caches (4.2 GB), all made
+again on demand.
+
+### Tasks
+
+- [ ] T8 The Gradle home linked to the person's, the old caches removed. (R9)
+- [ ] T9 kotlin-lsp reads every Kotlin project of the window; T5 dropped. (R10, R11)
+- [ ] T10 Try it on the big workspace: one index, nothing in the own home but `daemon/` and
+  `gradle.properties`; the free disk before and after.
