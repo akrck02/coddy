@@ -69,5 +69,5 @@ Left as they are:
   opened again.
 - It is a preview build: version 263.7084.0-EAP has an EAP licence that ends on 13 November 2026,
   though `kotlin-lsp license status` also says the build needs none. If it stops starting after
-  that date, `brew upgrade kotlin-lsp` gets a newer build.
+  that date, `brew upgrade jetbrains/utils/kotlin-lsp` gets a newer build (a cask of the same name now exists, so the bare name means the cask).
 - The bundle ships without its EULA text (`--show-eula` fails with "EULA.txt is missing").
