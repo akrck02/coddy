@@ -26,8 +26,17 @@ type Client struct {
 	versions  map[string]int // the documents opened, by URI, with the version last sent
 	ready     chan struct{}  // closed once the server has read the projects
 	readyOnce sync.Once
-	working   map[string]bool // the work the server reports running, by its token
+	working   map[string]*work // the work the server reports running, by its token
 	folders   map[string]bool
+	// what it says of itself: jdtls's status, the projects kotlin-lsp imported and the one it
+	// imports, its messages; changes signals each change
+	started     time.Time
+	status      string
+	statusSince time.Time
+	imported    map[string]bool
+	importing   string
+	log         []Message
+	changes     chan struct{}
 	// followsFolders tells whether the server says it follows workspace folders added and removed
 	// while it runs; one that does not reads those it started with.
 	followsFolders bool
@@ -53,7 +62,8 @@ func Start(ctx context.Context, server Server, root string, folders []string, da
 		return nil, failure.Wrap(ServerNotFound, server.Name, err)
 	}
 	client := &Client{Server: server, Root: root, command: command, versions: map[string]int{}, folders: map[string]bool{},
-		ready: make(chan struct{}), working: map[string]bool{}}
+		ready: make(chan struct{}), working: map[string]*work{}, started: time.Now(), statusSince: time.Now(),
+		imported: map[string]bool{}, changes: make(chan struct{}, 1)}
 	if server.ReadyStatus == "" {
 		client.becomeReady()
 	}
@@ -132,12 +142,11 @@ func (client *Client) handle(method string, params json.RawMessage) (any, error)
 	case "$/progress":
 		client.noteProgress(params)
 	case "language/status":
-		var status struct {
-			Type string `json:"type"`
-		}
-		if json.Unmarshal(params, &status) == nil && status.Type == client.Server.ReadyStatus {
-			client.becomeReady()
-		}
+		client.noteStatus(params)
+	case "intellij/importLog":
+		client.noteImport(params)
+	case "window/logMessage", "window/showMessage":
+		client.noteLog(params)
 	case "workspace/configuration":
 		var asked struct {
 			Items []json.RawMessage `json:"items"`
@@ -149,18 +158,24 @@ func (client *Client) handle(method string, params json.RawMessage) (any, error)
 }
 
 // becomeReady marks the server as having read the projects.
-func (client *Client) becomeReady() { client.readyOnce.Do(func() { close(client.ready) }) }
+func (client *Client) becomeReady() {
+	client.readyOnce.Do(func() { close(client.ready) })
+	client.changed()
+}
 
-// Ready tells whether the server has read the projects and reports no work running: it answers
-// requests in full.
-func (client *Client) Ready() bool {
+// isReady tells whether the server said it has read the projects, busy or not.
+func (client *Client) isReady() bool {
 	select {
 	case <-client.ready:
-		return !client.Busy()
+		return true
 	default:
 		return false
 	}
 }
+
+// Ready tells whether the server has read the projects and reports no work running: it answers
+// requests in full.
+func (client *Client) Ready() bool { return client.isReady() && !client.Busy() }
 
 // waitReady waits for the server to have read the projects, as a request asked before would be
 // answered with nothing; it gives up with the request's context, or when the server stops.

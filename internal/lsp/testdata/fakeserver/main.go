@@ -17,7 +17,8 @@
 //     sends ServiceReady once it has read the projects.
 //   - FAKE_LSP_NO_FOLDERS: when set, it does not say it follows workspace folders, as kotlin-lsp.
 //   - FAKE_LSP_BUSY: milliseconds of work it reports with $/progress once initialized, answering
-//     every request with nothing meanwhile, as kotlin-lsp does while Gradle imports the projects.
+//     every request with nothing meanwhile, as kotlin-lsp does while Gradle imports the projects:
+//     it logs "Importing with Gradle: <folder>" for each folder, and reports 50 % halfway.
 package main
 
 import (
@@ -105,8 +106,15 @@ func (fake *server) work(milliseconds string) {
 	fake.busy = true
 	fake.lock.Unlock()
 	_ = fake.conn.Notify("$/progress", map[string]any{"token": 7, "value": map[string]string{"kind": "begin", "title": "Importing"}})
+	fake.lock.Lock()
+	for _, folder := range fake.folders {
+		_ = fake.conn.Notify("intellij/importLog", map[string]any{"type": 3, "message": "Importing with Gradle: " + folder})
+	}
+	fake.lock.Unlock()
 	go func() {
-		time.Sleep(time.Duration(length) * time.Millisecond)
+		time.Sleep(time.Duration(length/2) * time.Millisecond)
+		_ = fake.conn.Notify("$/progress", map[string]any{"token": 7, "value": map[string]any{"kind": "report", "percentage": 50}})
+		time.Sleep(time.Duration(length-length/2) * time.Millisecond)
 		fake.lock.Lock()
 		fake.busy = false
 		fake.lock.Unlock()

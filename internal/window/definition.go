@@ -96,12 +96,14 @@ func (application *Window) GoToDefinition(place viewer.Place) {
 	at := application.positionOf(place)
 	name := wordAt(application.viewer.LineText(place.Line), place.Column)
 	from, _ := application.here()
+	application.waitFor(asked.client)
 	application.work.run("definition", func(stop cancellation) func() {
 		ctx, cancel := context.WithTimeout(stop, requestWait)
 		defer cancel()
 		asked.tellFirst()
 		locations, err := asked.client.Definition(ctx, asked.path, at)
 		return func() {
+			application.waiting = nil
 			switch {
 			case err != nil:
 				application.toast = "The declaration could not be found: " + err.Error()
@@ -113,6 +115,14 @@ func (application *Window) GoToDefinition(place viewer.Place) {
 			}
 		}
 	})
+}
+
+// waitFor says, until the answer comes, that a question waits for a server still reading.
+func (application *Window) waitFor(client *lsp.Client) {
+	application.waiting = nil
+	if !client.Ready() {
+		application.waiting = client
+	}
 }
 
 // definitionAsked goes to the declaration of the name at the caret, or clicked last.

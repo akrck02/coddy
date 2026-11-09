@@ -92,11 +92,14 @@ type Window struct {
 	tap         *inputTap
 	keys        pane.Keys
 	toast       string
-	themeSet    bool
-	questions   questions
-	servers     languageServers
-	trail       trail
-	hover       hoverCard
+	// waiting is the server a question asked waits for, still reading the projects, to say so
+	// until the answer comes
+	waiting   *lsp.Client
+	themeSet  bool
+	questions questions
+	servers   languageServers
+	trail     trail
+	hover     hoverCard
 	// pointer is where the pointer was in the last frame, for a card shown under it
 	pointerX, pointerY float32
 }

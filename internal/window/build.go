@@ -3,6 +3,7 @@ package window
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/akrck02/code-review/internal/finder"
 	"github.com/akrck02/code-review/internal/pane"
@@ -54,6 +55,8 @@ func (application *Window) Build(context *ui.Context) {
 	if application.toast != "" {
 		context.Toast(application.toast, false)
 		application.toast = ""
+	} else if waiting := application.waiting; waiting != nil && !waiting.Ready() {
+		context.Toast("Waiting for "+statusOf(waiting.Server.Name, waiting.Progress(), time.Now()), false)
 	}
 }
 

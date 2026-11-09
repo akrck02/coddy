@@ -1,6 +1,7 @@
 package lsp
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -80,8 +81,8 @@ func TestARequestWaitsForTheServerToReadTheProjects(test *testing.T) {
 		test.Fatal(err)
 	}
 	defer client.Stop()
-	if client.Ready() {
-		test.Error("the server is ready before it said so")
+	if client.Ready() || client.Progress().Phase != "starting" {
+		test.Errorf("the server is ready before it said so: %+v", client.Progress())
 	}
 	declared, err := client.Definition(within(test), filepath.Join(folder, "lamp.go"), Position{Line: 2, Character: 6})
 	if err != nil || len(declared) != 1 || !client.Ready() {
@@ -102,9 +103,18 @@ func TestARequestAnsweredWithNothingWhileTheServerWorksIsAskedAgain(test *testin
 	if client.Ready() {
 		test.Error("the server is ready while it reports work running")
 	}
+	for deadline := time.Now().Add(2 * time.Second); client.Progress().Percent != 50 && time.Now().Before(deadline); time.Sleep(10 * time.Millisecond) {
+	}
+	busy := client.Progress()
+	if busy.Phase != "importing" || busy.Detail != filepath.Base(folder) || busy.Percent != 50 || busy.Done != 1 || busy.Total != 1 {
+		test.Errorf("while it works the server is %+v, want importing %s, 50 %%, 1 of 1", busy, filepath.Base(folder))
+	}
 	declared, err := client.Definition(within(test), filepath.Join(folder, "lamp.go"), Position{Line: 2, Character: 6})
 	if err != nil || len(declared) != 1 || client.Busy() {
 		test.Errorf("asked while it worked, the server declared Beam at %+v (%v)", declared, err)
+	}
+	if done := client.Progress(); done.Phase != "ready" || !strings.Contains(fmt.Sprint(done.Log), "Importing with Gradle") {
+		test.Errorf("once done the server is %+v", done)
 	}
 }
 

@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -222,6 +221,7 @@ func (application *Window) serverStarted(server lsp.Server, key string, client *
 	default:
 		servers.running[key] = client
 		application.work.whenDone(client.Done(), func() { application.serverEnded(server.Name, key, client) })
+		go watchProgress(client)
 		return true
 	}
 	return false
@@ -314,31 +314,6 @@ func (application *Window) stopServers() {
 	}
 	waiting.Wait()
 	servers.running = map[string]*lsp.Client{}
-}
-
-// serverStatus is what the status bar says of the servers: those starting, those running, and
-// those not installed.
-func (application *Window) serverStatus() string {
-	servers := &application.servers
-	var parts []string
-	for key := range servers.starting {
-		parts = append(parts, strings.Fields(key)[0]+" starting…")
-	}
-	for key, client := range servers.running {
-		name := strings.Fields(key)[0]
-		if !client.Ready() {
-			name += " reading the projects…"
-		}
-		parts = append(parts, name)
-	}
-	for name := range servers.missing {
-		parts = append(parts, name+" not installed")
-	}
-	for name := range servers.failed {
-		parts = append(parts, name+" failed")
-	}
-	sort.Strings(parts)
-	return strings.Join(unique(parts), " · ")
 }
 
 // unique drops the repeats of a sorted list.

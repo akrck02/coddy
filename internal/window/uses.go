@@ -26,12 +26,14 @@ func (application *Window) usesAsked() {
 	}
 	at := application.positionOf(place)
 	name := wordAt(application.viewer.LineText(place.Line), place.Column)
+	application.waitFor(asked.client)
 	application.work.run("references", func(stop cancellation) func() {
 		ctx, cancel := context.WithTimeout(stop, requestWait)
 		defer cancel()
 		asked.tellFirst()
 		locations, err := asked.client.References(ctx, asked.path, at)
 		return func() {
+			application.waiting = nil
 			if err != nil {
 				application.toast = "The uses could not be found: " + err.Error()
 				return
