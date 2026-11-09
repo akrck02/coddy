@@ -2,7 +2,6 @@ package uses
 
 import (
 	"fmt"
-	"path"
 	"sort"
 
 	"github.com/akrck02/code-review/internal/builds"
@@ -18,6 +17,7 @@ type graphs struct {
 	links          [][]int
 	readFor        string // the projects the builds were read for
 	reading        bool
+	opened         map[workspace.FileReference]*opened // the files of the name graph opened further
 }
 
 const (
@@ -29,39 +29,48 @@ const (
 
 // nameScene lays out who uses the name: the name in the middle, the projects with uses on either
 // side, one under the other, nearest first, each holding its files with their counts; an arrow
-// goes from each file to the name. A file box's target is its first use.
+// goes from each file to the name, and to a file opened further from the files using it. A file
+// box's target is its first use.
 func (uses *Mode) nameScene() scene {
 	label := uses.name
 	centre := box{x: -(textWidth(label) + 32) / 2, y: -20, width: textWidth(label) + 32, height: 40, label: label,
 		kind: centreBox, target: -1}
 	graph := scene{boxes: []box{centre}}
-	sides := [2]float32{} // how far down each side is filled
+	sides, outer := [2]float32{}, [2]float32{} // how far down each side, and its callers, are filled
 	for order, project := range uses.projectsWithUses() {
 		side := order % 2
-		files := uses.filesOf(project)
-		width := float32(180)
-		for _, file := range files {
-			width = max(width, textWidth(path.Base(file.Path))+70)
-		}
-		width = max(width, textWidth(uses.window.Projects()[project].Name)+30)
-		height := groupTop + float32(len(files))*(fileHeight+6) + 6
-		x := centre.x + centre.width + sideGap
-		if side == 0 {
-			x = centre.x - sideGap - width
-		}
-		graph.boxes = append(graph.boxes, box{x: x, y: sides[side], width: width, height: height,
-			label: uses.window.Projects()[project].Name, kind: groupBox, target: -1})
-		for row, file := range files {
-			indexes := uses.byFile[file]
-			graph.boxes = append(graph.boxes, box{x: x + 10, y: sides[side] + groupTop + float32(row)*(fileHeight+6),
-				width: width - 20, height: fileHeight, label: path.Base(file.Path), detail: fmt.Sprint(len(indexes)),
-				kind: litBox, target: indexes[0]})
-			graph.arrows = append(graph.arrows, arrow{from: len(graph.boxes) - 1, to: 0})
-		}
-		sides[side] += height + groupGap
+		height := uses.placeProject(&graph, project, side, sides[side], &outer[side])
+		sides[side] = max(sides[side]+height, outer[side]) + groupGap
 	}
 	centreAt(graph.boxes[1:], sides) // both sides centred on the name
 	return graph
+}
+
+// placeProject lays out a project's box at a height of a side, holding its files, and the callers
+// of those opened further; it gives the box's height.
+func (uses *Mode) placeProject(graph *scene, project, side int, top float32, outer *float32) float32 {
+	centre := graph.boxes[0]
+	files := uses.filesOf(project)
+	width := max(float32(180), textWidth(uses.window.Projects()[project].Name)+30)
+	for _, file := range files {
+		width = max(width, textWidth(uses.fileLabel(file))+70)
+	}
+	height := groupTop + float32(len(files))*(fileHeight+6) + 6
+	x := centre.x + centre.width + sideGap
+	if side == 0 {
+		x = centre.x - sideGap - width
+	}
+	graph.boxes = append(graph.boxes, box{x: x, y: top, width: width, height: height,
+		label: uses.window.Projects()[project].Name, kind: groupBox, target: -1})
+	for row, file := range files {
+		indexes := uses.byFile[file]
+		graph.boxes = append(graph.boxes, box{x: x + 10, y: top + groupTop + float32(row)*(fileHeight+6),
+			width: width - 20, height: fileHeight, label: uses.fileLabel(file), detail: fmt.Sprint(len(indexes)),
+			kind: litBox, target: indexes[0]})
+		graph.arrows = append(graph.arrows, arrow{from: len(graph.boxes) - 1, to: 0})
+		uses.placeCallers(graph, len(graph.boxes)-1, side, outer)
+	}
+	return height
 }
 
 // centreAt moves each side's boxes up so the side is centred on the name, at 0.
@@ -100,13 +109,23 @@ func (uses *Mode) filesOf(project int) []workspace.FileReference {
 	return files
 }
 
-// buildNameGraph shows who uses the name; a click on a file opens it at its first use.
+// buildNameGraph shows who uses the name; a click on a file opens it at its first use, a ⌘-click
+// opens it a level further: who uses the declaration its use is in.
 func (uses *Mode) buildNameGraph(context *ui.Context) {
 	graph := uses.nameScene()
-	if clicked := uses.graphs.name.build(context, uses.window.Keys(), uses.window.Look(), graph); clicked >= 0 {
-		if target := graph.boxes[clicked].target; target >= 0 {
-			uses.goTo(target)
+	keys := uses.window.Keys()
+	if clicked := uses.graphs.name.build(context, keys, uses.window.Look(), graph); clicked >= 0 {
+		chosen := graph.boxes[clicked]
+		switch {
+		case chosen.reveals:
+			uses.view = listView
+			uses.window.RevealLine(chosen.use.File, chosen.use.Line)
+		case chosen.target >= 0 && keys.Command():
+			uses.open(uses.uses[chosen.target].File)
+		case chosen.target >= 0:
+			uses.goTo(chosen.target)
 		}
 	}
-	context.Caption("A click opens the file at its first use · the wheel zooms · drag to move · 0 fits it in again")
+	context.Caption("A click opens the file at its first use · ⌘-click: who uses the method or class the use is in · " +
+		"the wheel zooms · drag to move · 0 fits it in again")
 }

@@ -21,6 +21,9 @@ type Host interface {
 	mode.Window
 	// SearchUsesAgain makes the last search of uses again, from the start.
 	SearchUsesAgain()
+	// UsersOf asks the server of a use's file for the declaration the use is in and who uses it;
+	// done gets them once known. It tells whether it asked.
+	UsersOf(use mode.Use, done func(declaration string, users []mode.Use)) bool
 }
 
 // Mode is the uses mode.

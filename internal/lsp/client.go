@@ -164,6 +164,7 @@ var capabilities = map[string]any{
 		"definition":      map[string]any{"linkSupport": false},
 		"references":      map[string]any{},
 		"hover":           map[string]any{"contentFormat": []string{"markdown", "plaintext"}},
+		"documentSymbol":  map[string]any{"hierarchicalDocumentSymbolSupport": true},
 	},
 	"workspace": map[string]any{"workspaceFolders": true, "configuration": true, "applyEdit": false},
 	"window":    map[string]any{"workDoneProgress": true},

@@ -7,13 +7,18 @@ import (
 
 	"github.com/akrck02/code-review/internal/files"
 	"github.com/akrck02/code-review/internal/lsp"
+	"github.com/akrck02/code-review/internal/mode"
 	"github.com/akrck02/code-review/internal/review"
 	"github.com/akrck02/code-review/internal/sidebar"
 	"github.com/akrck02/code-review/internal/uses"
 	"github.com/akrck02/code-review/internal/viewer"
+	"github.com/akrck02/code-review/internal/workspace"
 	"github.com/akrck02/go-renderer/input"
 	uitest "github.com/akrck02/go-ui/uitest"
 )
+
+// the window is what the uses mode needs to search again and to open a graph further.
+var _ uses.Host = (*Window)(nil)
 
 // readerOfUses opens two repositories, harbour using lighthouse's Lamp through a jar, with the
 // uses mode, and asks the uses of Lamp where it is declared.
@@ -25,6 +30,7 @@ func readerOfUses(test *testing.T) (*Window, *uitest.Window) {
 	javaRepository(test, filepath.Join(folder, "harbour"), map[string]string{
 		"src/main/java/org/harbour/Quay.java":  "package org.harbour;\n\nimport org.lighthouse.Lamp;\n\npublic class Quay {\n    Lamp lamp = new Lamp();\n}\n",
 		"src/main/java/org/harbour/Other.java": "package org.harbour;\n\npublic class Other {\n}\n",
+		"src/main/java/org/harbour/Dock.java":  "package org.harbour;\n\npublic class Dock {\n    Quay quay = new Quay();\n}\n",
 	})
 	servers := []lsp.Server{{Name: "fakels", Command: fakeServer(test), Languages: []string{"java"}, Environment: []string{"FAKE_LSP_JARS=1"}}}
 	application, err := New(Settings{Folders: []string{folder}, WorkingTree: true, Synchronous: true,
@@ -105,4 +111,40 @@ func TestTheUsesShowAsGraphsInTheViewerPlace(test *testing.T) {
 	if application.mode.Name() != "Uses" || !application.viewer.IsOpen() {
 		test.Error("⇧1 did not bring the list back")
 	}
+}
+
+func TestTheUsersOfTheDeclarationAUseIsInAreFound(test *testing.T) {
+	application, window := readerOfUses(test)
+	use, found := lastUseIn(application, "Quay.java")
+	if !found {
+		test.Fatal("no use in Quay.java")
+	}
+	var declaration string
+	var users []mode.Use
+	if !application.UsersOf(use, func(name string, found []mode.Use) { declaration, users = name, found }) {
+		test.Fatalf("it did not ask: %s", application.toast)
+	}
+	for frame := 0; frame < 40 && declaration == ""; frame++ {
+		window.Frames(1)
+	}
+	if declaration != "Quay" || len(users) != 2 || !strings.HasSuffix(users[0].File.Path, "Dock.java") {
+		test.Errorf("the use %+v is in %q, used by %+v (%s)", use, declaration, users, application.toast)
+	}
+}
+
+// lastUseIn is the last use the uses mode holds in a file: one in its class, not its imports.
+func lastUseIn(application *Window, base string) (mode.Use, bool) {
+	holder, _ := application.usesHolder()
+	last, found := mode.Use{}, false
+	for index, project := range application.projects {
+		for _, path := range project.Files {
+			reference := workspace.FileReference{Project: index, Path: path}
+			for line, spans := range holder.UsesIn(reference) {
+				if filepath.Base(path) == base && line > last.Line {
+					last, found = mode.Use{File: reference, Line: line, Start: spans[0].Start, End: spans[0].End}, true
+				}
+			}
+		}
+	}
+	return last, found
 }

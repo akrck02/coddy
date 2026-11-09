@@ -3,6 +3,7 @@ package uses
 import (
 	"math"
 
+	"github.com/akrck02/code-review/internal/mode"
 	"github.com/akrck02/code-review/internal/pane"
 	"github.com/akrck02/code-review/internal/theme"
 	"github.com/akrck02/go-renderer/draw2d"
@@ -26,12 +27,14 @@ const (
 )
 
 // box is a box of a graph, in the canvas's units; target is what a click on it means to the
-// graph, -1 for nothing.
+// graph, -1 for nothing. A box that reveals opens its use instead.
 type box struct {
 	x, y, width, height float32
 	label, detail       string
 	kind                boxKind
 	target              int
+	reveals             bool
+	use                 mode.Use
 }
 
 // arrow goes from a box to another, by their places in the scene.

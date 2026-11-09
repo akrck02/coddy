@@ -344,14 +344,7 @@ func (reader commentReader) mentionOnly(place candidate) bool {
 func askDeclaration(stop cancellation, client *lsp.Client, place candidate) []lsp.Location {
 	ctx, cancel := context.WithTimeout(stop, requestWait)
 	defer cancel()
-	if !client.IsOpen(place.path) {
-		text, err := os.ReadFile(place.path)
-		if err != nil {
-			return nil
-		}
-		_ = client.Tell(place.path, string(text), 1)
-		defer func() { _ = client.Close(place.path) }()
-	}
+	defer openFor(client, place.path)()
 	asking, done := context.WithTimeout(ctx, checkWait)
 	defer done()
 	locations, _ := client.Definition(asking, place.path, place.at)

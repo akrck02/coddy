@@ -171,3 +171,24 @@ func TestAServerOfAMemoryFlagHasItOnItsCommandLine(test *testing.T) {
 		test.Errorf("the server heard:\n%s", content)
 	}
 }
+
+func TestTheDeclarationAroundAPlaceIsFound(test *testing.T) {
+	folder := project(test, map[string]string{"go.mod": "module lamp\n",
+		"lamp.go": "package lamp\n\nfunc Beam() int {\n\treturn Light()\n}\n\nfunc Light() int { return 2 }\n"})
+	server, _ := fake(test, false)
+	client, err := Start(within(test), server, folder, nil, "")
+	if err != nil {
+		test.Fatal(err)
+	}
+	defer client.Stop()
+	symbols, err := client.Symbols(within(test), filepath.Join(folder, "lamp.go"))
+	if err != nil || len(symbols) != 2 {
+		test.Fatalf("the symbols are %+v (%v)", symbols, err)
+	}
+	if around, found := Enclosing(symbols, Position{Line: 3, Character: 9}); !found || around.Name != "Beam" {
+		test.Errorf("Light() on line 4 is in %+v", around)
+	}
+	if _, found := Enclosing(symbols, Position{Line: 6, Character: 6}); found {
+		test.Error("the name of a declaration is taken as inside it")
+	}
+}

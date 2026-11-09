@@ -76,6 +76,8 @@ func (fake *server) handle(method string, params json.RawMessage) (any, error) {
 		fake.change(params)
 	case "textDocument/definition", "textDocument/references", "textDocument/hover":
 		return fake.request(method, params)
+	case "textDocument/documentSymbol":
+		return fake.symbols(params), nil
 	case "shutdown":
 		return nil, nil
 	case "exit":
@@ -346,6 +348,34 @@ func (fake *server) references(params json.RawMessage) (any, error) {
 		return []lsp.Location{}, nil
 	}
 	return fake.find(regexp.MustCompile(`\b`+regexp.QuoteMeta(word)+`\b`), word), nil
+}
+
+// symbols are a document's declarations, each from its line to the next one's, or to the end.
+func (fake *server) symbols(params json.RawMessage) []lsp.Symbol {
+	var asked struct {
+		TextDocument lsp.TextDocumentIdentifier `json:"textDocument"`
+	}
+	_ = json.Unmarshal(params, &asked)
+	declaration := regexp.MustCompile(`\b(?:func|class|interface|type)\s+(\w+)|^\s+(?:public|private|protected)\s+[\w<>]+\s+(\w+)\(`)
+	lines := strings.Split(fake.text(asked.TextDocument.URI), "\n")
+	symbols := []lsp.Symbol{}
+	for number, line := range lines {
+		found := declaration.FindStringSubmatchIndex(line)
+		if found == nil {
+			continue
+		}
+		start, end := found[2], found[3]
+		if start < 0 {
+			start, end = found[4], found[5]
+		}
+		name := lsp.Range{Start: lsp.Position{Line: number, Character: start}, End: lsp.Position{Line: number, Character: end}}
+		if count := len(symbols); count > 0 {
+			symbols[count-1].Range.End = lsp.Position{Line: number}
+		}
+		symbols = append(symbols, lsp.Symbol{Name: line[start:end], Selection: name,
+			Range: lsp.Range{Start: lsp.Position{Line: number}, End: lsp.Position{Line: len(lines)}}})
+	}
+	return symbols
 }
 
 func (fake *server) hover(params json.RawMessage) (any, error) {

@@ -42,6 +42,18 @@ func (fake *window) RevealLine(file workspace.FileReference, line int) {
 	fake.revealed = append(fake.revealed, mode.Use{File: file, Line: line})
 }
 
+func (fake *window) SearchUsesAgain() {}
+
+// UsersOf says the Keeper class is used by quay's Dock, twice, and lighthouse's Lens.
+func (fake *window) UsersOf(use mode.Use, done func(string, []mode.Use)) bool {
+	done("Keeper", []mode.Use{
+		{File: workspace.FileReference{Project: 0, Path: "Dock.java"}, Line: 5},
+		{File: workspace.FileReference{Project: 1, Path: "Lens.java"}, Line: 8},
+		{File: workspace.FileReference{Project: 0, Path: "Dock.java"}, Line: 7},
+	})
+	return true
+}
+
 // lamps is the uses mode with the uses of Lamp in three projects: its own, lighthouse, and two
 // others, harbour with changes.
 func lamps() (*Mode, *window) {
@@ -143,4 +155,42 @@ func TestACanvasFitsItsSceneAndFindsTheBoxUnderThePointer(test *testing.T) {
 	if found := shown.boxAt(graph, x, y); found != 0 {
 		test.Errorf("under the name's middle is box %d", found)
 	}
+}
+
+func TestAFileOfTheNameGraphOpensALevelFurther(test *testing.T) {
+	uses, fake := lamps()
+	keeper := workspace.FileReference{Project: 2, Path: "Keeper.java"}
+	uses.open(keeper)
+	graph := uses.nameScene()
+	var callers []box
+	for _, each := range graph.boxes {
+		if each.reveals {
+			callers = append(callers, each)
+		}
+	}
+	if len(callers) != 2 || callers[0].label != "quay · Dock.java" || callers[0].detail != "2" || callers[1].label != "lighthouse · Lens.java" {
+		test.Fatalf("the callers are %+v", callers)
+	}
+	if len(graph.arrows) != 5 || !hasLabel(graph, "Keeper.java › Keeper") {
+		test.Errorf("%d arrows, and the file is not labelled with its class", len(graph.arrows))
+	}
+	for _, each := range graph.boxes {
+		if each.label == "Keeper.java › Keeper" && (each.x < 0) != (callers[0].x < 0) {
+			test.Error("the callers are not on the file's side")
+		}
+	}
+	uses.open(keeper)
+	if graph := uses.nameScene(); len(graph.arrows) != 3 || fake.toast != "" {
+		test.Errorf("closed again it has %d arrows, and toasts %q", len(graph.arrows), fake.toast)
+	}
+}
+
+// hasLabel tells whether a scene has a box with a label.
+func hasLabel(graph scene, label string) bool {
+	for _, each := range graph.boxes {
+		if each.label == label {
+			return true
+		}
+	}
+	return false
 }
