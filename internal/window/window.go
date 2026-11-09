@@ -5,6 +5,7 @@ package window
 import (
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/akrck02/code-review/internal/finder"
 	"github.com/akrck02/code-review/internal/git"
@@ -96,7 +97,10 @@ type Window struct {
 	kindsWanted []workspace.FileReference
 	tap         *inputTap
 	keys        pane.Keys
-	toast       string
+	toast       string // a note to show, taken by the next frame
+	// shownToast is the note shown, until toastUntil
+	shownToast string
+	toastUntil time.Time
 	// waiting is the server a question asked waits for, still reading the projects, to say so
 	// until the answer comes
 	waiting *lsp.Client

@@ -9,6 +9,7 @@ import (
 	"github.com/akrck02/code-review/internal/finder"
 	"github.com/akrck02/code-review/internal/lsp"
 	"github.com/akrck02/code-review/internal/viewer"
+	"github.com/akrck02/go-renderer/draw2d"
 	ui "github.com/akrck02/go-ui"
 )
 
@@ -142,9 +143,6 @@ func hoverLines(markdown string) []string {
 		}
 		lines = append(lines, line)
 	}
-	if len(lines) > hoverLineLimit {
-		lines = append(lines[:hoverLineLimit], "…")
-	}
 	return lines
 }
 
@@ -153,30 +151,45 @@ const (
 	hoverWidth     = 520
 )
 
-// buildHover shows the hover card under the pointer, kept inside the window.
+// buildHover shows the hover card under the pointer, kept inside the window, its long lines
+// wrapped to its width.
 func (application *Window) buildHover(context *ui.Context) {
 	card := application.hover
-	lines := hoverLines(card.text)
-	if !card.resting || len(lines) == 0 || application.ModalOpen() {
+	if !card.resting || application.ModalOpen() {
 		return
 	}
 	width, height := context.Size()
+	cardWidth := min(hoverWidth, width-16)
+	palette := context.Theme
+	size := palette.SmallTextSize + 1
+	measure := func(text string) float32 { return context.Measurer().MeasureText(text, size, draw2d.Regular, 1).Width }
+	lines := limitLines(wrapLines(hoverLines(card.text), cardWidth-24, measure))
+	if len(lines) == 0 {
+		return
+	}
 	tall := float32(len(lines))*20 + 20
-	left := max(min(card.x+8, width-hoverWidth-16), 8)
+	left := max(min(card.x+8, width-cardWidth-8), 8)
 	top := card.y + 20
 	if top+tall > height-8 {
 		top = max(card.y-tall-8, 8)
 	}
-	options := ui.LayerOptions{AlignX: ui.Start, AlignY: ui.Start, Padding: ui.Padding{Left: left, Top: top}, Width: ui.Fixed(hoverWidth)}
-	palette := context.Theme
+	options := ui.LayerOptions{AlignX: ui.Start, AlignY: ui.Start, Padding: ui.Padding{Left: left, Top: top}, Width: ui.Fixed(cardWidth)}
 	look := ui.Look{Fill: palette.Surface, Border: application.look.Chosen, BorderWidth: 1, Radius: 8, Shadow: true}
 	context.Overlay("hover", options, func() {
-		context.Frame(ui.Layout{Direction: ui.Vertical, Width: ui.Grow(), Padding: ui.PadXY(12, 10), Gap: 2, Wrap: true}, look, func() {
+		context.Frame(ui.Layout{Direction: ui.Vertical, Width: ui.Grow(), Padding: ui.PadXY(12, 10), Gap: 2}, look, func() {
 			for _, line := range lines {
-				context.Text(line, ui.TextStyle{Size: palette.SmallTextSize + 1, Color: palette.Ink})
+				context.Text(line, ui.TextStyle{Size: size, Color: palette.Ink})
 			}
 		})
 	})
+}
+
+// limitLines keeps a card's first lines, an ellipsis after them when there were more.
+func limitLines(lines []string) []string {
+	if len(lines) > hoverLineLimit {
+		return append(lines[:hoverLineLimit], "…")
+	}
+	return lines
 }
 
 // ShowServerFiles lists the files language servers wrote in a project in the finder's panel, to

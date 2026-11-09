@@ -55,10 +55,10 @@ func (application *Window) Build(context *ui.Context) {
 	application.buildQuestions(context)
 	application.buildHover(context)
 	application.pointerX, application.pointerY = context.Pointer()
-	if application.toast != "" {
-		context.Toast(application.toast, false)
-		application.toast = ""
-	} else if waiting := application.waiting; waiting != nil && !waiting.Ready() {
+	if application.showToast(context, time.Now()) {
+		return
+	}
+	if waiting := application.waiting; waiting != nil && !waiting.Ready() {
 		context.Toast("Waiting for "+statusOf(waiting.Server.Name, waiting.Progress(), time.Now()), false)
 	}
 }
@@ -504,4 +504,25 @@ func (application *Window) buildPicker(context *ui.Context) {
 	if closed {
 		application.pickerOpen = false
 	}
+}
+
+// showToast shows the last note for a few seconds, longer for a longer one, and draws again when it
+// is due to go: shown for one frame, a note went with the next move of the mouse, too fast to read.
+func (application *Window) showToast(context *ui.Context, now time.Time) bool {
+	if application.toast != "" {
+		application.shownToast, application.toastUntil = application.toast, now.Add(toastTime(application.toast))
+		application.toast = ""
+	}
+	if application.shownToast == "" || !now.Before(application.toastUntil) {
+		application.shownToast = ""
+		return false
+	}
+	context.Toast(application.shownToast, false)
+	context.RequestFrame(application.toastUntil.Sub(now))
+	return true
+}
+
+// toastTime is how long a note shows: three seconds, and a little more for each word, up to eight.
+func toastTime(note string) time.Duration {
+	return min(3*time.Second+time.Duration(len(strings.Fields(note)))*250*time.Millisecond, 8*time.Second)
 }

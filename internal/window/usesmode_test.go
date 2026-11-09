@@ -4,6 +4,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/akrck02/code-review/internal/files"
 	"github.com/akrck02/code-review/internal/lsp"
@@ -147,4 +148,20 @@ func lastUseIn(application *Window, base string) (mode.Use, bool) {
 		}
 	}
 	return last, found
+}
+
+func TestANoteStaysLongEnoughToReadAndThenGoes(test *testing.T) {
+	application, window := readerOfUses(test)
+	application.Toast("No one else uses Quay")
+	window.Frames(1)
+	window.MoveTo(40, 40)
+	window.Frames(2)
+	if shown := strings.Join(window.Texts(), " "); !strings.Contains(shown, "No one else uses Quay") {
+		test.Fatal("the note went with the mouse")
+	}
+	application.toastUntil = time.Now()
+	window.Frames(1)
+	if shown := strings.Join(window.Texts(), " "); strings.Contains(shown, "No one else uses Quay") {
+		test.Error("the note did not go in its time")
+	}
 }
