@@ -74,14 +74,29 @@ It has two modes, chosen on the rail at the far left (or with `1`, `2`, `c`):
 - **Follows names with language servers**: `gopls` for Go, `jdtls` for Java and `kotlin-lsp` for
   Kotlin (JetBrains' preview, `brew install JetBrains/utils/kotlin-lsp`), found on
   the `PATH` and started the first time a file of their language opens. `F12` or `⌘`-click goes
-  to where a name is declared, even in another project, and `⌃-` comes back; `⇧F12` lists every
-  use in the finder's panel, where typing narrows them; resting the pointer on a name shows its
+  to where a name is declared, even in another project, and `⌃-` comes back; `⇧F12` opens the
+  uses mode on every use of it (below); resting the pointer on a name shows its
   type and documentation. A server not installed is named, with the command that installs it.
   One `jdtls` reads every Java project of the window, and one `kotlin-lsp` every Kotlin one, so
   names cross repositories; a name another repository gives as a jar opens in that repository's
   source when it is open. While a server reads the projects (`kotlin-lsp` imports each Gradle
   build, minutes the first time) the status bar says so, and a question waits for it. Servers
   start once the projects are read, and read only the projects in sight.
+- **A mode for the uses of a name** (`⇧F12`, or `3` once a search was made): the sidebar lists only
+  the files that use it, by project, the name's own first, then those with changes, each with its
+  count. A file opens with its uses marked and the lines away from them folded, still editable
+  (`d` shows it whole). `n` and `⇧N` go from use to use across files, `v` ticks one as seen, and
+  the header counts them; `r` searches again. Over the viewer, three views (`⇧1` `⇧2` `⇧3`):
+  - the list of uses, in the files;
+  - the graph of the name: the name in the middle, the projects that use it on either side, each
+    file with its count. A click opens the file at its use; a `⌘`-click asks that file's server
+    for the method or class the use is in, and lays out beside it the files that use that;
+  - the graph of the repositories: each project, an arrow to each it depends on, read from its
+    Gradle and Maven build files as text (nothing is run). Changed projects are edged, those that
+    use the name lit; a dependency declared in a way not read (a version catalog, a coordinate
+    made in code) is counted under it.
+
+  The graphs zoom with the wheel, move with a drag, and `0` fits them in again.
 - **Servers that leave nothing behind**:
   - Indexes go in the reader's own folder, or in the one `-server-data` names (another disk; the
     choice is remembered). `kotlin-lsp` builds one index per set of projects, about 5 GB for 44
@@ -152,7 +167,7 @@ below, an F-key or `Esc`. `Esc` gives the keyboard back to the sidebar, where th
 | `⌘⇧F` (or `/`) | Find a text in the files of every project; `Tab` in the finder switches between names and content |
 | `n` / `m` (`⌘⇧N` / `⌘⇧M`) | Next / previous changed file, across every project |
 | `]` / `[` (`⌘]` / `⌘[`) | Next / previous change in the file (the diff, or the marked lines) |
-| `1` / `2` (`⌘1` / `⌘2`; `c` or `⌘0` switches) | Files mode / Review mode |
+| `1` / `2` / `3` (`⌘1` / `⌘2` / `⌘3`; `c` or `⌘0` switches) | Files mode / Review mode / Uses mode |
 | `Enter` on a project, `e` (`⌘E`), or its → button | Enter the project: the sidebar lists only its tree, and `n`/`m`/`v` stay in it |
 | `Esc` / `Backspace` | Back to every project |
 | `v` (`⌘⇧V`) | Mark the file as viewed (or not); marking it opens the next file not viewed |
@@ -171,9 +186,20 @@ below, an F-key or `Esc`. `Esc` gives the keyboard back to the sidebar, where th
 | `t` (`⌘⇧T`) | Light or dark |
 | `l` (`⌘⇧L`) | Read-only, or editing |
 | `F12`, or `⌘`-click | Go to where the name at the caret (or clicked) is declared |
-| `⇧F12` | Every use of the name at the caret (or clicked) |
+| `⇧F12` | Every use of the name at the caret (or clicked), in the uses mode |
 | `⌃-` / `⌃⇧-` | Back to where you were before following a name, and forward again |
 | `?` (`F1`) | These keys |
+
+In the uses mode, its keys come first:
+
+| Key | |
+|---|---|
+| `n` / `⇧N` | Next / previous use, across files |
+| `v` | Tick the use as seen, and go to the next not seen |
+| `r` | Search the uses again |
+| `⇧1` / `⇧2` / `⇧3` | The list of uses / the graph of the name / the graph of the repositories |
+| `0` | Fit the graph in the window |
+| click / `⌘`-click on a file of the graph | Open it at its use / who uses the method or class that use is in |
 
 Editing a file:
 

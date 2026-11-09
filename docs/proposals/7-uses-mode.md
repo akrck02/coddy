@@ -1,6 +1,6 @@
 # 7. A mode for uses, with their graph and the graph of repositories
 
-> Status: approved · Author's approval: proposal ☑ plan ☑
+> Status: in progress · Author's approval: proposal ☑ plan ☑
 
 ## Why
 
@@ -61,9 +61,27 @@ layers, the projects nothing depends on at the top (Sugiyama-style, as small gra
 
 ## Tasks
 
-- [ ] T1 The Uses mode: the search moved from the window, the sidebar listing with counts, ⇧F12 opens it. (R1, R2, R5)
-- [ ] T2 The viewer marks the uses and folds the rest; `n`/`⇧N`, `v` and the header. (R3, R4)
-- [ ] T3 The views and their keys; zoom and pan for graphs. (R8)
-- [ ] T4 The graph of the name, its clicks, and opening a node a level further. (R6)
-- [ ] T5 `internal/builds` and the graph of repositories. (R7)
+- [x] T1 The Uses mode: the search moved from the window, the sidebar listing with counts, ⇧F12 opens it. (R1, R2, R5)
+- [x] T2 The viewer marks the uses and folds the rest; `n`/`⇧N`, `v` and the header. (R3, R4)
+- [x] T3 The views and their keys; zoom and pan for graphs. (R8)
+- [x] T4 The graph of the name, its clicks, and opening a node a level further. (R6)
+- [x] T5 `internal/builds` and the graph of repositories. (R7)
 - [ ] T6 Try it on the big workspace: the `LampStore` case, a repository graph of the 44; README and Result.
+
+## Notes from building it
+
+- The views are `⇧1`, `⇧2`, `⇧3`, not `1`, `2`, `3`: those already switch modes. A mode's own keys
+  (`n`, `v`, `r`, `0`, the views) come first while it is on, so `n` goes through uses, not changes.
+- The search stays in the window, which knows the servers; the mode receives the uses as they are
+  found (`mode.UsesHolder`) and asks the window to search again. Not "moved there", as the design
+  said, but the same split as Review and git.
+- A file opens on its uses, folded; editing it is in the whole file (`d`), as in Review.
+- Opening a node further asks only that file's own server: the declaration the use is in, from
+  `textDocument/documentSymbol`, then that declaration's references. It asks about the use `n`
+  went to, if it is in that file, or else the file's last one: the first is most often an import,
+  in no declaration. The files found go in a column beside the file, not a ring: rings crossed the
+  other side's arrows. A `⌘`-click opens it, a plain click still opens the file.
+- The graph of the name lays the projects on either side, alternating, nearest first, instead of
+  rings: a column of boxes reads top to bottom, and labels do not turn.
+- The build reading, on the big workspace: 44 projects, 130 links, 7 declarations not understood (version
+  catalogs and coordinates made in code).
