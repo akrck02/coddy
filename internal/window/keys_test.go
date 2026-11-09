@@ -283,10 +283,10 @@ func changeShortcuts() []shortcut {
 			holds: func(application *Window) string {
 				return unless(application.viewer.Mode == viewer.DiffView, "the file is not shown as a diff")
 			}},
-		{name: "f shows every unchanged line of a diff", open: "tides/coast.txt", long: true, review: true,
+		{name: "f folds the unchanged lines of a diff, shown whole at first", open: "tides/coast.txt", long: true, review: true,
 			press: pressing(input.KeyF),
 			holds: func(application *Window) string {
-				return unless(application.viewer.RowCount() == longFileLines+changedLines, fmt.Sprintf("the diff shows %d rows, want all %d lines and the %d old ones", application.viewer.RowCount(), longFileLines, changedLines))
+				return unless(application.viewer.RowCount() < longFileLines, fmt.Sprintf("the diff shows %d rows, want fewer than its %d lines", application.viewer.RowCount(), longFileLines))
 			}},
 	}
 }
@@ -424,6 +424,7 @@ func foldingShortcut() shortcut {
 	return shortcut{name: "Enter opens the fold in sight", open: "tides/coast.txt", long: true, review: true,
 		prepare: func(test *testing.T, application *Window, window *uitest.Window) {
 			focusEditor(test, application, window)
+			application.viewer.ToggleContext() // the diff is shown whole at first
 			rowsFolded = application.viewer.RowCount()
 		},
 		press: pressing(input.KeyEnter),

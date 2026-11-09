@@ -46,14 +46,16 @@ It has two modes, chosen on the rail at the far left (or with `1`, `2`, `c`):
   `origin/master`, `main`, `master`, `develop`; `b` (or `-base`) chooses another branch, tag or
   commit for one project or for all of them. Changes not committed yet count too, unless `w` (or
   `-committed`) leaves them out.
-- **Reads a changed file as a diff**, both sides interleaved with their line numbers, the unchanged
-  lines folded away (`f` shows them all, Enter or a click opens one fold), and a map of the changes
-  along the scroll bar. Inside a replaced line the words that changed are washed stronger. `d`
+- **Reads a changed file as a diff**, both sides interleaved with their line numbers, whole at first
+  (`f` or the *Fold* button folds the unchanged lines away, Enter or a click opens one fold), with
+  arrows to the previous and next change (`[` and `]`), and a map of the changes along the scroll bar. Inside a replaced line the words that changed are washed stronger. `d`
   switches to the whole file.
 - **Only the changes**, by default: the projects a development did not touch are left out of the
   sidebar, the finder and the language servers, and the *Files* mode lists only the changed files,
   with its folders left as you opened them. `g` (or `h`), the button over the sidebar or `-all`
   show every project and file; the choice is remembered.
+- **A filter over the sidebar** (`⌘F`) lists only the files whose path holds each of its words,
+  folders open, and the projects it names, whole; Enter takes the keyboard to the first file found.
 - **Every other file stays readable**: the *Files* mode lists them all, and the finder finds them.
 - **Enter a project** to see only its tree, from its top (Enter on its row, `e`, or the → that
   shows on its row under the pointer); `Esc` goes back to every project.
@@ -167,6 +169,7 @@ below, an F-key or `Esc`. `Esc` gives the keyboard back to the sidebar, where th
 
 | Key | |
 |---|---|
+| `⌘F` | Filter the projects and files the sidebar lists; Enter goes to them |
 | `⌘P` (or `Shift+P`) | Find a file by its name, in any project; changed files first |
 | `⌘⇧F` (or `/`) | Find a text in the files of every project; `Tab` in the finder switches between names and content |
 | `n` / `m` (`⌘⇧N` / `⌘⇧M`) | Next / previous changed file, across every project |
@@ -176,7 +179,7 @@ below, an F-key or `Esc`. `Esc` gives the keyboard back to the sidebar, where th
 | `Esc` / `Backspace` | Back to every project |
 | `v` (`⌘⇧V`) | Mark the file as viewed (or not); marking it opens the next file not viewed |
 | `d` (`⌘D`) | Diff, or the whole file |
-| `f` (`⌘U`) | Fold the unchanged lines, or show them all |
+| `f` (`⌘U`) | Fold the unchanged lines, or show them all again (a diff opens whole) |
 | `Tab` (`⌃Tab`) | Move between the sidebar and the editor |
 | `↑ ↓ ← →`, `PgUp PgDn`, `Home End` | Move in the sidebar (←/→ close and open folders), or scroll the file |
 | `j` / `k`, `Space` | Scroll a line, a page |

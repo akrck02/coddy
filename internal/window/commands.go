@@ -85,6 +85,11 @@ var commands = []command{
 	{description: "Find a text in the files of every project (Tab switches in the finder)",
 		keys: []pane.Press{pane.CommandShiftKey(input.KeyF, "⌘⇧F"), {Text: "/", Label: "/"}},
 		do:   func(application *Window, _ *ui.Context, _ int) { application.finder.Show(finder.ContentScope) }},
+	{description: "Filter the projects and files the sidebar lists (Enter goes to them)", keys: []pane.Press{pane.CommandKey(input.KeyF, "⌘F")},
+		do: func(application *Window, _ *ui.Context, _ int) {
+			application.sidebar.FilterAsked = true
+			application.focus = sidebarPane
+		}},
 	{description: "Find a file by its name, in any project",
 		keys: []pane.Press{pane.CommandKey(input.KeyP, "⌘P"), {Key: input.KeyP, Shift: true, Label: "Shift+P"}},
 		do:   func(application *Window, _ *ui.Context, _ int) { application.finder.Show(finder.NamesScope) }},

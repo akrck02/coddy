@@ -67,6 +67,21 @@ func ToolButton(context *ui.Context, name, icon string, on bool) bool {
 	return clicked
 }
 
+// LabelledButton is a button of a toolbar with an icon and a word after it, for one whose icon alone
+// would not say what it does.
+func LabelledButton(context *ui.Context, name, icon, label string) bool {
+	theme := context.Theme
+	normal := ui.Look{Radius: 6}
+	hovered := ui.Look{Fill: theme.Sunken, Radius: 6}
+	layout := ui.Layout{Height: ui.Fixed(28), Padding: ui.PadXY(8, 0), Gap: 6, AlignY: ui.Center}
+	clicked := context.Clickable(name, layout, ui.Looks{Normal: normal, Hovered: hovered, Pressed: hovered}, func() {
+		context.IconSized(icon, 16, theme.InkSoft)
+		context.Text(label, ui.TextStyle{Size: theme.SmallTextSize, Color: theme.InkSoft})
+	})
+	context.Tooltip(name)
+	return clicked
+}
+
 // FitText shortens a text with an ellipsis until it fits a width; it gives "" when not even its
 // first letter and the ellipsis fit, so a narrow pane drops what it cannot show instead of
 // pushing its buttons out.

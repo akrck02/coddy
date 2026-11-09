@@ -78,8 +78,10 @@ type Viewer struct {
 	Request   int // counts the files asked for, so a slow read that was overtaken is dropped
 	showing   bool
 
-	Mode        Mode
-	fullContext bool         // show every unchanged line instead of folding them
+	Mode Mode
+	// unfolded are the views that show every unchanged line instead of folding them: the changes,
+	// unless folded by hand; the uses fold the lines away from them
+	unfolded    map[Mode]bool
 	openedFolds map[int]bool // folds opened by hand, by where they start in the diff
 
 	rows []workspace.Row // the diff's rows as shown
@@ -136,7 +138,7 @@ type Viewer struct {
 
 // New makes a view with no file open.
 func New() Viewer {
-	return Viewer{openedFolds: map[int]bool{}, codeSize: 13, rowHeight: codeRowHeight, List: pane.Scroller{RowHeight: codeRowHeight},
+	return Viewer{openedFolds: map[int]bool{}, unfolded: map[Mode]bool{DiffView: true}, codeSize: 13, rowHeight: codeRowHeight, List: pane.Scroller{RowHeight: codeRowHeight},
 		ColourPause: colourPause, HoverPause: hoverPause}
 }
 
@@ -272,11 +274,7 @@ func (view *Viewer) layOut() {
 		view.Marks = workspace.LineMarks(document.Diff)
 	}
 	if view.Mode == DiffView && document.Changed {
-		context := foldContext
-		if view.fullContext {
-			context = -1
-		}
-		view.rows, view.diff = workspace.DiffRows(document.Diff, context, view.openedFolds), document.Diff
+		view.rows, view.diff = workspace.DiffRows(document.Diff, view.foldContext(), view.openedFolds), document.Diff
 		view.Hunks = workspace.HunkStarts(view.rows)
 		view.Inline = workspace.InlineChanges(view.rows, func(line git.DiffLine) []rune {
 			if line.Kind == git.Removal {
@@ -296,15 +294,11 @@ func (view *Viewer) layOut() {
 
 // layOutUses folds the lines away from the uses, as the diff folds the lines away from changes.
 func (view *Viewer) layOutUses() {
-	context := foldContext
-	if view.fullContext {
-		context = -1
-	}
 	focus := map[int]bool{}
 	for number := range view.Uses {
 		focus[number] = true
 	}
-	view.rows, view.diff = workspace.FocusRows(len(view.lines()), focus, context, view.openedFolds)
+	view.rows, view.diff = workspace.FocusRows(len(view.lines()), focus, view.foldContext(), view.openedFolds)
 	view.Hunks = workspace.FocusStarts(view.rows, focus)
 }
 
@@ -347,9 +341,20 @@ func (view *Viewer) SetMode(mode Mode) {
 	}
 }
 
+// foldContext is how many unchanged lines the view keeps around a change: -1 for every one.
+func (view *Viewer) foldContext() int {
+	if view.unfolded[view.Mode] {
+		return -1
+	}
+	return foldContext
+}
+
+// Unfolded tells whether the view shows every unchanged line.
+func (view *Viewer) Unfolded() bool { return view.unfolded[view.Mode] }
+
 // ToggleContext shows every unchanged line, or folds them again.
 func (view *Viewer) ToggleContext() {
-	view.fullContext = !view.fullContext
+	view.unfolded[view.Mode] = !view.unfolded[view.Mode]
 	view.layOut()
 	view.List.Clamp()
 }
@@ -528,7 +533,7 @@ func (view *Viewer) buildHeader(context *ui.Context, window Window) {
 			context.Text(document.Language, ui.TextStyle{Size: context.Theme.SmallTextSize, Color: context.Theme.InkQuiet})
 		}
 		if document.Changed {
-			view.buildViewButtons(context, window)
+			view.buildViewButtons(context, window, compact)
 		}
 	})
 }
@@ -548,7 +553,7 @@ func (view *Viewer) pathRoom(context *ui.Context, name string, compact bool) flo
 		room -= theme.TextWidth(context, document.Language, ui.TextStyle{Size: palette.SmallTextSize}) + 12
 	}
 	if document.Changed {
-		room -= 230 // the counts, the fold, view and viewed buttons
+		room -= 330 // the counts, the arrows, the fold, view and viewed buttons
 		if !compact {
 			room -= 70 // the status's word
 		}
@@ -601,15 +606,19 @@ func (view *Viewer) buildChange(context *ui.Context, compact bool) {
 	}
 }
 
-// buildViewButtons offers the ways to show a changed file: folding, the view and the mode's button.
-func (view *Viewer) buildViewButtons(context *ui.Context, window Window) {
+// buildViewButtons offers the ways to show a changed file: the changes' arrows, folding, the view
+// and the mode's button. A narrow view shows the folding's icon without its word.
+func (view *Viewer) buildViewButtons(context *ui.Context, window Window, compact bool) {
 	context.Box(ui.Layout{Width: ui.Fixed(6)}, nil)
+	if len(view.Hunks) > 0 {
+		view.buildHunkArrows(context)
+	}
 	if view.Mode != FileView {
-		icon, tip := "unfold-vertical", "Show every unchanged line (f)"
-		if view.fullContext {
-			icon, tip = "fold-vertical", "Fold the unchanged lines (f)"
+		icon, label, tip := "unfold-vertical", "Expand", "Show every unchanged line (f)"
+		if view.Unfolded() {
+			icon, label, tip = "fold-vertical", "Fold", "Fold the unchanged lines (f)"
 		}
-		if theme.ToolButton(context, tip, icon, false) {
+		if compact && theme.ToolButton(context, tip, icon, false) || !compact && theme.LabelledButton(context, tip, icon, label) {
 			view.ToggleContext()
 		}
 	}
@@ -618,6 +627,16 @@ func (view *Viewer) buildViewButtons(context *ui.Context, window Window) {
 		if theme.ToolButton(context, button.Tip, button.Icon, button.On) {
 			window.PressFileButton(view.Reference)
 		}
+	}
+}
+
+// buildHunkArrows goes to the previous or the next run of changes, as [ and ] do.
+func (view *Viewer) buildHunkArrows(context *ui.Context) {
+	if theme.ToolButton(context, "Previous change ([)", "chevron-up", false) {
+		view.StepHunk(-1)
+	}
+	if theme.ToolButton(context, "Next change (])", "chevron-down", false) {
+		view.StepHunk(1)
 	}
 }
 
