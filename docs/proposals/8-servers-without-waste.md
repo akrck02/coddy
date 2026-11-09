@@ -90,3 +90,24 @@ Marked **seen** (in docs, code, logs or on disk) or **not tried**.
 - **T3**: `-keep-indexes` and `-server-memory` change the table's values from the command line.
 - **T4**: pointing at a name does not wake a resting server (hovering would start 2 GB by
   accident); following a name and asking its uses do.
+
+## Result (T7, first try on the big workspace, 9 November 2026)
+
+44 repositories, 23 with changes; `~/.gradle` had just moved to an external disk (a link).
+
+| | Before | During | After the window closed |
+|---|---|---|---|
+| Free disk | 60 GB | | 62 GB |
+| kotlin-lsp data | 4.2 GB, one index | 1.2 GB, the same index | 1.2 GB |
+| Gradle daemons | 0 | 0 | 0 |
+| Java servers' memory | — | jdtls 0.9 GB; with kotlin-lsp 2.5 GB | 0 |
+| Files new in the repositories | — | — | none (`git status --ignored` the same in all 44) |
+
+- kotlin-lsp started only when a search of uses reached Kotlin files, five minutes in. It started
+  with the same set of projects as the day before, so it **reused its index**: its workspace model
+  came back from cache and it answered in 12 seconds, with no Gradle import and so no daemon. The
+  index shrank from 4.2 to 1.1 GB on that start (RocksDB compacting it, presumably; not checked).
+- Not seen yet: a cold import with the reader's own Gradle home on the big workspace, and a server resting after
+  15 minutes; the window was closed first. The real-server test covers the first on a small build.
+- Seen in passing (proposal 6): a word in a Javadoc comment, not a `{@link}`, counted as a use, as
+  jdtls answers its definition. Places in comments should be left out of the uses checked.
