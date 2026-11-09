@@ -35,6 +35,8 @@ type Server struct {
 	Memory         string
 	MemoryFlag     string
 	MemoryVariable string
+	// JVMOptions are more options of the server's JVM, given in MemoryVariable after its memory.
+	JVMOptions []string
 	// Indexes, when set, is the folder of its data folder where the server builds one index per
 	// set of workspace folders (kotlin-lsp's workspaces); the reader keeps the KeepIndexes used
 	// last and removes the others before it starts the server.
@@ -82,10 +84,13 @@ var Servers = []Server{
 	// removed, keeping the index of the set it started with.
 	{Name: "kotlin-lsp", Command: "kotlin-lsp", Arguments: []string{"--stdio"}, DataFlag: "--system-path",
 		Languages: []string{"kotlin"}, OnePerWindow: true, Install: "brew install JetBrains/utils/kotlin-lsp",
-		// an index per set of projects it starts with, about 5 GB for 44 repositories': it reads them all,
+		// an index per set of projects it starts with, about 5 GB for 44 repositories: it reads them all,
 		// whatever is in sight, so one index serves, and the reader keeps the one used last
 		Indexes: "workspaces", KeepIndexes: 1, ReadsAll: true, OwnGradle: true, NeedsFree: 10 << 30,
-		Memory: "2g", MemoryVariable: "IJ_JAVA_OPTIONS"},
+		Memory: "2g", MemoryVariable: "IJ_JAVA_OPTIONS",
+		// it imports every Gradle build at once, each in a daemon of its own that no import
+		// uses again: told so, each daemon stops as its import ends, instead of idling
+		JVMOptions: []string{"-Dcom.jetbrains.ls.imports.gradle.daemon.no.idle.timeout=true"}},
 }
 
 // setting is the value of a section of settings, "java" or "java.import", if there is one.

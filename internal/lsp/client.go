@@ -91,7 +91,8 @@ func commandOf(path string, server Server, dataFolder string) *exec.Cmd {
 	case server.Memory != "" && server.MemoryFlag != "":
 		arguments = append(arguments, server.MemoryFlag+server.Memory)
 	case server.Memory != "" && server.MemoryVariable != "":
-		environment = append(environment, server.MemoryVariable+"=-Xmx"+server.Memory)
+		options := append([]string{"-Xmx" + server.Memory}, server.JVMOptions...)
+		environment = append(environment, server.MemoryVariable+"="+strings.Join(options, " "))
 	}
 	command := exec.Command(path, arguments...)
 	command.Env = environment
