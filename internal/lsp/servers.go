@@ -43,6 +43,9 @@ type Server struct {
 	// OwnGradle gives a server that imports Gradle builds a Gradle home of its own, in its data
 	// folder, whose daemons stop soon after it and with it (gradle.go).
 	OwnGradle bool
+	// FoldersInOptions gives the workspace folders in initializationOptions too: jdtls reads them
+	// there, and from the parameters only the first.
+	FoldersInOptions bool
 	// ReadsAll reads every project of the window with a file of its languages, not only those in
 	// sight: a server whose index is per set of projects (Indexes) would build another, cold, each
 	// time the filter changed what is in sight.
@@ -59,7 +62,7 @@ var Servers = []Server{
 	// jdtls reads Java only: Kotlin has kotlin-lsp, below. It writes nothing in the repositories: .project, .classpath and .settings go in its data
 	// folder (a JVM property, read before the setting is), and no build fills bin/ or target/; a
 	// build file changed is not imported again on its own.
-	{Name: "jdtls", Command: "jdtls", Languages: []string{"java"}, OnePerWindow: true, DataFlag: "-data",
+	{Name: "jdtls", Command: "jdtls", Languages: []string{"java"}, OnePerWindow: true, DataFlag: "-data", FoldersInOptions: true,
 		Arguments: []string{"--jvm-arg=-Djava.import.generatesMetadataFilesAtProjectRoot=false"},
 		Install:   "brew install jdtls", ReadyStatus: "ServiceReady",
 		// a name declared in a jar (another repository, as a dependency) answers with a
@@ -70,7 +73,8 @@ var Servers = []Server{
 			"autobuild":     map[string]any{"enabled": false},
 			"configuration": map[string]any{"updateBuildConfiguration": "disabled"},
 		}},
-		Memory: "2g", MemoryFlag: "--jvm-arg=-Xmx"},
+		// its Gradle import (Buildship) honours GRADLE_USER_HOME: its daemons time out, as kotlin-lsp's
+		Memory: "2g", MemoryFlag: "--jvm-arg=-Xmx", OwnGradle: true},
 	// JetBrains' server, still a preview. It imports each Gradle build first (minutes, cold) and
 	// answers with nothing meanwhile, telling its work by $/progress; a name in a jar answers
 	// jar:///…!/package/Class.class. Its index goes in the system path; Gradle's import writes

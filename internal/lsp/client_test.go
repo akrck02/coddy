@@ -138,11 +138,12 @@ func TestApplyEditIsRefused(test *testing.T) {
 	test.Fatalf("the server's edit was not answered \"not applied\":\n%s", heard)
 }
 
-func TestAServerIsGivenItsSettingsAndItsMemory(test *testing.T) {
+func TestAServerIsGivenItsSettingsItsFoldersAndItsMemory(test *testing.T) {
 	folder := project(test, map[string]string{"go.mod": "module lamp\n"})
 	server, log := fake(test, true, "FAKE_LSP_ASKS=java.import")
 	server.Settings = map[string]any{"java": map[string]any{"import": map[string]any{"generatesMetadataFilesAtProjectRoot": false}}}
 	server.Memory, server.MemoryVariable = "2g", "FAKE_JVM_OPTIONS"
+	server.FoldersInOptions = true
 	client, err := Start(within(test), server, "", []string{folder}, "")
 	if err != nil {
 		test.Fatal(err)
@@ -151,7 +152,8 @@ func TestAServerIsGivenItsSettingsAndItsMemory(test *testing.T) {
 	client.Stop()
 	content, _ := os.ReadFile(log)
 	for _, want := range []string{`"settings":{"java":{"import":{"generatesMetadataFilesAtProjectRoot":false}}}`,
-		"jvm options -Xmx2g", `configuration [{"generatesMetadataFilesAtProjectRoot":false}]`} {
+		"jvm options -Xmx2g", `configuration [{"generatesMetadataFilesAtProjectRoot":false}]`,
+		`"workspaceFolders":["` + FileURI(folder) + `"]`} {
 		if !strings.Contains(string(content), want) {
 			test.Errorf("the server heard no %s:\n%s", want, content)
 		}

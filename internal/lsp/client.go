@@ -123,7 +123,7 @@ func (client *Client) initialize(ctx context.Context, root string, folders []str
 		"workspaceFolders": workspaceFolders,
 		"capabilities":     capabilities,
 	}
-	if options := client.initializationOptions(); options != nil {
+	if options := client.initializationOptions(folders); options != nil {
 		params["initializationOptions"] = options
 	}
 	var answer struct {
@@ -142,17 +142,27 @@ func (client *Client) initialize(ctx context.Context, root string, folders []str
 	return client.conn.Notify("initialized", struct{}{})
 }
 
-// initializationOptions are the server's own options, with its settings when it has some.
-func (client *Client) initializationOptions() map[string]any {
+// initializationOptions are the server's own options, with its settings when it has some, and its
+// workspace folders for a server that reads them there.
+func (client *Client) initializationOptions(folders []string) map[string]any {
 	server := client.Server
-	if server.Settings == nil {
+	if server.Settings == nil && !server.FoldersInOptions {
 		return server.Options
 	}
 	options := maps.Clone(server.Options)
 	if options == nil {
 		options = map[string]any{}
 	}
-	options["settings"] = server.Settings
+	if server.Settings != nil {
+		options["settings"] = server.Settings
+	}
+	if server.FoldersInOptions {
+		uris := make([]string, len(folders))
+		for index, folder := range folders {
+			uris[index] = FileURI(folder)
+		}
+		options["workspaceFolders"] = uris
+	}
 	return options
 }
 

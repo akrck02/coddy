@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
@@ -171,4 +172,43 @@ func newFiles(before, after []string) []string {
 		}
 	}
 	return added
+}
+
+// jdtls imports every folder it starts with: given them only in the parameters, it imported the
+// first alone, and a file of another project read as a lone file, its imports unknown.
+func TestJdtlsImportsEveryProjectItStartsWith(test *testing.T) {
+	server := realServer(test, "jdtls")
+	lamp := project(test, map[string]string{"pom.xml": pomNamed("lamp"), "src/lamp/Lamp.java": "package lamp;\npublic class Lamp {}\n"})
+	keeper := project(test, map[string]string{"pom.xml": pomNamed("keeper"), "src/keeper/Keeper.java": "package keeper;\npublic class Keeper {}\n"})
+	data := test.TempDir()
+	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
+	defer cancel()
+	client, err := Start(ctx, server, "", []string{lamp, keeper}, data)
+	if err != nil {
+		test.Fatal(err)
+	}
+	defer client.Stop()
+	imported := filepath.Join(data, ".metadata", ".plugins", "org.eclipse.core.resources", ".projects")
+	for wait := 0; wait < 300 && len(entriesOf(imported)) < 2; wait++ {
+		time.Sleep(200 * time.Millisecond)
+	}
+	if names := entriesOf(imported); !slices.Contains(names, "lamp") || !slices.Contains(names, "keeper") {
+		test.Errorf("jdtls imported %v", names)
+	}
+}
+
+// pomNamed is the Maven build of a project of one artifact, its sources in src.
+func pomNamed(name string) string {
+	return "<project><modelVersion>4.0.0</modelVersion><groupId>lamp</groupId><artifactId>" + name +
+		"</artifactId><version>1</version><build><sourceDirectory>src</sourceDirectory></build></project>\n"
+}
+
+// entriesOf are the names in a folder, none when it is not there.
+func entriesOf(folder string) []string {
+	entries, _ := os.ReadDir(folder)
+	var names []string
+	for _, entry := range entries {
+		names = append(names, entry.Name())
+	}
+	return names
 }
