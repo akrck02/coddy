@@ -53,23 +53,30 @@ func PathOf(uri string) string {
 	return filepath.FromSlash(address.Path)
 }
 
-// ClassInJar reads a jdt:// location, a class jdtls found in a jar: its package and the name of
-// its source file, ("app.coast.lamp", "Lamp.java").
-func ClassInJar(uri string) (pkg, file string, found bool) {
-	rest, isJar := strings.CutPrefix(uri, "jdt://contents/")
-	if !isJar {
+// ClassInJar reads a location in a jar: its package and the class, the outer one of an inner
+// class, ("org.lighthouse.lamp", "Lamp"). jdtls gives jdt://contents/<jar>/<package>/Lamp.java,
+// kotlin-lsp jar:///<jar>!/org/lighthouse/lamp/Lamp.class.
+func ClassInJar(uri string) (pkg, class string, found bool) {
+	var file string
+	if rest, isJdt := strings.CutPrefix(uri, "jdt://contents/"); isJdt {
+		rest, _, _ = strings.Cut(rest, "?")
+		parts := strings.Split(rest, "/")
+		if len(parts) < 3 {
+			return "", "", false
+		}
+		pkg, file = parts[len(parts)-2], parts[len(parts)-1]
+	} else if _, inside, isJar := strings.Cut(uri, "!/"); isJar && strings.HasPrefix(uri, "jar:") {
+		slash := strings.LastIndex(inside, "/")
+		if slash < 0 {
+			return "", "", false
+		}
+		pkg, file = strings.ReplaceAll(inside[:slash], "/", "."), inside[slash+1:]
+	}
+	class, _, _ = strings.Cut(strings.TrimSuffix(strings.TrimSuffix(file, ".class"), ".java"), "$")
+	if pkg == "" || class == "" {
 		return "", "", false
 	}
-	rest, _, _ = strings.Cut(rest, "?")
-	parts := strings.Split(rest, "/")
-	if len(parts) < 3 || parts[len(parts)-2] == "" {
-		return "", "", false
-	}
-	file = strings.TrimSuffix(parts[len(parts)-1], ".class")
-	if !strings.HasSuffix(file, ".java") {
-		file += ".java"
-	}
-	return parts[len(parts)-2], file, true
+	return pkg, class, true
 }
 
 // UTF16Column is a column counted in characters as the protocol counts it, in UTF-16 units.

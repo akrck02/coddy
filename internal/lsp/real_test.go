@@ -97,6 +97,33 @@ func TestJdtlsFollowsANameAcrossFiles(test *testing.T) {
 	test.Logf("jdtls wrote: %v", newFiles(before, filesIn(test, folder)))
 }
 
+// kotlin-lsp follows a name across the files of a Gradle project, once it has imported it.
+func TestKotlinLspFollowsANameAcrossFiles(test *testing.T) {
+	server := realServer(test, "kotlin-lsp")
+	folder := project(test, map[string]string{
+		"settings.gradle.kts":              "rootProject.name = \"lamp\"\n",
+		"build.gradle.kts":                 "plugins { kotlin(\"jvm\") version \"2.1.0\" }\n\nrepositories { mavenCentral() }\n",
+		"src/main/kotlin/lamp/Lamp.kt":     "package lamp\n\nobject Lamp {\n    fun beam() = 2\n}\n",
+		"src/main/kotlin/keeper/Keeper.kt": "package keeper\n\nimport lamp.Lamp\n\nclass Keeper {\n    val light = Lamp.beam()\n}\n",
+	})
+	before := filesIn(test, folder)
+	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Minute)
+	defer cancel()
+	client, err := Start(ctx, server, "", []string{folder}, test.TempDir())
+	if err != nil {
+		test.Fatal(err)
+	}
+	defer client.Stop()
+	use := filepath.Join(folder, "src", "main", "kotlin", "keeper", "Keeper.kt")
+	content, _ := os.ReadFile(use)
+	client.Tell(use, string(content), 1)
+	declared, err := client.Definition(ctx, use, placeOf(test, use, "beam("))
+	if err != nil || len(declared) == 0 || filepath.Base(PathOf(declared[0].URI)) != "Lamp.kt" {
+		test.Errorf("beam is declared at %+v (%v), want Lamp.kt", declared, err)
+	}
+	test.Logf("kotlin-lsp wrote: %v", newFiles(before, filesIn(test, folder)))
+}
+
 // filesIn lists every file under some folders.
 func filesIn(test *testing.T, folders ...string) []string {
 	var found []string

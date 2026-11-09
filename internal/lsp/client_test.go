@@ -89,6 +89,25 @@ func TestARequestWaitsForTheServerToReadTheProjects(test *testing.T) {
 	}
 }
 
+func TestARequestAnsweredWithNothingWhileTheServerWorksIsAskedAgain(test *testing.T) {
+	folder := project(test, map[string]string{"lamp.go": "package lamp\n\nfunc Beam() int { return 2 }\n"})
+	server, _ := fake(test, false, "FAKE_LSP_BUSY=600")
+	client, err := Start(within(test), server, folder, nil, "")
+	if err != nil {
+		test.Fatal(err)
+	}
+	defer client.Stop()
+	for deadline := time.Now().Add(2 * time.Second); !client.Busy() && time.Now().Before(deadline); time.Sleep(10 * time.Millisecond) {
+	}
+	if client.Ready() {
+		test.Error("the server is ready while it reports work running")
+	}
+	declared, err := client.Definition(within(test), filepath.Join(folder, "lamp.go"), Position{Line: 2, Character: 6})
+	if err != nil || len(declared) != 1 || client.Busy() {
+		test.Errorf("asked while it worked, the server declared Beam at %+v (%v)", declared, err)
+	}
+}
+
 func TestApplyEditIsRefused(test *testing.T) {
 	folder := project(test, map[string]string{"go.mod": "module lamp\n", "lamp.go": "package lamp\n"})
 	server, log := fake(test, false, "FAKE_LSP_APPLY_EDIT=1")

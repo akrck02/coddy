@@ -15,6 +15,8 @@
 //   - FAKE_LSP_APPLY_EDIT: when set, it asks the client to apply an edit once initialized.
 //   - FAKE_LSP_READY: a language/status type it sends a moment after it is initialized, as jdtls
 //     sends ServiceReady once it has read the projects.
+//   - FAKE_LSP_BUSY: milliseconds of work it reports with $/progress once initialized, answering
+//     every request with nothing meanwhile, as kotlin-lsp does while Gradle imports the projects.
 package main
 
 import (
@@ -40,6 +42,7 @@ type server struct {
 	documents map[string]string // by URI
 	conn      *lsp.Conn
 	stopped   chan struct{}
+	busy      bool
 }
 
 func main() {
@@ -65,18 +68,49 @@ func (fake *server) handle(method string, params json.RawMessage) (any, error) {
 		fake.open(params)
 	case "textDocument/didChange":
 		fake.change(params)
-	case "textDocument/definition":
-		return fake.definition(params)
-	case "textDocument/references":
-		return fake.references(params)
-	case "textDocument/hover":
-		return fake.hover(params)
+	case "textDocument/definition", "textDocument/references", "textDocument/hover":
+		return fake.request(method, params)
 	case "shutdown":
 		return nil, nil
 	case "exit":
 		close(fake.stopped)
 	}
 	return nil, nil
+}
+
+// request answers a question about a document, or nothing while the fake reports work running.
+func (fake *server) request(method string, params json.RawMessage) (any, error) {
+	fake.lock.Lock()
+	busy := fake.busy
+	fake.lock.Unlock()
+	switch {
+	case busy:
+		return nil, nil
+	case method == "textDocument/definition":
+		return fake.definition(params)
+	case method == "textDocument/references":
+		return fake.references(params)
+	}
+	return fake.hover(params)
+}
+
+// work reports work running for some milliseconds, as a begin and an end of $/progress.
+func (fake *server) work(milliseconds string) {
+	var length int
+	if _, err := fmt.Sscan(milliseconds, &length); err != nil {
+		return
+	}
+	fake.lock.Lock()
+	fake.busy = true
+	fake.lock.Unlock()
+	_ = fake.conn.Notify("$/progress", map[string]any{"token": 7, "value": map[string]string{"kind": "begin", "title": "Importing"}})
+	go func() {
+		time.Sleep(time.Duration(length) * time.Millisecond)
+		fake.lock.Lock()
+		fake.busy = false
+		fake.lock.Unlock()
+		_ = fake.conn.Notify("$/progress", map[string]any{"token": 7, "value": map[string]string{"kind": "end"}})
+	}()
 }
 
 // logLine appends a line to the log, when the test asked for one.
@@ -141,6 +175,9 @@ func (fake *server) addFolderList(folders []folder) {
 
 // afterInitialized asks the client to apply an edit, when the test asked for it, and logs the answer.
 func (fake *server) afterInitialized() {
+	if busy := os.Getenv("FAKE_LSP_BUSY"); busy != "" {
+		fake.work(busy)
+	}
 	if ready := os.Getenv("FAKE_LSP_READY"); ready != "" {
 		go func() {
 			time.Sleep(300 * time.Millisecond)

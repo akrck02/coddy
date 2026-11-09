@@ -137,7 +137,7 @@ What T9 found on the big workspace:
   not ignore, and `bin/`, which it does; nothing in the library. The first three are what R6 and R7
   are for.
 - **A third of the big workspace is Kotlin, and jdtls does not read Kotlin.** The table now gives jdtls Java only;
-  Kotlin needs a server of its own, a proposal of its own.
+  Kotlin needs a server of its own, a proposal of its own: [5](5-kotlin.md).
 
 | Id | Met | How |
 |---|---|---|

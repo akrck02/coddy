@@ -25,6 +25,7 @@ type Client struct {
 	versions  map[string]int // the documents opened, by URI, with the version last sent
 	ready     chan struct{}  // closed once the server has read the projects
 	readyOnce sync.Once
+	working   map[string]bool // the work the server reports running, by its token
 	folders   map[string]bool
 }
 
@@ -48,7 +49,7 @@ func Start(ctx context.Context, server Server, root string, folders []string, da
 		return nil, failure.Wrap(ServerNotFound, server.Name, err)
 	}
 	client := &Client{Server: server, Root: root, command: command, versions: map[string]int{}, folders: map[string]bool{},
-		ready: make(chan struct{})}
+		ready: make(chan struct{}), working: map[string]bool{}}
 	if server.ReadyStatus == "" {
 		client.becomeReady()
 	}
@@ -114,6 +115,8 @@ func (client *Client) handle(method string, params json.RawMessage) (any, error)
 	switch method {
 	case "workspace/applyEdit":
 		return map[string]any{"applied": false, "failureReason": "code-review does not let a language server edit files"}, nil
+	case "$/progress":
+		client.noteProgress(params)
 	case "language/status":
 		var status struct {
 			Type string `json:"type"`
@@ -134,11 +137,12 @@ func (client *Client) handle(method string, params json.RawMessage) (any, error)
 // becomeReady marks the server as having read the projects.
 func (client *Client) becomeReady() { client.readyOnce.Do(func() { close(client.ready) }) }
 
-// Ready tells whether the server has read the projects, and answers requests in full.
+// Ready tells whether the server has read the projects and reports no work running: it answers
+// requests in full.
 func (client *Client) Ready() bool {
 	select {
 	case <-client.ready:
-		return true
+		return !client.Busy()
 	default:
 		return false
 	}
@@ -222,11 +226,11 @@ func (client *Client) locations(ctx context.Context, method, path string, at Pos
 	if context != nil {
 		params["context"] = context
 	}
-	var raw json.RawMessage
-	if err := client.waitReady(ctx); err != nil {
-		return nil, err
-	}
-	if err := client.conn.Call(ctx, method, params, &raw); err != nil {
+	raw, err := client.ask(ctx, method, params, func(raw json.RawMessage) bool {
+		found, _ := decodeLocations(raw)
+		return len(found) == 0
+	})
+	if err != nil {
 		return nil, err
 	}
 	return decodeLocations(raw)
@@ -263,16 +267,22 @@ func decodeLocations(raw json.RawMessage) ([]Location, error) {
 // Markdown; "" when it has none.
 func (client *Client) Hover(ctx context.Context, path string, at Position) (string, error) {
 	params := TextDocumentPositionParams{TextDocument: TextDocumentIdentifier{URI: FileURI(path)}, Position: at}
+	raw, err := client.ask(ctx, "textDocument/hover", params, func(raw json.RawMessage) bool { return hoverOf(raw) == "" })
+	if err != nil {
+		return "", err
+	}
+	return hoverOf(raw), nil
+}
+
+// hoverOf is the text of a hover's answer; "" for none.
+func hoverOf(raw json.RawMessage) string {
 	var answer struct {
 		Contents json.RawMessage `json:"contents"`
 	}
-	if err := client.waitReady(ctx); err != nil {
-		return "", err
+	if json.Unmarshal(raw, &answer) != nil {
+		return ""
 	}
-	if err := client.conn.Call(ctx, "textDocument/hover", params, &answer); err != nil {
-		return "", err
-	}
-	return hoverText(answer.Contents), nil
+	return hoverText(answer.Contents)
 }
 
 // hoverText reads a hover's contents: MarkupContent, a MarkedString, or a list of them.

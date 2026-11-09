@@ -32,12 +32,19 @@ type Server struct {
 var Servers = []Server{
 	{Name: "gopls", Command: "gopls", Languages: []string{"go"}, RootMarkers: []string{"go.mod"},
 		Install: "go install golang.org/x/tools/gopls@latest"},
-	// jdtls reads Java only: Kotlin needs a server of its own (not in this table yet)
+	// jdtls reads Java only: Kotlin has kotlin-lsp, below
 	{Name: "jdtls", Command: "jdtls", Languages: []string{"java"}, OnePerWindow: true, DataFlag: "-data",
 		Install: "brew install jdtls", ReadyStatus: "ServiceReady",
 		// a name declared in a jar (another repository of the big workspace, as a dependency) answers with a
 		// jdt:// location, which the reader maps to that repository's source when it is open
 		Options: map[string]any{"extendedClientCapabilities": map[string]any{"classFileContentsSupport": true}}},
+	// JetBrains' server, still a preview. It imports each Gradle build first (minutes, cold) and
+	// answers with nothing meanwhile, telling its work by $/progress; a name in a jar answers
+	// jar:///…!/package/Class.class. Its index goes in the system path; Gradle's import writes
+	// .gradle/ and build/ in the project, as a build does. It does not say it follows workspace
+	// folders: it reads the projects open when it starts.
+	{Name: "kotlin-lsp", Command: "kotlin-lsp", Arguments: []string{"--stdio"}, DataFlag: "--system-path",
+		Languages: []string{"kotlin"}, OnePerWindow: true, Install: "brew install JetBrains/utils/kotlin-lsp"},
 }
 
 // ServerFor is the server of a language among those given, if one reads it.

@@ -70,12 +70,16 @@ It has two modes, chosen on the rail at the far left (or with `1`, `2`, `c`):
   asks whether to keep yours or take theirs. A dot after the name marks edits not saved, and
   opening another file or quitting asks first. A saved file shows as changed at once. The diff
   stays for reading.
-- **Follows names with language servers**: `gopls` for Go, `jdtls` for Java (not Kotlin yet), found on
+- **Follows names with language servers**: `gopls` for Go, `jdtls` for Java and `kotlin-lsp` for
+  Kotlin (JetBrains' preview, `brew install JetBrains/utils/kotlin-lsp`), found on
   the `PATH` and started the first time a file of their language opens. `F12` or `⌘`-click goes
   to where a name is declared, even in another project, and `⌃-` comes back; `⇧F12` lists every
   use in the finder's panel, where typing narrows them; resting the pointer on a name shows its
   type and documentation. A server not installed is named, with the command that installs it.
-  One `jdtls` reads every Java project of the window, so names cross repositories.
+  One `jdtls` reads every Java project of the window, and one `kotlin-lsp` every Kotlin one, so
+  names cross repositories; a name another repository gives as a jar opens in that repository's
+  source when it is open. While a server reads the projects (`kotlin-lsp` imports each Gradle
+  build, minutes the first time) the status bar says so, and a question waits for it.
 - **What a server writes is not your change**: `jdtls` writes `.project`, `.classpath` and
   `.settings/`. The reader notes what each project held before a server started in it, and a file
   that appears or changes afterwards, which you did not save in the reader, leaves the review, the
@@ -219,5 +223,7 @@ are ready.
 - Long lines are not wrapped: scroll sideways (Shift+wheel, ←/→ in the editor).
 - One typeface for code at a time: SF Mono by default, or the one `-code-font` names (a `.ttf`;
   collections such as `Menlo.ttc` are not read).
+- `kotlin-lsp` reads the Kotlin projects open when it starts: one opened later is not read until
+  the window is opened again.
 - Language servers only follow names: no rename, formatting, completion or diagnostics yet, and
   not on the old side of a diff, which is not on disk.

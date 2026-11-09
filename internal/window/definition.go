@@ -222,8 +222,8 @@ func (application *Window) leavingFor(reference workspace.FileReference, going f
 
 // outsideName names a declaration outside the projects open: its file, or the class in a jar.
 func outsideName(uri, path string) string {
-	if pkg, file, isJar := lsp.ClassInJar(uri); isJar {
-		return pkg + "." + strings.TrimSuffix(file, ".java") + ", in a jar whose project is not open"
+	if pkg, class, isJar := lsp.ClassInJar(uri); isJar {
+		return pkg + "." + class + ", in a jar whose project is not open"
 	}
 	if path == "" {
 		return uri
