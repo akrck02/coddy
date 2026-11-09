@@ -91,10 +91,11 @@ var commands = []command{
 			application.focus = sidebarPane
 		}},
 	{description: "Find a file by its name, in any project",
-		keys: []pane.Press{pane.CommandKey(input.KeyP, "⌘P"), {Key: input.KeyP, Shift: true, Label: "Shift+P"}},
-		do:   func(application *Window, _ *ui.Context, _ int) { application.finder.Show(finder.NamesScope) }},
+		keys: []pane.Press{pane.CommandShiftKey(input.KeyO, "⌘⇧O"), pane.CommandKey(input.KeyO, "⌘O"), pane.CommandKey(input.KeyP, "⌘P"),
+			{Key: input.KeyP, Shift: true, Label: "Shift+P"}},
+		do: func(application *Window, _ *ui.Context, _ int) { application.finder.Show(finder.NamesScope) }},
 	{description: "Open a repository or a folder of repositories",
-		keys: []pane.Press{pane.Key(input.KeyO, "o"), pane.CommandKey(input.KeyO, "⌘O")},
+		keys: []pane.Press{pane.Key(input.KeyO, "o"), {Key: input.KeyO, Command: true, Alt: true, Label: "⌘⌥O"}},
 		do:   func(application *Window, _ *ui.Context, _ int) { application.pickerOpen = true }},
 	{description: "Read every project again",
 		keys: []pane.Press{pane.Key(input.KeyR, "r"), pane.CommandKey(input.KeyR, "⌘R")},
@@ -102,7 +103,7 @@ var commands = []command{
 			application.reloadAll()
 			application.toast = "Reading the projects again"
 		}},
-	{description: "Compare against another branch, tag or commit", keys: []pane.Press{pane.Key(input.KeyB, "b"), pane.CommandKey(input.KeyB, "⌘B")},
+	{description: "Compare against another branch, tag or commit", keys: []pane.Press{pane.Key(input.KeyB, "b"), pane.CommandShiftKey(input.KeyB, "⌘⇧B")},
 		do: func(application *Window, _ *ui.Context, _ int) { application.openBaseDialog() }},
 	{description: "Stop editing: the sidebar takes the keyboard", place: editing,
 		keys: []pane.Press{pane.AnyKey(input.KeyEscape, "Esc")},
@@ -144,8 +145,8 @@ var commands = []command{
 			{Key: input.KeyN, Command: true, Shift: true, Label: "⌘⇧N", Step: 1}, {Key: input.KeyM, Command: true, Shift: true, Label: "⌘⇧M", Step: -1}},
 		do: func(application *Window, _ *ui.Context, step int) { application.stepChangedFile(step) }},
 	{description: "Next / previous change in the file",
-		keys: []pane.Press{{Key: input.KeyRightBracket, Label: "]", Step: 1, AnyModifiers: true}, {Key: input.KeyLeftBracket, Label: "[", Step: -1, AnyModifiers: true},
-			{Key: input.KeyRightBracket, Command: true, Label: "⌘]", Step: 1}, {Key: input.KeyLeftBracket, Command: true, Label: "⌘[", Step: -1}},
+		keys: []pane.Press{{Key: input.KeyF7, Label: "F7", Step: 1}, {Key: input.KeyF7, Shift: true, Label: "⇧F7", Step: -1},
+			{Key: input.KeyRightBracket, Label: "]", Step: 1}, {Key: input.KeyLeftBracket, Label: "[", Step: -1}},
 		do: func(application *Window, _ *ui.Context, step int) { application.viewer.StepHunk(step) }},
 	{description: "Diff or the whole file", keys: []pane.Press{pane.Key(input.KeyD, "d"), pane.CommandKey(input.KeyD, "⌘D")},
 		do: func(application *Window, _ *ui.Context, _ int) { application.toggleView() }},
@@ -155,21 +156,30 @@ var commands = []command{
 				application.viewer.ToggleContext()
 			}
 		}},
+	{description: "Fold every unchanged line / show them all",
+		keys: []pane.Press{{Key: input.KeyMinus, Command: true, Shift: true, Label: "⌘⇧-", Step: -1}, {Key: input.KeyPlus, Command: true, Shift: true, Label: "⌘⇧+", Step: 1}},
+		do: func(application *Window, _ *ui.Context, step int) {
+			if application.viewer.Mode != viewer.FileView && application.viewer.Unfolded() != (step > 0) {
+				application.viewer.ToggleContext()
+			}
+		}},
 	{description: "Only the changes, projects and files, or everything (sidebar and finder)", keys: []pane.Press{pane.Key(input.KeyG, "g"), pane.Key(input.KeyH, "h"), pane.CommandShiftKey(input.KeyG, "⌘⇧G")},
 		do: func(application *Window, _ *ui.Context, _ int) { application.setOnlyChanged(!application.onlyChanged) }},
 	{description: "Count the changes not committed yet, or only commits", keys: []pane.Press{pane.Key(input.KeyW, "w"), pane.CommandShiftKey(input.KeyW, "⌘⇧W")},
 		do: func(application *Window, _ *ui.Context, _ int) {
 			application.keepingEdits(application.toggleWorkingTree)
 		}},
-	{description: "Every use of the name at the caret, or clicked", keys: []pane.Press{{Key: input.KeyF12, Shift: true, Label: "⇧F12"}},
+	{description: "Every use of the name at the caret, or clicked", keys: []pane.Press{{Key: input.KeyF7, Alt: true, Label: "⌥F7"}, {Key: input.KeyF12, Shift: true, Label: "⇧F12"}},
 		applies: func(application *Window) bool { return application.viewer.IsOpen() },
 		do:      func(application *Window, _ *ui.Context, _ int) { application.usesAsked() }},
-	{description: "Go to the declaration of the name at the caret, or clicked; or ⌘-click it", keys: []pane.Press{pane.Key(input.KeyF12, "F12")},
+	{description: "Go to the declaration of the name at the caret, or clicked, or ⌘-click it; on the declaration, its uses",
+		keys:    []pane.Press{pane.CommandKey(input.KeyB, "⌘B"), pane.Key(input.KeyF12, "F12")},
 		applies: func(application *Window) bool { return application.viewer.IsOpen() },
 		do:      func(application *Window, _ *ui.Context, _ int) { application.definitionAsked() }},
 	{description: "Back / forward, after following a name",
-		keys: []pane.Press{{Key: input.KeyMinus, Command: true, Label: "⌃-", Step: -1}, {Key: input.KeyMinus, Command: true, Shift: true, Label: "⌃⇧-", Step: 1}},
-		do:   func(application *Window, _ *ui.Context, step int) { application.stepTrail(step) }},
+		keys: []pane.Press{{Key: input.KeyLeftBracket, Command: true, Label: "⌘[", Step: -1}, {Key: input.KeyRightBracket, Command: true, Label: "⌘]", Step: 1},
+			{Key: input.KeyLeft, Command: true, Alt: true, Label: "⌘⌥←", Step: -1}, {Key: input.KeyRight, Command: true, Alt: true, Label: "⌘⌥→", Step: 1}},
+		do: func(application *Window, _ *ui.Context, step int) { application.stepTrail(step) }},
 	{description: "Read-only: files are only read, or can be edited",
 		keys: []pane.Press{pane.Key(input.KeyL, "l"), pane.CommandShiftKey(input.KeyL, "⌘⇧L")},
 		do: func(application *Window, _ *ui.Context, _ int) {
@@ -220,7 +230,7 @@ var commands = []command{
 	{description: "Scroll sideways", place: inViewer,
 		keys: []pane.Press{pane.StepKey(input.KeyRight, "→", 1), pane.StepKey(input.KeyLeft, "←", -1)},
 		do:   func(application *Window, _ *ui.Context, step int) { application.viewer.ScrollSideways(step) }},
-	{description: "Open a fold in sight", place: inViewer, keys: []pane.Press{pane.Key(input.KeyEnter, "Enter")},
+	{description: "Open a fold in sight", place: inViewer, keys: []pane.Press{pane.Key(input.KeyEnter, "Enter"), pane.CommandKey(input.KeyPlus, "⌘+")},
 		do: func(application *Window, _ *ui.Context, _ int) { application.viewer.OpenFoldInSight() }},
 }
 

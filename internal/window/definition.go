@@ -97,7 +97,8 @@ func (application *Window) positionOf(place viewer.Place) lsp.Position {
 }
 
 // GoToDefinition asks the server of the file open where the name at a place is declared, and
-// opens it there, keeping where the person was to go back to.
+// opens it there, keeping where the person was to go back to. Asked on the declaration itself, it
+// searches the name's uses instead, as IntelliJ's ⌘B does.
 func (application *Window) GoToDefinition(place viewer.Place) {
 	asked, ready := application.readyServer()
 	if !ready {
@@ -106,6 +107,7 @@ func (application *Window) GoToDefinition(place viewer.Place) {
 	at := application.positionOf(place)
 	name := wordAt(application.viewer.LineText(place.Line), place.Column)
 	from, _ := application.here()
+	home := application.viewer.Reference.Project
 	application.waitFor(asked.client)
 	application.work.run("definition", func(stop cancellation) func() {
 		ctx, cancel := context.WithTimeout(stop, requestWait)
@@ -119,12 +121,22 @@ func (application *Window) GoToDefinition(place viewer.Place) {
 				application.toast = "The declaration could not be found: " + err.Error()
 			case len(locations) == 0:
 				application.toast = "No declaration found"
+			case declares(locations[0], asked.path, at):
+				application.searchUses(asked, at, name, home)
 			default:
 				location, _ := application.fromJar(locations[0], name)
 				application.goToLocation(from, location)
 			}
 		}
 	})
+}
+
+// declares tells whether a location is the declaration at a place of a file: the name asked about
+// is the one declared there.
+func declares(location lsp.Location, path string, at lsp.Position) bool {
+	start, end := location.Range.Start, location.Range.End
+	return lsp.PathOf(location.URI) == path && start.Line == at.Line && end.Line == at.Line &&
+		start.Character <= at.Character && at.Character <= end.Character
 }
 
 // waitFor says, until the answer comes, that a question waits for a server still reading.

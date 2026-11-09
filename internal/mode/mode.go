@@ -55,7 +55,7 @@ type Use struct {
 	Probable bool
 }
 
-// UsesHolder is a mode that shows the uses of a name the window searches (⇧F12): the window gives
+// UsesHolder is a mode that shows the uses of a name the window searches (⌥F7): the window gives
 // it the uses as they are found, and asks it which to mark in a file.
 type UsesHolder interface {
 	Mode

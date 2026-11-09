@@ -55,7 +55,7 @@ func (uses *Mode) Icon() string { return "scan-search" }
 
 // Description is the rail's tooltip.
 func (uses *Mode) Description() string {
-	return "Uses (3): every use of a name across the projects, file by file, and their graphs (⇧F12 on a name)"
+	return "Uses (3): every use of a name across the projects, file by file, and their graphs (⌥F7 on a name)"
 }
 
 // Start gives the mode its window.
@@ -313,7 +313,7 @@ func (uses *Mode) Commands() []mode.Command {
 // step goes to the next use (step 1) or the previous one (-1), going round, opening its file.
 func (uses *Mode) step(step int) {
 	if len(uses.uses) == 0 {
-		uses.window.Toast("No uses: press ⇧F12 on a name")
+		uses.window.Toast("No uses: press ⌥F7 on a name")
 		return
 	}
 	next := uses.current + step
@@ -358,5 +358,5 @@ func (uses *Mode) searchAgain() {
 		host.SearchUsesAgain()
 		return
 	}
-	uses.window.Toast("No search to make again: press ⇧F12 on a name")
+	uses.window.Toast("No search to make again: press ⌥F7 on a name")
 }

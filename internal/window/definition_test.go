@@ -72,14 +72,14 @@ func TestBackReturnsToThePlaceBefore(test *testing.T) {
 	application.viewer.PlaceCaret(viewer.Place{Line: 3, Column: 20})
 	application.GoToDefinition(viewer.Place{Line: 3, Column: 20})
 	window.Frames(1)
-	press(window, input.KeyMinus, input.KeyControl)
+	press(window, input.KeyLeftBracket, input.KeySuper)
 	if !isAt(application, "harbour", "src/use.go", 4) {
-		test.Fatalf("⌃- went to %s at line %d, want harbour's src/use.go at line 4",
+		test.Fatalf("⌘[ went to %s at line %d, want harbour's src/use.go at line 4",
 			application.viewer.Reference.Path, application.viewer.MarkedLine)
 	}
-	press(window, input.KeyMinus, input.KeyControl, input.KeyShift)
+	press(window, input.KeyRightBracket, input.KeySuper)
 	if !isAt(application, "lighthouse", "src/keeper.go", 4) {
-		test.Errorf("⌃⇧- went to %s at line %d, want src/keeper.go again", application.viewer.Reference.Path, application.viewer.MarkedLine)
+		test.Errorf("⌘] went to %s at line %d, want src/keeper.go again", application.viewer.Reference.Path, application.viewer.MarkedLine)
 	}
 	if len(application.trail.back) != 1 {
 		test.Errorf("the trail keeps %d places back, want 1", len(application.trail.back))

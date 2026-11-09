@@ -48,7 +48,7 @@ It has two modes, chosen on the rail at the far left (or with `1`, `2`, `c`):
   `-committed`) leaves them out.
 - **Reads a changed file as a diff**, both sides interleaved with their line numbers, whole at first
   (`f` or the *Fold* button folds the unchanged lines away, Enter or a click opens one fold), with
-  arrows to the previous and next change (`[` and `]`), and a map of the changes along the scroll bar. Inside a replaced line the words that changed are washed stronger. `d`
+  arrows to the previous and next change (`F7` and `⇧F7`, or `]` and `[`), and a map of the changes along the scroll bar. Inside a replaced line the words that changed are washed stronger. `d`
   switches to the whole file.
 - **Only the changes**, by default: the projects a development did not touch are left out of the
   sidebar, the finder and the language servers, and the *Files* mode lists only the changed files,
@@ -75,9 +75,10 @@ It has two modes, chosen on the rail at the far left (or with `1`, `2`, `c`):
   stays for reading.
 - **Follows names with language servers**: `gopls` for Go, `jdtls` for Java and `kotlin-lsp` for
   Kotlin (JetBrains' preview, `brew install JetBrains/utils/kotlin-lsp`), found on
-  the `PATH` and started the first time a file of their language opens. `F12` or `⌘`-click goes
-  to where a name is declared, even in another project, and `⌃-` comes back; `⇧F12` opens the
-  uses mode on every use of it (below); resting the pointer on a name shows its
+  the `PATH` and started the first time a file of their language opens. `⌘B` or `⌘`-click goes
+  to where a name is declared, even in another project, and `⌘[` comes back; on the declaration
+  itself `⌘B` shows its uses instead, as IntelliJ does, and `⌥F7` opens the uses mode on every
+  use of a name (below); resting the pointer on a name shows its
   type and documentation. A server not installed is named, with the command that installs it.
   One `jdtls` reads every Java project of the window, and one `kotlin-lsp` every Kotlin one, so
   names cross repositories; a name another repository gives as a jar opens in that repository's
@@ -164,37 +165,40 @@ go vet ./... && go test ./...     # the interface tests drive the window with no
 
 ## Keys
 
+The keys follow IntelliJ's macOS keymap where the reader does what IntelliJ does (`⌘B`, `⌥F7`,
+`⌘[` / `⌘]`, `F7` in a diff, `⌘⇧O`, `⌘⇧F`, `⌘⇧-` / `⌘⇧+`); the single letters are the reader's own.
 While you edit a file, letters type: commands then take the key with `⌘` (or `⌃`), shown second
 below, an F-key or `Esc`. `Esc` gives the keyboard back to the sidebar, where the letters work.
 
 | Key | |
 |---|---|
 | `⌘F` | Filter the projects and files the sidebar lists; Enter goes to them |
-| `⌘P` (or `Shift+P`) | Find a file by its name, in any project; changed files first |
+| `⌘⇧O`, `⌘O`, `⌘P` (or `Shift+P`) | Find a file by its name, in any project; changed files first |
 | `⌘⇧F` (or `/`) | Find a text in the files of every project; `Tab` in the finder switches between names and content |
 | `n` / `m` (`⌘⇧N` / `⌘⇧M`) | Next / previous changed file, across every project |
-| `]` / `[` (`⌘]` / `⌘[`) | Next / previous change in the file (the diff, or the marked lines) |
+| `F7` / `⇧F7`, `]` / `[` | Next / previous change in the file (the diff, or the marked lines) |
 | `1` / `2` / `3` (`⌘1` / `⌘2` / `⌘3`; `c` or `⌘0` switches) | Files mode / Review mode / Uses mode |
 | `Enter` on a project, `e` (`⌘E`), or its → button | Enter the project: the sidebar lists only its tree, and `n`/`m`/`v` stay in it |
 | `Esc` / `Backspace` | Back to every project |
 | `v` (`⌘⇧V`) | Mark the file as viewed (or not); marking it opens the next file not viewed |
 | `d` (`⌘D`) | Diff, or the whole file |
 | `f` (`⌘U`) | Fold the unchanged lines, or show them all again (a diff opens whole) |
+| `⌘⇧-` / `⌘⇧+` | Fold every unchanged line / show them all |
 | `Tab` (`⌃Tab`) | Move between the sidebar and the editor |
 | `↑ ↓ ← →`, `PgUp PgDn`, `Home End` | Move in the sidebar (←/→ close and open folders), or scroll the file |
 | `j` / `k`, `Space` | Scroll a line, a page |
-| `Enter` | Open a file or a folder (sidebar), open a fold (editor) |
+| `Enter` (`⌘+` in the editor) | Open a file or a folder (sidebar), open a fold (editor) |
 | `g`, `h` (`⌘⇧G`) | Only the changes, projects and files, or everything (sidebar, finder and servers) |
-| `b` (`⌘B`) | Compare against another branch, tag or commit |
+| `b` (`⌘⇧B`) | Compare against another branch, tag or commit |
 | `w` (`⌘⇧W`) | Count the changes not committed yet, or the commits only |
 | `r` (`⌘R`) | Read every project again |
-| `o` (`⌘O`) | Open a repository or a folder of repositories |
+| `o` (`⌘⌥O`) | Open a repository or a folder of repositories |
 | `y` (`⌘⇧C`) | Copy the open file's path |
 | `t` (`⌘⇧T`) | Light or dark |
 | `l` (`⌘⇧L`) | Read-only, or editing |
-| `F12`, or `⌘`-click | Go to where the name at the caret (or clicked) is declared |
-| `⇧F12` | Every use of the name at the caret (or clicked), in the uses mode |
-| `⌃-` / `⌃⇧-` | Back to where you were before following a name, and forward again |
+| `⌘B` (`F12`), or `⌘`-click | Go to where the name at the caret (or clicked) is declared; on the declaration, its uses |
+| `⌥F7` (`⇧F12`) | Every use of the name at the caret (or clicked), in the uses mode |
+| `⌘[` / `⌘]` (`⌘⌥←` / `⌘⌥→`) | Back to where you were before following a name, and forward again |
 | `?` (`F1`) | These keys |
 
 In the uses mode, its keys come first:

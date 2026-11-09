@@ -122,7 +122,7 @@ type Viewer struct {
 	// HoverPause is how long the pointer rests on a name before the window is asked about it
 	HoverPause time.Duration
 	rest       resting
-	// clicked is the place of the code clicked last, in any view: what F12 and ⇧F12 ask about
+	// clicked is the place of the code clicked last, in any view: what ⌘B and ⌥F7 ask about
 	// when there is no caret
 	clicked     Place
 	clickedSome bool
@@ -632,10 +632,10 @@ func (view *Viewer) buildViewButtons(context *ui.Context, window Window, compact
 
 // buildHunkArrows goes to the previous or the next run of changes, as [ and ] do.
 func (view *Viewer) buildHunkArrows(context *ui.Context) {
-	if theme.ToolButton(context, "Previous change ([)", "chevron-up", false) {
+	if theme.ToolButton(context, "Previous change (⇧F7, [)", "chevron-up", false) {
 		view.StepHunk(-1)
 	}
-	if theme.ToolButton(context, "Next change (])", "chevron-down", false) {
+	if theme.ToolButton(context, "Next change (F7, ])", "chevron-down", false) {
 		view.StepHunk(1)
 	}
 }

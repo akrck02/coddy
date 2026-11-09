@@ -54,14 +54,14 @@ func TestADiffOpensWholeAndItsArrowsGoFromChangeToChange(test *testing.T) {
 		test.Fatalf("the diff opens with %d rows, want all %d lines and the %d old ones", rows, longFileLines, changedLines)
 	}
 	application.viewer.List.Offset = 0
-	if err := window.Click("Next change (])"); err != nil {
+	if err := window.Click("Next change (F7, ])"); err != nil {
 		test.Fatal(err)
 	}
 	window.Frames(2)
 	if first, _ := application.viewer.List.Visible(); first < 40 {
 		test.Errorf("after the next change the first row in sight is %d, want the change at line 70", first)
 	}
-	if err := window.Click("Previous change ([)"); err != nil {
+	if err := window.Click("Previous change (⇧F7, [)"); err != nil {
 		test.Fatal(err)
 	}
 	window.Frames(2)

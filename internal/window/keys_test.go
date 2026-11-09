@@ -183,7 +183,7 @@ func openingShortcuts() []shortcut {
 	helpOpen := func(application *Window) string { return unless(application.helpOpen, "the help is closed") }
 	return []shortcut{
 		{name: "o opens the folder picker", press: pressing(input.KeyO), holds: pickerOpen},
-		{name: "⌘O opens the folder picker", press: pressing(input.KeyO, input.KeySuper), holds: pickerOpen},
+		{name: "⌘⌥O opens the folder picker", press: pressing(input.KeyO, input.KeySuper, input.KeyAlt), holds: pickerOpen},
 		{name: "b opens the base dialog", press: pressing(input.KeyB),
 			holds: func(application *Window) string { return unless(application.base.open, "the base dialog is closed") }},
 		{name: "Shift+P finds a file by name", press: pressing(input.KeyP, input.KeyShift),
@@ -282,6 +282,20 @@ func changeShortcuts() []shortcut {
 		{name: "d shows the file open as its diff", open: "lighthouse/src/lamp.go", press: pressing(input.KeyD),
 			holds: func(application *Window) string {
 				return unless(application.viewer.Mode == viewer.DiffView, "the file is not shown as a diff")
+			}},
+		{name: "⌘⇧- folds every unchanged line of a diff", open: "tides/coast.txt", long: true, review: true,
+			press: pressing(input.KeyMinus, input.KeySuper, input.KeyShift),
+			holds: func(application *Window) string {
+				return unless(application.viewer.RowCount() < longFileLines, fmt.Sprintf("the diff shows %d rows", application.viewer.RowCount()))
+			}},
+		{name: "F7 goes to the next change of a diff", open: "tides/coast.txt", long: true, review: true,
+			prepare: func(test *testing.T, application *Window, window *uitest.Window) {
+				focusEditor(test, application, window)
+			},
+			press: pressing(input.KeyF7),
+			holds: func(application *Window) string {
+				first, _ := application.viewer.List.Visible()
+				return unless(first > 40, fmt.Sprintf("after F7 the first row in sight is %d, want near line 70", first))
 			}},
 		{name: "f folds the unchanged lines of a diff, shown whole at first", open: "tides/coast.txt", long: true, review: true,
 			press: pressing(input.KeyF),

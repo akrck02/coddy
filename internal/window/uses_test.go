@@ -57,3 +57,26 @@ func TestCommandClickGoesToTheDeclaration(test *testing.T) {
 			application.viewer.Reference.Path, application.viewer.MarkedLine)
 	}
 }
+
+func TestCommandBOnADeclarationListsItsUses(test *testing.T) {
+	application, window := followingNames(test)
+	application.viewer.PlaceCaret(keeperUse)
+	press(window, input.KeyB, input.KeySuper)
+	if !isAt(application, "lighthouse", "src/keeper.go", 4) {
+		test.Fatalf("⌘B on a use opened %s at line %d, want its declaration", application.viewer.Reference.Path, application.viewer.MarkedLine)
+	}
+	press(window, input.KeyB, input.KeySuper) // the caret is on Keeper's declaration now
+	found := application.finder
+	if !found.Open || found.Name != "uses of Keeper" || len(found.Hits) != 3 {
+		test.Errorf("⌘B on the declaration listed %d uses of %q (open %t), want the 3 of Keeper", len(found.Hits), found.Name, found.Open)
+	}
+}
+
+func TestOptionF7ListsTheUses(test *testing.T) {
+	application, window := followingNames(test)
+	application.viewer.PlaceCaret(keeperUse)
+	press(window, input.KeyF7, input.KeyAlt)
+	if found := application.finder; !found.Open || found.Name != "uses of Keeper" {
+		test.Errorf("⌥F7 listed the uses of %q (open %t), want Keeper's", found.Name, found.Open)
+	}
+}

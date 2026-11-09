@@ -118,7 +118,7 @@ func (application *Window) Relist() { application.sidebar.Invalidate() }
 func (application *Window) SearchUsesAgain() {
 	last := application.uses
 	if last == nil {
-		application.toast = "No search to make again: press ⇧F12 on a name"
+		application.toast = "No search to make again: press ⌥F7 on a name"
 		return
 	}
 	application.searchUses(last.asked, last.at, last.name, last.home)

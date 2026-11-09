@@ -23,7 +23,8 @@ func stopsEditingFirst(first, second command, key pane.Press) bool {
 
 // sameKeys tells whether two key presses are the same keys, so one would hide the other.
 func sameKeys(first, second pane.Press) bool {
-	return first.Key == second.Key && first.Text == second.Text && first.Command == second.Command && first.Shift == second.Shift
+	return first.Key == second.Key && first.Text == second.Text && first.Command == second.Command && first.Shift == second.Shift &&
+		first.Alt == second.Alt
 }
 
 func TestNoTwoCommandsShareAKeyInOneMode(test *testing.T) {

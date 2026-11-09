@@ -72,7 +72,7 @@ func (uses *Mode) BuildInsteadOfAFile(context *ui.Context) bool {
 		ui.Look{Fill: look.Editor}, func() {
 			context.Text("Uses", ui.TextStyle{Size: palette.HeadingSize, Weight: draw2d.Bold})
 			if uses.name == "" {
-				context.Text("Put the caret on a name, or click it, and press ⇧F12: its uses across the projects open are listed here.",
+				context.Text("Put the caret on a name, or click it, and press ⌥F7: its uses across the projects open are listed here.",
 					ui.TextStyle{Color: palette.InkSoft})
 				return
 			}

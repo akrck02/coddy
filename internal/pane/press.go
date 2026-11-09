@@ -15,6 +15,7 @@ type Press struct {
 	Text    string
 	Command bool // with Command, or Control off a Mac
 	Shift   bool
+	Alt     bool // with Option (Alt off a Mac), as IntelliJ's ⌥F7
 	// Repeats runs the command again while the key is held down, as moving through rows does
 	Repeats bool
 	Step    int
@@ -31,8 +32,9 @@ func (press Press) Matches(keys Keys) bool {
 		return keys.Pressed(press.Key)
 	case press.Text != "":
 		return strings.Contains(keys.TypedText(), press.Text)
-	case press.Command:
-		return keys.Command() && keys.Pressed(press.Key) && press.Shift == keys.Shift()
+	case press.Command || press.Alt:
+		return keys.Command() == press.Command && keys.Down(input.KeyAlt) == press.Alt && keys.Pressed(press.Key) &&
+			press.Shift == keys.Shift()
 	case press.Shift && !keys.Shift():
 		return false
 	case press.Repeats:
@@ -46,7 +48,7 @@ func (press Press) Matches(keys Keys) bool {
 // plain keys type: a key with Command, an F-key, or Esc.
 func (press Press) WorksWhileEditing() bool {
 	functionKey := press.Key >= input.KeyF1 && press.Key <= input.KeyF12
-	return press.Text == "" && (press.Command || functionKey || press.Key == input.KeyEscape)
+	return press.Text == "" && (press.Command || press.Alt || functionKey || press.Key == input.KeyEscape)
 }
 
 // Key is a plain key with its label.
