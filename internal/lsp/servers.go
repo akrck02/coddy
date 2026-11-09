@@ -43,6 +43,10 @@ type Server struct {
 	// OwnGradle gives a server that imports Gradle builds a Gradle home of its own, in its data
 	// folder, whose daemons stop soon after it and with it (gradle.go).
 	OwnGradle bool
+	// ReadsAll reads every project of the window with a file of its languages, not only those in
+	// sight: a server whose index is per set of projects (Indexes) would build another, cold, each
+	// time the filter changed what is in sight.
+	ReadsAll bool
 	// NeedsFree is how many bytes must be free on its data folder's disk for it to start: an index
 	// that fills the disk breaks the server, and whatever else writes there.
 	NeedsFree uint64
@@ -58,7 +62,7 @@ var Servers = []Server{
 	{Name: "jdtls", Command: "jdtls", Languages: []string{"java"}, OnePerWindow: true, DataFlag: "-data",
 		Arguments: []string{"--jvm-arg=-Djava.import.generatesMetadataFilesAtProjectRoot=false"},
 		Install:   "brew install jdtls", ReadyStatus: "ServiceReady",
-		// a name declared in a jar (another repository of the big workspace, as a dependency) answers with a
+		// a name declared in a jar (another repository, as a dependency) answers with a
 		// jdt:// location, which the reader maps to that repository's source when it is open
 		Options: map[string]any{"extendedClientCapabilities": map[string]any{"classFileContentsSupport": true}},
 		Settings: map[string]any{"java": map[string]any{
@@ -74,8 +78,9 @@ var Servers = []Server{
 	// removed, keeping the index of the set it started with.
 	{Name: "kotlin-lsp", Command: "kotlin-lsp", Arguments: []string{"--stdio"}, DataFlag: "--system-path",
 		Languages: []string{"kotlin"}, OnePerWindow: true, Install: "brew install JetBrains/utils/kotlin-lsp",
-		// an index per set of projects, about 5 GB for the big workspace's 44: keep the one used last
-		Indexes: "workspaces", KeepIndexes: 1, OwnGradle: true, NeedsFree: 10 << 30,
+		// an index per set of projects it starts with, about 5 GB for 44 repositories': it reads them all,
+		// whatever is in sight, so one index serves, and the reader keeps the one used last
+		Indexes: "workspaces", KeepIndexes: 1, ReadsAll: true, OwnGradle: true, NeedsFree: 10 << 30,
 		Memory: "2g", MemoryVariable: "IJ_JAVA_OPTIONS"},
 }
 

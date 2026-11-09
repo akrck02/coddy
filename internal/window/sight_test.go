@@ -70,3 +70,26 @@ func folderList(client *lsp.Client) []string {
 	}
 	return client.Folders()
 }
+
+func TestAServerWithAnIndexPerSetReadsEveryProjectWhateverIsInSight(test *testing.T) {
+	folder, log := makeRepository(test), filepath.Join(test.TempDir(), "log")
+	addHarbour(test, folder)
+	servers := []lsp.Server{{Name: "fakels", Command: fakeServer(test), Languages: []string{"go"}, OnePerWindow: true,
+		ReadsAll: true, Environment: []string{"FAKE_LSP_LOG=" + log, "FAKE_LSP_NO_FOLDERS=1"}}}
+	application := newReader(Settings{Folders: []string{folder}, WorkingTree: true, Synchronous: true, OnlyChanged: true,
+		Open: "lighthouse/src/lamp.go", Servers: servers})
+	test.Cleanup(application.stopServers)
+	window := newWindow(test, application)
+	window.Frames(2)
+	first := application.servers.running["fakels"]
+	if first == nil || !slices.Contains(first.Folders(), filepath.Join(folder, "harbour")) {
+		test.Fatalf("the server reads %v, not harbour out of sight", folderList(first))
+	}
+	application.setOnlyChanged(false)
+	window.Frames(2)
+	time.Sleep(50 * time.Millisecond)
+	window.Frames(2)
+	if application.servers.running["fakels"] != first {
+		test.Error("the filter started the server again")
+	}
+}

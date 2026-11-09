@@ -100,13 +100,15 @@ It has two modes, chosen on the rail at the far left (or with `1`, `2`, `c`):
 - **Servers that leave nothing behind**:
   - Indexes go in the reader's own folder, or in the one `-server-data` names (another disk; the
     choice is remembered). `kotlin-lsp` builds one index per set of projects, about 5 GB for 44
-    repositories: the reader keeps the one used last (`-keep-indexes` keeps more), and does not
-    start it on a disk with less than 10 GB free, saying why.
+    repositories, so it reads every Kotlin project of the window, whatever the filter shows, and
+    imports them once. The reader keeps the index used last (`-keep-indexes` keeps more), and
+    does not start it on a disk with less than 10 GB free, saying why.
   - `jdtls` writes nothing in the repositories: its `.project`, `.classpath` and `.settings/` go in
     its data folder, and it builds nothing into `bin/` or `target/`.
-  - `kotlin-lsp` imports with a Gradle home of its own, in its data folder, reading the
-    dependencies and Gradle versions you already downloaded: its Gradle daemons stop two minutes
-    after their last build, and with the server, never touching yours.
+  - `kotlin-lsp` imports with a Gradle home of its own, in its data folder, holding only its
+    daemons and their settings: its caches, Gradle versions and JDKs are yours, linked, so
+    nothing is downloaded or made twice. Its Gradle daemons stop two minutes after their last
+    build, and with the server, never touching yours.
   - Each Java server takes at most 2 GB of memory (`-server-memory` changes it).
   - A server nobody asks anything for 15 minutes rests, giving its memory back; following a name
     or asking its uses starts it again, from its index. The servers panel shows what each takes,

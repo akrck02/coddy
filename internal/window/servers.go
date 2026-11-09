@@ -307,8 +307,8 @@ func (application *Window) serverEnded(name, key string, client *lsp.Client) {
 }
 
 // foldersFor are the workspace folders of a server that runs for the whole window: every project
-// in sight with a file of its languages, and the project of the file open. A server with roots
-// gets its root instead.
+// in sight with a file of its languages (every project, for one that reads all), and the project
+// of the file open. A server with roots gets its root instead.
 func (application *Window) foldersFor(server lsp.Server) []string {
 	if !server.OnePerWindow {
 		return nil
@@ -316,7 +316,7 @@ func (application *Window) foldersFor(server lsp.Server) []string {
 	folders, worked := application.servers.inSight[server.Name]
 	if !worked {
 		for _, project := range application.projects {
-			if !application.hidden(project) && hasFileOf(project, server) {
+			if (server.ReadsAll || !application.hidden(project)) && hasFileOf(project, server) {
 				folders = append(folders, project.Path)
 			}
 		}

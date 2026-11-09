@@ -14,11 +14,17 @@ import (
 // A server that imports Gradle builds (kotlin-lsp) leaves Gradle daemons behind, one per Gradle
 // version, each waiting three hours for another build. Given a Gradle home of its own, in its data
 // folder, its daemons stop after two minutes without a build, and the reader stops them with it,
-// never touching those of the person's builds or IDE. That home reads the dependencies the person
-// already downloaded, and the Gradle versions too, so nothing is downloaded twice.
+// never touching those of the person's builds or IDE. That home holds only what makes its daemons
+// its own: the rest are links to the person's Gradle home, so nothing Gradle downloads or makes,
+// the Gradle versions, their generated API, the jars it transforms, is made twice, and it goes on
+// the person's disk.
 
 // gradleIdle is how long a daemon of a server's Gradle home waits for another build, in milliseconds.
 const gradleIdle = 120000
+
+// sharedGradle are the folders of a server's Gradle home that are the person's: all but daemon/.
+// Gradle locks what is in them file by file, across processes, as for builds run at once.
+var sharedGradle = []string{"caches", "wrapper", "jdks", "native"}
 
 // gradleHome is the Gradle home of a server, in its data folder.
 func gradleHome(dataFolder string) string { return filepath.Join(dataFolder, "gradle") }
@@ -35,19 +41,29 @@ func prepareGradleHome(dataFolder string) []string {
 	if os.WriteFile(filepath.Join(home, "gradle.properties"), []byte(properties), 0o644) != nil {
 		return nil
 	}
-	environment := []string{"GRADLE_USER_HOME=" + home}
 	persons := personsGradleHome()
-	if _, err := os.Stat(filepath.Join(persons, "caches", "modules-2")); err == nil {
-		environment = append(environment, "GRADLE_RO_DEP_CACHE="+filepath.Join(persons, "caches"))
-	}
-	// the Gradle versions the person's wrappers downloaded, shared rather than downloaded again
-	wrapper := filepath.Join(persons, "wrapper")
-	if _, err := os.Lstat(filepath.Join(home, "wrapper")); os.IsNotExist(err) {
-		if _, found := os.Stat(wrapper); found == nil {
-			_ = os.Symlink(wrapper, filepath.Join(home, "wrapper"))
+	if _, err := os.Stat(persons); err == nil {
+		for _, name := range sharedGradle {
+			linkToPersons(home, persons, name)
 		}
 	}
-	return environment
+	return []string{"GRADLE_USER_HOME=" + home}
+}
+
+// linkToPersons makes a folder of a server's Gradle home a link to the person's, made there when
+// missing; a folder of its own there before, from a home of the old kind, is removed: all of it
+// can be made again.
+func linkToPersons(home, persons, name string) {
+	own, theirs := filepath.Join(home, name), filepath.Join(persons, name)
+	if target, err := os.Readlink(own); err == nil && target == theirs {
+		return
+	}
+	if os.MkdirAll(theirs, 0o755) != nil {
+		return
+	}
+	if os.RemoveAll(own) == nil {
+		_ = os.Symlink(theirs, own)
+	}
 }
 
 // personsGradleHome is the Gradle home of the person's own builds.

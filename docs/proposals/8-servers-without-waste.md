@@ -1,6 +1,6 @@
 # 8. Language servers without waste
 
-> Status: amended, waiting for approval · Author's approval: proposal ☑ plan ☑
+> Status: in progress (amendment 1) · Author's approval: proposal ☑ plan ☑
 
 ## Why
 
@@ -68,8 +68,8 @@ Marked **seen** (in docs, code, logs or on disk) or **not tried**.
 - [x] T2 kotlin-lsp's own Gradle user home, daemons timed out and stopped. (R5, R7)
 - [x] T3 Free space checked; one index kept. (R2, R3)
 - [x] T4 Idle servers stop and start again. (R4)
-- [ ] T5 The start set from changes and their dependencies (needs proposal 7's T5). (R1) —
-  waits for proposal 7.
+- [ ] ~~T5 The start set from changes and their dependencies (needs proposal 7's T5). (R1)~~ —
+  dropped by amendment 1 (R11).
 - [x] T6 Memory, index size and a stop button in the panel. (R8)
 - [ ] T7 Try it on the big workspace for a day of reviews: disk and processes before and after; Result.
 
@@ -115,7 +115,7 @@ Marked **seen** (in docs, code, logs or on disk) or **not tried**.
 
 ## Amendment 1: the disk after a cold import (9 November 2026)
 
-> Author's approval: amendment ☐ plan ☐
+> Author's approval: amendment ☑ plan ☑
 
 ### What was seen
 
@@ -157,7 +157,7 @@ again on demand.
 
 ### Tasks
 
-- [ ] T8 The Gradle home linked to the person's, the old caches removed. (R9)
-- [ ] T9 kotlin-lsp reads every Kotlin project of the window; T5 dropped. (R10, R11)
+- [x] T8 The Gradle home linked to the person's, the old caches removed. (R9)
+- [x] T9 kotlin-lsp reads every Kotlin project of the window; T5 dropped. (R10, R11)
 - [ ] T10 Try it on the big workspace: one index, nothing in the own home but `daemon/` and
   `gradle.properties`; the free disk before and after.
