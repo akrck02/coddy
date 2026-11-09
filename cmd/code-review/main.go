@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/akrck02/code-review/internal/files"
@@ -30,6 +31,7 @@ const (
 	foldersPreference     = "folders"
 	onlyChangedPreference = "only-changed"
 	readOnlyPreference    = "read-only"
+	serverDataPreference  = "server-data"
 )
 
 func main() {
@@ -54,6 +56,7 @@ type commandLine struct {
 	base, open, find, codeFont               *string
 	committed, light, reviewing, allProjects *bool
 	readOnly                                 *bool
+	serverData                               *string
 }
 
 // registerFlags declares the reader's own flags, beside the platform's.
@@ -68,6 +71,8 @@ func registerFlags() commandLine {
 		codeFont:    flag.String("code-font", "", "a TrueType file to read the code in (default: SF Mono, else Go Mono)"),
 		allProjects: flag.Bool("all", false, "show every project, not only those with changes (the choice is remembered otherwise)"),
 		readOnly:    flag.Bool("read-only", false, "start read-only: files are only read, not edited (the choice is remembered otherwise)"),
+		serverData: flag.String("server-data", "", "keep the language servers' indexes in this folder, another disk say "+
+			"(default: the reader's own folder; the choice is remembered)"),
 	}
 	flag.Usage = func() {
 		fmt.Fprintln(flag.CommandLine.Output(), "usage: code-review [flags] [repository or folder of repositories …]")
@@ -99,6 +104,7 @@ func settingsOf(asked commandLine, options platform.Options) window.Settings {
 		Servers:     serversFor(options.CapturePath),
 		// what language servers wrote stays theirs after a restart
 		ServersWrote: workspace.DefaultWrittenPath(),
+		ServerData:   serverData(*asked.serverData),
 	}
 }
 
@@ -134,6 +140,20 @@ func onlyChanged(allProjects bool) bool {
 	}
 	remembered, found := platform.Preference(onlyChangedPreference)
 	return !found || remembered != "false"
+}
+
+// serverData is the folder the servers keep their indexes in: the one -server-data names, kept
+// for the next time, else the one named last time; "" is the reader's own folder.
+func serverData(asked string) string {
+	if asked != "" {
+		absolute, err := filepath.Abs(asked)
+		if err == nil {
+			_ = platform.KeepPreference(serverDataPreference, absolute)
+			return absolute
+		}
+	}
+	remembered, _ := platform.Preference(serverDataPreference)
+	return remembered
 }
 
 // readOnly tells whether to start read-only: when -read-only asks, or the person chose it last

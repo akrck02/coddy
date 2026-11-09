@@ -26,6 +26,11 @@ type Server struct {
 	ReadyStatus string
 	// Options are the server's own initializationOptions, as it documents them.
 	Options map[string]any
+	// Indexes, when set, is the folder of its data folder where the server builds one index per
+	// set of workspace folders (kotlin-lsp's workspaces); the reader keeps the KeepIndexes used
+	// last and removes the others before it starts the server.
+	Indexes     string
+	KeepIndexes int
 }
 
 // Servers are the language servers the reader runs, found on the PATH.
@@ -44,7 +49,9 @@ var Servers = []Server{
 	// .gradle/ and build/ in the project, as a build does. It does not say it follows workspace
 	// folders: it reads the projects open when it starts.
 	{Name: "kotlin-lsp", Command: "kotlin-lsp", Arguments: []string{"--stdio"}, DataFlag: "--system-path",
-		Languages: []string{"kotlin"}, OnePerWindow: true, Install: "brew install JetBrains/utils/kotlin-lsp"},
+		Languages: []string{"kotlin"}, OnePerWindow: true, Install: "brew install JetBrains/utils/kotlin-lsp",
+		// an index per set of projects, about 5 GB for the big workspace's 44: keep two
+		Indexes: "workspaces", KeepIndexes: 2},
 }
 
 // ServerFor is the server of a language among those given, if one reads it.

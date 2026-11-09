@@ -102,7 +102,9 @@ func (application *Window) serveOpenFile() (*lsp.Client, told, string) {
 	key := serverKey(server, root)
 	client := servers.running[key]
 	if client == nil {
-		if !servers.starting[key] {
+		// not while the projects are read: a file shown a moment then would start a server for
+		// nothing, and one for the whole window would start without the projects still unread
+		if !servers.starting[key] && !application.Loading() {
 			application.startServer(server, root, key, application.viewer.Project.Path)
 		}
 		return nil, told{}, ""
@@ -146,14 +148,18 @@ func (application *Window) startServer(server lsp.Server, root, key, project str
 	if !server.OnePerWindow {
 		projects = []string{project}
 	}
-	data := dataFolder(server)
+	data := application.dataFolder(server)
 	options := application.optionsOf(projects)
 	application.work.run("start "+key, func(cancellation) func() {
+		removed, _ := lsp.PruneIndexes(data, server, time.Now()) // an index it cannot remove stays
 		snapshots := takeSnapshots(server.Name, options)
 		ctx, cancel := context.WithTimeout(context.Background(), startWait)
 		defer cancel()
 		client, err := lsp.Start(ctx, server, root, folders, data)
 		return func() {
+			if len(removed) > 0 {
+				application.toast = server.Name + ": removed " + plural(len(removed), "old index") + " of projects no longer open"
+			}
 			if application.serverStarted(server, key, client, err) {
 				application.keepSnapshots(snapshots) // a server that never ran wrote nothing
 			}
@@ -287,17 +293,21 @@ func hasFileOf(project *workspace.Project, server lsp.Server) bool {
 	return false
 }
 
-// dataFolder is where a server that asks for one keeps its index: in the reader's own folder,
-// never in a repository.
-func dataFolder(server lsp.Server) string {
+// dataFolder is where a server that asks for one keeps its index: in the folder the settings
+// name (another disk, say), else in the reader's own folder; never in a repository.
+func (application *Window) dataFolder(server lsp.Server) string {
 	if server.DataFlag == "" {
 		return ""
 	}
-	folder, err := os.UserConfigDir()
-	if err != nil {
-		return ""
+	folder := application.settings.ServerData
+	if folder == "" {
+		config, err := os.UserConfigDir()
+		if err != nil {
+			return ""
+		}
+		folder = filepath.Join(config, "code-review", "servers")
 	}
-	return filepath.Join(folder, "code-review", "servers", server.Name)
+	return filepath.Join(folder, server.Name)
 }
 
 // stopServers stops every server, together, and waits for them.

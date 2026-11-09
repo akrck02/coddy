@@ -232,7 +232,7 @@ func (application *Window) clientOf(place candidate) (*lsp.Client, string, strin
 	}
 	key := serverKey(server, root)
 	client := servers.running[key]
-	if client == nil && !servers.starting[key] {
+	if client == nil && !servers.starting[key] && !application.Loading() {
 		application.startServer(server, root, key, place.project)
 	}
 	return client, key, "running"

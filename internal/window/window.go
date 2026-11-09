@@ -44,6 +44,9 @@ type Settings struct {
 	// ServersWrote is the file that keeps what servers wrote in the repositories, in the reader's
 	// own folder; "" keeps it only in memory.
 	ServersWrote string
+	// ServerData is the folder the servers keep their indexes in, one folder each; "" is the
+	// reader's own folder. kotlin-lsp's take gigabytes: another disk may be better.
+	ServerData string
 }
 
 // focusedPane is the part of the window the keyboard moves in.

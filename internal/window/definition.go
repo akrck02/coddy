@@ -74,6 +74,9 @@ func (application *Window) runningServer() (asking, string) {
 		return asking{}, server.Name + " did not start: " + servers.failed[server.Name]
 	}
 	client, told, text := application.serveOpenFile()
+	if client == nil && application.Loading() {
+		return asking{}, server.Name + " starts once the projects are read"
+	}
 	if client == nil {
 		return asking{}, server.Name + " is starting: try again in a moment"
 	}

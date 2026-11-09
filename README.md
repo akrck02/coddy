@@ -80,7 +80,12 @@ It has two modes, chosen on the rail at the far left (or with `1`, `2`, `c`):
   One `jdtls` reads every Java project of the window, and one `kotlin-lsp` every Kotlin one, so
   names cross repositories; a name another repository gives as a jar opens in that repository's
   source when it is open. While a server reads the projects (`kotlin-lsp` imports each Gradle
-  build, minutes the first time) the status bar says so, and a question waits for it.
+  build, minutes the first time) the status bar says so, and a question waits for it. Servers
+  start once the projects are read, and read only the projects in sight.
+- **Server indexes kept in check**: servers keep their indexes in the reader's own folder, or in
+  the one `-server-data` names (another disk; the choice is remembered). `kotlin-lsp` builds one
+  index per set of projects, about 5 GB for 44 repositories: the reader keeps the two used last
+  and removes older ones when it starts the server.
 - **What a server writes is not your change**: `jdtls` writes `.project`, `.classpath` and
   `.settings/`. The reader notes what each project held before a server started in it, and a file
   that appears or changes afterwards, which you did not save in the reader, leaves the review, the
@@ -223,7 +228,7 @@ are ready.
 - Long lines are not wrapped: scroll sideways (Shift+wheel, ←/→ in the editor).
 - One typeface for code at a time: SF Mono by default, or the one `-code-font` names (a `.ttf`;
   collections such as `Menlo.ttc` are not read).
-- `kotlin-lsp` reads the Kotlin projects open when it starts: one opened later is not read until
-  the window is opened again.
+- `kotlin-lsp` does not follow projects coming into sight while it runs: the reader starts it
+  again for them, which may build another index.
 - Language servers only follow names: no rename, formatting, completion or diagnostics yet, and
   not on the old side of a diff, which is not on disk.
