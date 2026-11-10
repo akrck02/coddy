@@ -82,8 +82,10 @@ type Window struct {
 	helpOpen bool
 	// serversOpen shows the servers panel: what each language server does, project by project
 	serversOpen bool
-	pickerOpen  bool
-	dark        bool
+	// serverDetails are the servers whose card shows its projects and messages, by name
+	serverDetails map[string]bool
+	pickerOpen    bool
+	dark          bool
 	// onlyChanged hides the projects with no changes, in the sidebar and the finder
 	onlyChanged bool
 	// modes are the ways of looking at the workspace, in the rail's order; mode is the one on

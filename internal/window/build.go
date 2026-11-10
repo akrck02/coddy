@@ -277,8 +277,8 @@ func (application *Window) buildStatusBar(context *ui.Context) {
 	palette := context.Theme
 	small := ui.TextStyle{Size: palette.SmallTextSize, Color: palette.InkSoft}
 	context.Box(ui.Layout{Width: ui.Grow(), Height: ui.Fixed(28), Padding: ui.PadXY(14, 0), Gap: 16, AlignY: ui.Center}, func() {
-		context.Text(fmt.Sprintf("%d projects · %d with changes · %d changed files",
-			len(application.projects), application.projectsWithChanges(), len(application.changedOrder)), small)
+		context.Text(fmt.Sprintf("%s changed in %d of %d projects",
+			plural(len(application.changedOrder), "file"), application.projectsWithChanges(), len(application.projects)), small)
 		if viewed, total, words := application.progress(); total > 0 {
 			context.Box(ui.Layout{Gap: 6, AlignY: ui.Center}, func() {
 				application.buildProgress(context, viewed, total)
@@ -328,8 +328,11 @@ func (application *Window) buildBranch(context *ui.Context, small ui.TextStyle) 
 		}
 	}
 	if project.Base != "" {
-		context.IconSized("git-branch", 12, context.Theme.InkQuiet)
-		context.Text(fmt.Sprintf("%s ← %s · %d commits", project.Branch, project.Base, project.Ahead), small)
+		context.Box(ui.Layout{Gap: 6, AlignY: ui.Center}, func() {
+			context.IconSized("git-branch", 12, context.Theme.InkQuiet)
+			context.Text(project.Branch+" ← "+project.Base, small)
+		})
+		context.Tooltip(fmt.Sprintf("%s is %s ahead of %s", project.Branch, plural(project.Ahead, "commit"), project.Base))
 	}
 }
 

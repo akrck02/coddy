@@ -259,7 +259,7 @@ func movingShortcuts() []shortcut {
 			holds: func(application *Window) string {
 				return unless(openPath(application) == "lighthouse/src/beam.go", "m opened "+openPath(application)+", want lighthouse/src/beam.go")
 			}},
-	}, changeShortcuts()...)
+	}, append(changeShortcuts(), intelliJChangeShortcuts()...)...)
 }
 
 // changeShortcuts move between a file's changes and change how it shows.
@@ -283,6 +283,17 @@ func changeShortcuts() []shortcut {
 			holds: func(application *Window) string {
 				return unless(application.viewer.Mode == viewer.DiffView, "the file is not shown as a diff")
 			}},
+		{name: "f folds the unchanged lines of a diff, shown whole at first", open: "tides/coast.txt", long: true, review: true,
+			press: pressing(input.KeyF),
+			holds: func(application *Window) string {
+				return unless(application.viewer.RowCount() < longFileLines, fmt.Sprintf("the diff shows %d rows, want fewer than its %d lines", application.viewer.RowCount(), longFileLines))
+			}},
+	}
+}
+
+// intelliJChangeShortcuts are IntelliJ's keys for a diff's changes and its folds.
+func intelliJChangeShortcuts() []shortcut {
+	return []shortcut{
 		{name: "⌘⇧- folds every unchanged line of a diff", open: "tides/coast.txt", long: true, review: true,
 			press: pressing(input.KeyMinus, input.KeySuper, input.KeyShift),
 			holds: func(application *Window) string {
@@ -296,11 +307,6 @@ func changeShortcuts() []shortcut {
 			holds: func(application *Window) string {
 				first, _ := application.viewer.List.Visible()
 				return unless(first > 40, fmt.Sprintf("after F7 the first row in sight is %d, want near line 70", first))
-			}},
-		{name: "f folds the unchanged lines of a diff, shown whole at first", open: "tides/coast.txt", long: true, review: true,
-			press: pressing(input.KeyF),
-			holds: func(application *Window) string {
-				return unless(application.viewer.RowCount() < longFileLines, fmt.Sprintf("the diff shows %d rows, want fewer than its %d lines", application.viewer.RowCount(), longFileLines))
 			}},
 	}
 }

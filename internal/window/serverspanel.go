@@ -2,12 +2,12 @@ package window
 
 import (
 	"path/filepath"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/akrck02/code-review/internal/lsp"
+	"github.com/akrck02/code-review/internal/theme"
 	"github.com/akrck02/go-renderer/draw2d"
 	ui "github.com/akrck02/go-ui"
 )
@@ -32,7 +32,7 @@ func (application *Window) buildServers(context *ui.Context) {
 	dismissed := context.Sheet("Language servers", ui.SheetOptions{Width: ui.Fixed(serversPanelWidth)}, func() {
 		_, windowHeight := context.Size()
 		context.ScrollArea("servers", ui.Layout{Width: ui.Grow(), Height: ui.Fixed(max(windowHeight-serversRoomAround, 200))}, func() {
-			context.Box(ui.Layout{Direction: ui.Vertical, Width: ui.Grow(), Gap: 20}, func() {
+			context.Box(ui.Layout{Direction: ui.Vertical, Width: ui.Grow(), Gap: 12}, func() {
 				application.buildServerList(context)
 			})
 		})
@@ -48,30 +48,14 @@ func (application *Window) buildServers(context *ui.Context) {
 	}
 }
 
-// buildServerList shows every server the window knows of: running, starting, missing or failed.
+// buildServerList shows a card for every server the window knows of: running, starting, resting,
+// missing or failed.
 func (application *Window) buildServerList(context *ui.Context) {
-	servers := &application.servers
-	keys := make([]string, 0, len(servers.running))
-	for key := range servers.running {
-		keys = append(keys, key)
+	views := application.serverViews()
+	for _, view := range views {
+		application.buildServerCard(context, view)
 	}
-	sort.Strings(keys)
-	for _, key := range keys {
-		application.buildServerCard(context, key, servers.running[key])
-	}
-	for _, part := range application.serverParts() {
-		switch {
-		case servers.missing[part.name]:
-			application.buildServerNote(context, part.text, "Install it with: "+application.installOf(part.name))
-		case servers.failed[part.name] != "":
-			application.buildServerNote(context, part.text, servers.failed[part.name])
-		case strings.HasSuffix(part.text, " resting"):
-			application.buildServerNote(context, part.text, "Stopped while nobody asks it anything: following a name or asking its uses starts it again.")
-		case strings.HasSuffix(part.text, " · starting"):
-			application.buildServerNote(context, part.text, "Answering its first message.")
-		}
-	}
-	if len(keys) == 0 && len(application.serverParts()) == 0 {
+	if len(views) == 0 {
 		context.Caption("No language server runs: one starts when a file of its language is opened.")
 	}
 }
@@ -86,43 +70,97 @@ func (application *Window) installOf(name string) string {
 	return ""
 }
 
-// buildServerNote is a server that does not run, and why.
-func (application *Window) buildServerNote(context *ui.Context, title, why string) {
-	context.Box(ui.Layout{Direction: ui.Vertical, Gap: 4}, func() {
-		context.Text(title, ui.TextStyle{Weight: draw2d.Bold})
-		context.Caption(why)
+// buildServerCard is one server: its state, a few words of what it does and how far it is, and
+// on asking, its projects and its last messages.
+func (application *Window) buildServerCard(context *ui.Context, view serverView) {
+	palette := context.Theme
+	card := ui.Look{Fill: palette.Sunken, Radius: 8}
+	context.Frame(ui.Layout{Direction: ui.Vertical, Width: ui.Grow(), Padding: ui.Pad(14), Gap: 8}, card, func() {
+		application.buildCardHead(context, view)
+		if view.state == serverWorking && view.fraction >= 0 { // a bar of a length nobody knows would say 0 %
+			application.buildBar(context, view.fraction, dotColour(palette, view.state))
+		}
+		quiet := ui.TextStyle{Size: palette.SmallTextSize, Color: palette.InkSoft}
+		if view.client == nil {
+			context.Text(view.why, quiet)
+			return
+		}
+		context.Text(application.cardFacts(view), quiet)
+		if activity := strings.TrimSpace(view.progress.Detail); activity != "" && view.state != serverReady {
+			if fitted := theme.FitText(context, activity, quiet, serversPanelWidth-80); fitted != "" {
+				context.Text(fitted, ui.TextStyle{Size: palette.SmallTextSize, Color: palette.InkQuiet})
+			}
+		}
+		application.buildCardDetails(context, view)
 	})
 }
 
-// buildServerCard is one running server: what it does, its projects and its last messages.
-func (application *Window) buildServerCard(context *ui.Context, key string, client *lsp.Client) {
-	progress, now := client.Progress(), time.Now()
+// buildCardHead is a card's first line: the state's dot, the name, the few words, the time it has
+// worked, and the button that stops a running server.
+func (application *Window) buildCardHead(context *ui.Context, view serverView) {
+	palette := context.Theme
+	context.Box(ui.Layout{Width: ui.Grow(), Gap: 10, AlignY: ui.Center}, func() {
+		buildDot(context, view.state, 10)
+		context.Text(view.name, ui.TextStyle{Weight: draw2d.Bold})
+		context.Text(view.headline, ui.TextStyle{Color: palette.InkSoft})
+		context.Spacer()
+		if elapsed := view.elapsed(time.Now()); elapsed != "" {
+			context.Text(elapsed, ui.TextStyle{Size: palette.SmallTextSize, Color: palette.InkQuiet, Weight: draw2d.Mono})
+		}
+		if view.client != nil && context.Button("Stop##"+view.key) {
+			application.restServer(view.key, view.client) // the next question starts it again
+		}
+	})
+}
+
+// cardFacts are a running server's facts in a line: its projects, what it takes, when it started.
+func (application *Window) cardFacts(view serverView) string {
+	facts := plural(len(view.progress.Projects), "project")
+	if usage := application.usageOf(view.key); usage != "" {
+		facts += " · " + usage
+	}
+	return facts + " · since " + view.progress.Started.Format("15:04")
+}
+
+// buildCardDetails is the link that shows a server's projects and its last messages, and them.
+func (application *Window) buildCardDetails(context *ui.Context, view serverView) {
+	if application.serverDetails == nil {
+		application.serverDetails = map[string]bool{}
+	}
+	open := application.serverDetails[view.name]
+	label, icon := "Show details", "chevron-right"
+	if open {
+		label, icon = "Hide details", "chevron-down"
+	}
+	palette := context.Theme
+	hovered := ui.Look{Fill: application.look.Hover, Radius: 4}
+	if context.Clickable("details "+view.name, ui.Layout{Padding: ui.PadXY(4, 2), Gap: 4, AlignY: ui.Center}, ui.Looks{Hovered: hovered, Pressed: hovered}, func() {
+		context.IconSized(icon, 12, palette.Primary)
+		context.Text(label, ui.TextStyle{Size: palette.SmallTextSize, Color: palette.Primary})
+	}) {
+		application.serverDetails[view.name] = !open
+	}
+	if open {
+		application.buildServerProjects(context, view.progress.Projects)
+		application.buildServerLog(context, view.progress.Log)
+	}
+}
+
+// buildServerProjects lists the projects a server reads, with how far it is with each.
+func (application *Window) buildServerProjects(context *ui.Context, projects []lsp.ProjectProgress) {
 	palette := context.Theme
 	small := ui.TextStyle{Size: palette.SmallTextSize, Color: palette.InkSoft}
-	context.Box(ui.Layout{Direction: ui.Vertical, Width: ui.Grow(), Gap: 6}, func() {
-		context.Row(func() {
-			context.Text(statusOf(client.Server.Name, progress, now), ui.TextStyle{Weight: draw2d.Bold})
-			context.Spacer()
-			if context.Button("Stop##" + key) {
-				application.restServer(key, client) // the next question starts it again
+	for _, project := range projects {
+		context.Box(ui.Layout{Width: ui.Grow(), Gap: 12}, func() {
+			context.Box(ui.Layout{Width: ui.Grow()}, func() { context.Text(filepath.Base(project.Path), small) })
+			context.Box(ui.Layout{Width: ui.Fixed(80)}, func() { context.Text(project.State, small) })
+			took := ""
+			if project.Took > 0 {
+				took = clock(project.Took)
 			}
+			context.Box(ui.Layout{Width: ui.Fixed(44)}, func() { context.Text(took, small) })
 		})
-		started := "started at " + progress.Started.Format("15:04:05") + " · " + plural(len(progress.Projects), "project")
-		if usage := application.usageOf(key); usage != "" {
-			started += " · " + usage
-		}
-		context.Text(started, small)
-		for _, project := range progress.Projects {
-			context.Box(ui.Layout{Gap: 12}, func() {
-				context.Box(ui.Layout{Width: ui.Fixed(300)}, func() { context.Text(filepath.Base(project.Path), ui.TextStyle{}) })
-				context.Box(ui.Layout{Width: ui.Fixed(90)}, func() { context.Text(project.State, small) })
-				if project.Took > 0 {
-					context.Text(clock(project.Took), small)
-				}
-			})
-		}
-		application.buildServerLog(context, progress.Log)
-	})
+	}
 }
 
 // buildServerLog shows a server's last messages, errors in the warning colour.

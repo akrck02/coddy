@@ -58,12 +58,18 @@ func TestAClickOnAServerOpensWhatItDoesProjectByProject(test *testing.T) {
 		test.Fatal(err)
 	}
 	window.Frames(2)
-	clickText(test, window, "fakels · ")
+	clickText(test, window, "fakels")
 	window.Frames(2)
 	shown := strings.Join(window.Texts(), " ")
-	if !application.serversOpen || !strings.Contains(shown, "Language servers") || !strings.Contains(shown, "lighthouse") ||
-		!strings.Contains(shown, "Importing with Gradle") {
-		test.Errorf("the servers panel shows %q", shown)
+	if !application.serversOpen || !strings.Contains(shown, "Language servers") || !strings.Contains(shown, "Importing") ||
+		strings.Contains(shown, "Importing with Gradle") {
+		test.Fatalf("the servers panel shows %q, want the server's state and no messages yet", shown)
+	}
+	clickText(test, window, "Show details")
+	window.Frames(2)
+	shown = strings.Join(window.Texts(), " ")
+	if !strings.Contains(shown, "lighthouse") || !strings.Contains(shown, "Importing with Gradle") {
+		test.Errorf("the details show %q", shown)
 	}
 }
 
@@ -82,4 +88,24 @@ func clickText(test *testing.T, window *uitest.Window, start string) {
 		return
 	}
 	test.Fatalf("no text starts with %q: %q", start, window.Texts())
+}
+
+func TestAServerIsSummedUpInAFewWords(test *testing.T) {
+	started := time.Date(2026, 11, 10, 9, 0, 0, 0, time.UTC)
+	projects := []lsp.ProjectProgress{{Path: "/a", State: "read"}, {Path: "/b", State: "reading"}, {Path: "/c", State: "reading"}}
+	cases := []struct {
+		progress lsp.Progress
+		headline string
+		fraction float32
+	}{
+		{lsp.Progress{Phase: "importing", Percent: -1, Done: 7, Total: 28, Started: started}, "Importing · 7 of 28 projects", 0.25},
+		{lsp.Progress{Phase: "indexing", Percent: 71, Started: started, Projects: projects}, "Indexing · 71 % · 1 of 3 projects", 0.71},
+		{lsp.Progress{Phase: "ready"}, "Ready", 1},
+	}
+	for _, each := range cases {
+		view := viewOf(each.progress)
+		if view.headline != each.headline || view.fraction != each.fraction {
+			test.Errorf("%+v is shown as %q at %v, want %q at %v", each.progress, view.headline, view.fraction, each.headline, each.fraction)
+		}
+	}
 }

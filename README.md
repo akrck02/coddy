@@ -83,9 +83,11 @@ It has two modes, chosen on the rail at the far left (or with `1`, `2`, `c`):
   One `jdtls` reads every Java project of the window, and one `kotlin-lsp` every Kotlin one, so
   names cross repositories; a name another repository gives as a jar opens in that repository's
   source when it is open. While a server reads the projects (`kotlin-lsp` imports each Gradle
-  build, minutes the first time) the status bar says so, and a question waits for it. Servers
+  build, minutes the first time) its dot in the status bar turns the accent, with how far it is,
+  and a question waits for it; a click on a server opens the servers panel: a card for each, with
+  its state, a bar of how far it is, and its projects and last messages under *Show details*. Servers
   start once the projects are read, and read only the projects in sight.
-- **A mode for the uses of a name** (`⇧F12`, or `3` once a search was made): the sidebar lists only
+- **A mode for the uses of a name** (`⌥F7`, or `3` once a search was made): the sidebar lists only
   the files that use it, by project, the name's own first, then those with changes, each with its
   count. A file opens with its uses marked and the lines away from them folded, still editable
   (`d` shows it whole). `n` and `⇧N` go from use to use across files, `v` ticks one as seen, and
