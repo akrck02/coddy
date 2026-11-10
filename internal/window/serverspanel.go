@@ -70,6 +70,21 @@ func (application *Window) installOf(name string) string {
 	return ""
 }
 
+// languageOf is the language a server reads, as people call it ("Java" for jdtls); its own name
+// for one the window does not know.
+func (application *Window) languageOf(name string) string {
+	for _, server := range application.servers.table {
+		if server.Name == name && len(server.Languages) > 0 {
+			return languageNames[server.Languages[0]]
+		}
+	}
+	return name
+}
+
+// languageNames are the protocol's names of languages as people write them.
+var languageNames = map[string]string{"go": "Go", "java": "Java", "kotlin": "Kotlin", "typescript": "TypeScript",
+	"javascript": "JavaScript", "python": "Python", "rust": "Rust"}
+
 // buildServerCard is one server: its state, a few words of what it does and how far it is, and
 // on asking, its projects and its last messages.
 func (application *Window) buildServerCard(context *ui.Context, view serverView) {
@@ -101,7 +116,8 @@ func (application *Window) buildCardHead(context *ui.Context, view serverView) {
 	palette := context.Theme
 	context.Box(ui.Layout{Width: ui.Grow(), Gap: 10, AlignY: ui.Center}, func() {
 		buildDot(context, view.state, 10)
-		context.Text(view.name, ui.TextStyle{Weight: draw2d.Bold})
+		context.Text(application.languageOf(view.name), ui.TextStyle{Weight: draw2d.Bold})
+		context.Text(view.name, ui.TextStyle{Size: palette.SmallTextSize, Color: palette.InkQuiet, Weight: draw2d.Mono})
 		context.Text(view.headline, ui.TextStyle{Color: palette.InkSoft})
 		context.Spacer()
 		if elapsed := view.elapsed(time.Now()); elapsed != "" {

@@ -69,8 +69,11 @@ func TestAClickOnAServerOpensWhatItDoesProjectByProject(test *testing.T) {
 	window.ClickAt(button.Rect.X+button.Rect.Width/2, button.Rect.Y+button.Rect.Height/2)
 	window.Frames(2)
 	if shown := strings.Join(window.Texts(), " "); !application.serversListed || !strings.Contains(shown, "fakels") ||
-		!strings.Contains(shown, "Importing") {
+		!strings.Contains(shown, "Go") || !strings.Contains(shown, "Importing") {
 		test.Fatalf("the servers' popover shows %q", shown)
+	}
+	if details, err := window.Element("Details…"); err != nil || details.Rect.Right() > 1600 {
+		test.Fatalf("the popover's button is at %v (%v), past the window's edge", details.Rect, err)
 	}
 	clickText(test, window, "Details…")
 	window.Frames(2)

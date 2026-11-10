@@ -48,15 +48,21 @@ func modeOf(views []serverView) (mode serversMode, fraction float32, broken bool
 	return textOnly, -1, broken
 }
 
-// modeWords say the mode in a few words, for the button's tooltip and its popover.
+// modeWords say the mode in a few words, for the button's tooltip.
 func modeWords(mode serversMode) string {
+	title, explanation := modeTitle(mode)
+	return title + ": " + explanation
+}
+
+// modeTitle is the mode's name and a short line of what it means for following names.
+func modeTitle(mode serversMode) (string, string) {
 	switch mode {
 	case serversFull:
-		return "Servers ready: names are followed by what they mean"
+		return "Ready", "names are followed by what they mean"
 	case serversLoading:
-		return "Servers reading the projects: uses found meanwhile by their text are marked ?"
+		return "Reading the projects", "uses found meanwhile by their text are marked ?"
 	}
-	return "Text only: no server answers, so uses are found by their text and marked ?"
+	return "Text only", "no server answers, so uses are found by their text, marked ?"
 }
 
 // buildServersButton is the status bar's button for the language servers: a bolt, crossed out
@@ -131,20 +137,23 @@ func arc(fraction float32) *draw2d.Path {
 	return path
 }
 
+// serversListWidth is the width of the servers' list; what does not fit in it ends with "…".
+const serversListWidth = 340
+
 // buildServersList is the popover of the servers' button: the mode in words, each server with its
 // state, and the way to the servers panel.
 func (application *Window) buildServersList(context *ui.Context, views []serverView, mode serversMode) {
 	palette := context.Theme
 	quiet := ui.TextStyle{Size: palette.SmallTextSize, Color: palette.InkSoft}
-	context.Box(ui.Layout{Direction: ui.Vertical, Width: ui.Fixed(340), Padding: ui.Pad(12), Gap: 8}, func() {
-		context.Text(modeWords(mode), quiet)
+	clipped := ui.Look{Clip: true}
+	context.Frame(ui.Layout{Direction: ui.Vertical, Width: ui.Fixed(serversListWidth), Padding: ui.Pad(12), Gap: 10}, clipped, func() {
+		title, explanation := modeTitle(mode)
+		context.Frame(ui.Layout{Direction: ui.Vertical, Width: ui.Grow(), Gap: 2}, clipped, func() {
+			context.Text(title, ui.TextStyle{Weight: draw2d.Bold})
+			context.Text(capitalised(explanation), quiet)
+		})
 		for _, view := range views {
-			context.Box(ui.Layout{Width: ui.Grow(), Gap: 8, AlignY: ui.Center}, func() {
-				buildDot(context, view.state, 8)
-				context.Text(view.name, ui.TextStyle{Weight: draw2d.Medium})
-				context.Spacer()
-				context.Text(view.headline, quiet)
-			})
+			application.buildServerLine(context, view, quiet)
 		}
 		if len(views) == 0 {
 			context.Text("None runs: one starts when a file of its language opens.", quiet)
@@ -152,5 +161,21 @@ func (application *Window) buildServersList(context *ui.Context, views []serverV
 		if context.Button("Details…") {
 			application.serversListed, application.serversOpen = false, true
 		}
+	})
+}
+
+// buildServerLine is a server in the list: its dot, language and own name, and under them what it
+// does.
+func (application *Window) buildServerLine(context *ui.Context, view serverView, quiet ui.TextStyle) {
+	palette := context.Theme
+	context.Box(ui.Layout{Direction: ui.Vertical, Width: ui.Grow(), Gap: 2}, func() {
+		context.Box(ui.Layout{Width: ui.Grow(), Gap: 8, AlignY: ui.Center}, func() {
+			buildDot(context, view.state, 8)
+			context.Text(application.languageOf(view.name), ui.TextStyle{Weight: draw2d.Medium})
+			context.Text(view.name, ui.TextStyle{Size: palette.SmallTextSize, Color: palette.InkQuiet, Weight: draw2d.Mono})
+		})
+		context.Frame(ui.Layout{Width: ui.Grow(), Padding: ui.Padding{Left: 16}}, ui.Look{Clip: true}, func() {
+			context.Text(view.headline, quiet)
+		})
 	})
 }
