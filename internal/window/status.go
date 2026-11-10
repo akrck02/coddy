@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/akrck02/code-review/internal/lsp"
-	ui "github.com/akrck02/go-ui"
 )
 
 // watchProgress redraws the window when what a server says of itself changes, and each second
@@ -74,36 +73,6 @@ func (application *Window) serverStatus() string {
 		texts = append(texts, part.text)
 	}
 	return strings.Join(texts, "   ")
-}
-
-// buildServerStatus shows each server in the status bar as its state's dot and its name, with how
-// far it is while it works; its tooltip says the rest, and a click opens the servers panel.
-func (application *Window) buildServerStatus(context *ui.Context, small ui.TextStyle) {
-	hovered := ui.Look{Fill: application.look.Hover, Radius: 4}
-	looks := ui.Looks{Hovered: hovered, Pressed: hovered}
-	for _, view := range application.serverViews() {
-		if context.Clickable("server status "+view.name, ui.Layout{Padding: ui.PadXY(6, 2), Gap: 5, AlignY: ui.Center}, looks, func() {
-			buildDot(context, view.state, 7)
-			context.Text(view.name+chipProgress(view), small)
-		}) {
-			application.serversOpen = true
-		}
-		context.Tooltip(view.name + " · " + view.headline)
-	}
-}
-
-// chipProgress is how far a working server is, after its name in the status bar: " 71 %", " 12/32".
-func chipProgress(view serverView) string {
-	if view.state != serverWorking {
-		return ""
-	}
-	if view.progress.Percent >= 0 {
-		return " " + strconv.Itoa(view.progress.Percent) + " %"
-	}
-	if done, total := projectsDone(view.progress); total > 1 {
-		return fmt.Sprintf(" %d/%d", done, total)
-	}
-	return ""
 }
 
 // statusOf says what one server is doing: "kotlin-lsp · importing harbour.api (7 of 22) ·

@@ -82,6 +82,8 @@ type Window struct {
 	helpOpen bool
 	// serversOpen shows the servers panel: what each language server does, project by project
 	serversOpen bool
+	// serversListed shows the status bar's popover of the servers and their states
+	serversListed bool
 	// serverDetails are the servers whose card shows its projects and messages, by name
 	serverDetails map[string]bool
 	pickerOpen    bool

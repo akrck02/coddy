@@ -34,7 +34,11 @@ func TestAServerNotAskedForAWhileRestsAndAQuestionWakesIt(test *testing.T) {
 		test.Fatalf("with lamp.go still open, the status bar says %q", application.serverStatus())
 	}
 	application.GoToDefinition(viewer.Place{Line: 2, Column: 5})
-	window.Frames(2)
+	// it starts once the one resting has ended, as both share the data folder
+	for attempt := 0; attempt < 200 && application.servers.running[key] == nil; attempt++ {
+		time.Sleep(10 * time.Millisecond)
+		window.Frames(1)
+	}
 	if again := application.servers.running[key]; again == nil || again == first {
 		test.Errorf("a question did not wake the server: the status bar says %q", application.serverStatus())
 	}

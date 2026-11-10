@@ -101,7 +101,7 @@ func viewOf(progress lsp.Progress) serverView {
 	case progress.Percent >= 0:
 		view.fraction = float32(progress.Percent) / 100
 		view.headline += " · " + strconv.Itoa(progress.Percent) + " %"
-	case total > 0:
+	case total > 1: // one project, still being read, is not 100 %
 		view.fraction = float32(done) / float32(total)
 	}
 	if total > 1 {

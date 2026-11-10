@@ -58,11 +58,24 @@ func TestAClickOnAServerOpensWhatItDoesProjectByProject(test *testing.T) {
 		test.Fatal(err)
 	}
 	window.Frames(2)
-	clickText(test, window, "fakels")
+	client := application.servers.running["fakels "+application.projects[0].Path]
+	for deadline := time.Now().Add(2 * time.Second); client != nil && !client.Busy() && time.Now().Before(deadline); time.Sleep(10 * time.Millisecond) {
+	}
+	window.Frames(1)
+	button, err := window.Element("Language servers")
+	if err != nil {
+		test.Fatal(err)
+	}
+	window.ClickAt(button.Rect.X+button.Rect.Width/2, button.Rect.Y+button.Rect.Height/2)
+	window.Frames(2)
+	if shown := strings.Join(window.Texts(), " "); !application.serversListed || !strings.Contains(shown, "fakels") ||
+		!strings.Contains(shown, "Importing") {
+		test.Fatalf("the servers' popover shows %q", shown)
+	}
+	clickText(test, window, "Details…")
 	window.Frames(2)
 	shown := strings.Join(window.Texts(), " ")
-	if !application.serversOpen || !strings.Contains(shown, "Language servers") || !strings.Contains(shown, "Importing") ||
-		strings.Contains(shown, "Importing with Gradle") {
+	if !application.serversOpen || !strings.Contains(shown, "Language servers") || strings.Contains(shown, "Importing with Gradle") {
 		test.Fatalf("the servers panel shows %q, want the server's state and no messages yet", shown)
 	}
 	clickText(test, window, "Show details")
@@ -106,6 +119,28 @@ func TestAServerIsSummedUpInAFewWords(test *testing.T) {
 		view := viewOf(each.progress)
 		if view.headline != each.headline || view.fraction != each.fraction {
 			test.Errorf("%+v is shown as %q at %v, want %q at %v", each.progress, view.headline, view.fraction, each.headline, each.fraction)
+		}
+	}
+}
+
+func TestTheServersButtonSaysTheReadersMode(test *testing.T) {
+	ready := serverView{state: serverReady, fraction: 1}
+	reading := serverView{state: serverWorking, fraction: 0.4}
+	cases := []struct {
+		views    []serverView
+		mode     serversMode
+		fraction float32
+		broken   bool
+	}{
+		{nil, textOnly, -1, false},
+		{[]serverView{{state: serverResting, fraction: -1}}, textOnly, -1, false},
+		{[]serverView{ready, reading}, serversLoading, 0.4, false},
+		{[]serverView{ready, {state: serverBroken, fraction: -1}}, serversFull, 1, true},
+	}
+	for _, each := range cases {
+		mode, fraction, broken := modeOf(each.views)
+		if mode != each.mode || fraction != each.fraction || broken != each.broken {
+			test.Errorf("%+v is mode %d at %v (broken %t), want %d at %v (%t)", each.views, mode, fraction, broken, each.mode, each.fraction, each.broken)
 		}
 	}
 }

@@ -3,6 +3,7 @@ package window
 import (
 	"fmt"
 	"github.com/akrck02/code-review/internal/mode"
+	"strconv"
 	"strings"
 	"time"
 
@@ -277,14 +278,7 @@ func (application *Window) buildStatusBar(context *ui.Context) {
 	palette := context.Theme
 	small := ui.TextStyle{Size: palette.SmallTextSize, Color: palette.InkSoft}
 	context.Box(ui.Layout{Width: ui.Grow(), Height: ui.Fixed(28), Padding: ui.PadXY(14, 0), Gap: 16, AlignY: ui.Center}, func() {
-		context.Text(fmt.Sprintf("%s changed in %d of %d projects",
-			plural(len(application.changedOrder), "file"), application.projectsWithChanges(), len(application.projects)), small)
-		if viewed, total, words := application.progress(); total > 0 {
-			context.Box(ui.Layout{Gap: 6, AlignY: ui.Center}, func() {
-				application.buildProgress(context, viewed, total)
-				context.Text(words, small)
-			})
-		}
+		application.buildCounts(context, small)
 		if application.loading > 0 {
 			context.Text(fmt.Sprintf("reading %d…", application.loading), small)
 		}
@@ -295,11 +289,32 @@ func (application *Window) buildStatusBar(context *ui.Context) {
 		if !application.settings.WorkingTree {
 			context.Text("commits only", ui.TextStyle{Size: palette.SmallTextSize, Color: palette.Warning})
 		}
-		application.buildServerStatus(context, small)
+		application.buildServersButton(context)
 		if application.settings.ReadOnly {
 			context.Text("read-only", small)
 		}
 	})
+}
+
+// buildCounts says, each with its icon, how many files changed, in how many of the projects, and
+// how far the mode's work has gone; their tooltips say it in words.
+func (application *Window) buildCounts(context *ui.Context, small ui.TextStyle) {
+	counted := func(icon, text, words string, more func()) {
+		context.Box(ui.Layout{Gap: 5, AlignY: ui.Center}, func() {
+			context.IconSized(icon, 13, context.Theme.InkQuiet)
+			if more != nil {
+				more()
+			}
+			context.Text(text, small)
+		})
+		context.Tooltip(words)
+	}
+	files, changed, projects := len(application.changedOrder), application.projectsWithChanges(), len(application.projects)
+	counted("file-diff", strconv.Itoa(files), plural(files, "file")+" changed", nil)
+	counted("folder-git-2", fmt.Sprintf("%d/%d", changed, projects), fmt.Sprintf("%d of %d projects have changes", changed, projects), nil)
+	if viewed, total, words := application.progress(); total > 0 {
+		counted("eye", fmt.Sprintf("%d/%d", viewed, total), words, func() { application.buildProgress(context, viewed, total) })
+	}
 }
 
 // buildProgress is a small bar of how far the mode's work has gone, green once it is done.
