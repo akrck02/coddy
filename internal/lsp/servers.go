@@ -70,6 +70,9 @@ var Servers = []Server{
 	{Name: "jdtls", Command: "jdtls", Languages: []string{"java"}, OnePerWindow: true, DataFlag: "-data", FoldersInOptions: true,
 		Arguments: []string{"--jvm-arg=-Djava.import.generatesMetadataFilesAtProjectRoot=false"},
 		Install:   "brew install jdtls", ReadyStatus: "ServiceReady",
+		// every Java project of the window from the start: jdtls drops from its workspace the
+		// projects it was not started with, and imports each one added later with Gradle again
+		ReadsAll: true,
 		// a name declared in a jar (another repository, as a dependency) answers with a
 		// jdt:// location, which the reader maps to that repository's source when it is open
 		Options: map[string]any{"extendedClientCapabilities": map[string]any{"classFileContentsSupport": true}},

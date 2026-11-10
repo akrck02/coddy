@@ -85,3 +85,11 @@ func TestTheDaemonsOfAServerGradleHomeStopWithItAndNoOtherProcess(test *testing.
 		test.Errorf("a process that is no daemon was stopped: %v", err)
 	}
 }
+
+func TestTheJavaServerReadsEveryJavaProjectOfTheWindow(test *testing.T) {
+	for _, server := range Servers {
+		if server.Name == "jdtls" && !server.ReadsAll {
+			test.Error("jdtls reads only the projects in sight: it would drop the others from its workspace and import them again")
+		}
+	}
+}

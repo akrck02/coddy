@@ -108,7 +108,9 @@ It has two modes, chosen on the rail at the far left (or with `1`, `2`, `c`):
   - Indexes go in the reader's own folder, or in the one `-server-data` names (another disk; the
     choice is remembered). `kotlin-lsp` builds one index per set of projects, about 5 GB for 44
     repositories, so it reads every Kotlin project of the window, whatever the filter shows, and
-    imports them once. The reader keeps the index used last (`-keep-indexes` keeps more), and
+    imports them once. `jdtls` too reads every Java project of the window from its start: it drops
+    from its workspace the projects it was not started with, and would import each again with
+    Gradle as a search of uses reached it. The reader keeps the index used last (`-keep-indexes` keeps more), and
     does not start it on a disk with less than 10 GB free, saying why.
   - `jdtls` writes nothing in the repositories: its `.project`, `.classpath` and `.settings/` go in
     its data folder, and it builds nothing into `bin/` or `target/`.
