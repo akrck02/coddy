@@ -28,7 +28,9 @@ It has two modes, chosen on the rail at the far left (or with `1`, `2`, `c`):
 - **Files** (the default) is for reading code: every file of every project in a tree, the changed
   ones named in colour (green added, amber modified, red deleted), and a file opens whole with its
   changes marked beside the line numbers, as Zed marks them: a bar for lines added or changed, a
-  wedge where lines were removed.
+  wedge where lines were removed. A Markdown file opens formatted, as it reads: headings, lists
+  and tasks, quotes, coloured code, tables and links. The eye in its header turns that off, to
+  read its text, its changes, or to edit it.
 - **Review** is for going through a development: only the changed files, each with the lines it
   adds and removes, opened as diffs. `v` marks the file as viewed and opens the next one not viewed;
   each project shows how much of it was viewed, and the status bar the whole. A mark is kept by the

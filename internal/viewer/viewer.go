@@ -105,6 +105,11 @@ type Viewer struct {
 
 	List pane.Scroller
 
+	// formatted shows a Markdown file as it reads, on from when one opens; formatting is its text
+	// laid out last
+	formatted  bool
+	formatting *formatting
+
 	// Edit is the file being edited, when it can be (see Editable); nil otherwise
 	Edit *text.Buffer
 	// coloured are the buffer's lines as last coloured, for its version colouredVersion
@@ -181,6 +186,7 @@ func (view *Viewer) Show(document *workspace.Document, showChanges bool) {
 	view.Document = document
 	view.keepEditing()
 	if !keepPlace {
+		view.formatted, view.formatting = view.IsMarkdown() && len(view.Uses) == 0 && view.GoTo == 0, nil
 		view.Mode = FileView
 		switch {
 		case len(view.Uses) > 0:
@@ -445,6 +451,10 @@ func (view *Viewer) Build(context *ui.Context, window Window) {
 		view.buildHeader(context, window)
 		context.Frame(ui.Layout{Width: ui.Grow(), Height: ui.Fixed(1)}, ui.Look{Fill: look.Hover}, nil)
 		view.measure(context)
+		if view.Formatted() {
+			view.buildFormatted(context, window)
+			return
+		}
 		view.List.RowHeight = view.rowHeight
 		view.List.Count = view.RowCount()
 		if !window.ModalOpen() {
@@ -532,7 +542,10 @@ func (view *Viewer) buildHeader(context *ui.Context, window Window) {
 		if !compact {
 			context.Text(document.Language, ui.TextStyle{Size: context.Theme.SmallTextSize, Color: context.Theme.InkQuiet})
 		}
-		if document.Changed {
+		if view.IsMarkdown() && !document.Binary {
+			view.buildFormatSwitch(context)
+		}
+		if document.Changed && !view.Formatted() {
 			view.buildViewButtons(context, window, compact)
 		}
 	})

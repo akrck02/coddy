@@ -93,7 +93,7 @@ func (view *Viewer) Discard() {
 // Editable tells whether the file shown can take the keyboard to be edited: whole, and read from
 // disk as text.
 func (view *Viewer) Editable() bool {
-	return view.showing && view.Edit != nil && view.Mode == FileView
+	return view.showing && view.Edit != nil && view.Mode == FileView && !view.Formatted()
 }
 
 // fileLine is a line of the file view: of the buffer when the file is edited, coloured as it was
