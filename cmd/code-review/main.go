@@ -91,7 +91,7 @@ func registerFlags() commandLine {
 // settingsOf is how the reader starts: the folders named, or else those open last time, and what
 // the flags ask for.
 func settingsOf(asked commandLine, options platform.Options) window.Settings {
-	folders := flag.Args()
+	folders := absolutes(flag.Args())
 	if len(folders) == 0 {
 		if remembered, found := platform.Preference(foldersPreference); found && remembered != "" {
 			folders = existing(strings.Split(remembered, "\n"))
@@ -199,6 +199,19 @@ func monospaced(asked string) []byte {
 		}
 	}
 	return gomono.TTF
+}
+
+// absolutes are folders named on the command line as full paths, so "." is called by its own name
+// and is found again when the reader starts elsewhere.
+func absolutes(folders []string) []string {
+	full := make([]string, 0, len(folders))
+	for _, folder := range folders {
+		if absolute, err := filepath.Abs(folder); err == nil {
+			folder = absolute
+		}
+		full = append(full, folder)
+	}
+	return full
 }
 
 // existing keeps the folders that are still there.
