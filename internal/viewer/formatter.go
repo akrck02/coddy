@@ -119,9 +119,11 @@ func (layout *formatter) code(block markdown.Block) {
 	lines := codeLines(block)
 	height := float32(len(lines))*lineHeight + 2*padding
 	layout.box(draw2d.Rectangle{Y: layout.y, Width: layout.width, Height: height}, layout.look.Hover, 6)
+	columns := int((layout.width - 2*padding) / max(layout.charWidth, 1))
 	for index, line := range lines {
 		top := layout.y + padding + float32(index)*lineHeight
 		for _, span := range line.Spans {
+			span.Text = cutAt(span.Text, columns-span.Column)
 			if strings.TrimSpace(span.Text) == "" {
 				continue
 			}
@@ -204,4 +206,17 @@ func (layout *formatter) text(words string, x, top, height, width float32, style
 // box keeps a filled box.
 func (layout *formatter) box(area draw2d.Rectangle, colour draw2d.Color, radius float32) {
 	layout.shapes = append(layout.shapes, shape{area: area, colour: colour, radius: radius})
+}
+
+// cutAt is a text cut to some characters, ending in "…" when it was longer; a line of code past
+// its block's edge is cut rather than run over the page.
+func cutAt(text string, characters int) string {
+	runes := []rune(text)
+	if len(runes) <= characters {
+		return text
+	}
+	if characters <= 0 {
+		return ""
+	}
+	return string(runes[:characters-1]) + "…"
 }

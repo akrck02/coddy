@@ -174,11 +174,21 @@ func paintShape(drawing *draw2d.List, piece shape, placed draw2d.Rectangle) {
 // codeLines are a block of code's lines, coloured as its language reads when it is known.
 func codeLines(block markdown.Block) []highlight.Line {
 	text := strings.Join(block.Lines, "\n")
-	if block.Language == "" {
-		return highlight.Lines("block.txt", text)
+	language := strings.ToLower(block.Language)
+	if extension, known := fenceExtensions[language]; known {
+		language = extension
 	}
-	return highlight.Lines("block."+block.Language, text)
+	if language == "" {
+		language = "txt"
+	}
+	return highlight.Lines("block."+language, text)
 }
+
+// fenceExtensions are the extensions of the languages a fence names by a word chroma does not take
+// for one.
+var fenceExtensions = map[string]string{"kotlin": "kt", "javascript": "js", "typescript": "ts", "python": "py",
+	"bash": "sh", "shell": "sh", "zsh": "sh", "rust": "rs", "ruby": "rb", "csharp": "cs", "c#": "cs", "yml": "yaml",
+	"golang": "go", "groovy": "groovy", "gradle": "gradle", "markdown": "md"}
 
 // FormattedWords are the words the formatted text paints, in order, for tests.
 func (view *Viewer) FormattedWords() string {
