@@ -93,7 +93,7 @@ func TestAWorkspaceListsTheChangedFilesOfItsRepositories(test *testing.T) {
 }
 
 func TestNOpensTheChangedFilesOneAfterTheOther(test *testing.T) {
-	application := newReader(Settings{Folders: []string{makeRepository(test)}, WorkingTree: true, Synchronous: true})
+	application := newReader(Settings{Folders: []string{makeRepository(test)}, WorkingTree: true, Synchronous: true, Mode: "Review"})
 	window := newWindow(test, application)
 	var opened []string
 	for range 3 {
@@ -111,6 +111,20 @@ func TestNOpensTheChangedFilesOneAfterTheOther(test *testing.T) {
 	added, removed := application.viewer.Added, application.viewer.Gone
 	if added != 0 || removed != 1 {
 		test.Errorf("the deleted file shows +%d −%d, want +0 −1", added, removed)
+	}
+}
+
+func TestNInTheFilesModeLeavesTheDeletedFilesOut(test *testing.T) {
+	application := newReader(Settings{Folders: []string{makeRepository(test)}, WorkingTree: true, Synchronous: true})
+	window := newWindow(test, application)
+	var opened []string
+	for range 3 {
+		window.PressKey(input.KeyN)
+		window.Frames(2)
+		opened = append(opened, application.viewer.Document.Path)
+	}
+	if got := strings.Join(opened, ","); got != "src/beam.go,src/lamp.go,src/beam.go" {
+		test.Errorf("n opened %s", got)
 	}
 }
 
@@ -295,7 +309,7 @@ func TestEnteringAProjectListsOnlyItsTree(test *testing.T) {
 			test.Fatalf("inside lighthouse the sidebar still lists %q of project %d", row.Label, row.Project)
 		}
 	}
-	if !sidebarShows(application, "src") || !sidebarShows(application, "notes.txt") {
+	if !sidebarShows(application, "src") {
 		test.Error("the project's own tree is not listed from its top")
 	}
 	window.PressKey(input.KeyEscape)

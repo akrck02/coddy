@@ -123,7 +123,8 @@ func (list *Scroller) RevealNearTop(index int) {
 // dragged. It tells whether the pointer is on the scroll bar, so a click there selects nothing.
 func (list *Scroller) Follow(context *ui.Context, keys Keys, step float32) (onBar bool) {
 	x, y := context.Pointer()
-	if list.Area.Contains(x, y) {
+	// the wheel with Command zooms, where a pane zooms, and scrolls nothing
+	if list.Area.Contains(x, y) && !keys.Command() {
 		horizontal, vertical := keys.Wheel()
 		list.Offset -= vertical * step
 		list.OffsetX -= horizontal * step

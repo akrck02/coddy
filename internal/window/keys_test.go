@@ -369,8 +369,11 @@ func sidebarShortcuts() []shortcut {
 
 // sidebarOpeningShortcuts open and close folders, and open files.
 func sidebarOpeningShortcuts() []shortcut {
-	selectNotes := func(test *testing.T, application *Window, window *uitest.Window) {
-		selectRow(test, application, "notes.txt")
+	// a file of the tree's top; the deleted notes.txt is left out of the files mode
+	selectBeam := func(test *testing.T, application *Window, window *uitest.Window) {
+		selectFolderRow(test, application, window)
+		press(window, input.KeyRight)
+		selectRow(test, application, "beam.go")
 	}
 	return []shortcut{
 		{name: "Right opens a folder", prepare: selectFolderRow, press: pressing(input.KeyRight),
@@ -382,13 +385,13 @@ func sidebarOpeningShortcuts() []shortcut {
 			},
 			press: pressing(input.KeyLeft),
 			holds: func(application *Window) string { return unless(!expanded(application, "src"), "src is still open") }},
-		{name: "Enter opens a file and moves to it", prepare: selectNotes, press: pressing(input.KeyEnter),
+		{name: "Enter opens a file and moves to it", prepare: selectBeam, press: pressing(input.KeyEnter),
 			holds: func(application *Window) string {
-				return unless(openPath(application) == "lighthouse/notes.txt" && application.focus == viewerPane, "notes.txt is not open with the focus on it")
+				return unless(openPath(application) == "lighthouse/src/beam.go" && application.focus == viewerPane, "beam.go is not open with the focus on it")
 			}},
-		{name: "Space opens a file and stays in the sidebar", prepare: selectNotes, press: pressing(input.KeySpace),
+		{name: "Space opens a file and stays in the sidebar", prepare: selectBeam, press: pressing(input.KeySpace),
 			holds: func(application *Window) string {
-				return unless(openPath(application) == "lighthouse/notes.txt" && application.focus == sidebarPane, "notes.txt is not open with the focus left on the sidebar")
+				return unless(openPath(application) == "lighthouse/src/beam.go" && application.focus == sidebarPane, "beam.go is not open with the focus left on the sidebar")
 			}},
 	}
 }

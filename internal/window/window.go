@@ -365,7 +365,7 @@ func (application *Window) openFileAt(reference workspace.FileReference, line in
 func (application *Window) stepChangedFile(step int) {
 	var order []workspace.FileReference
 	for _, reference := range application.changedOrder {
-		if application.inScope(reference) {
+		if application.inScope(reference) && !application.sidebar.LeavesOut(application.projects[reference.Project], reference.Path) {
 			order = append(order, reference)
 		}
 	}

@@ -121,6 +121,7 @@ func (view *Viewer) buildFormatted(context *ui.Context, window Window) {
 	view.List.Width = 0
 	if !window.ModalOpen() {
 		keys := window.Keys()
+		view.followZoom(context, keys)
 		view.List.Follow(context, keys, context.Theme.ScrollStep)
 		if x, y := context.Pointer(); keys.Clicked() && view.List.Area.Contains(x, y) {
 			window.FocusViewer()

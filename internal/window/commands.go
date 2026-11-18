@@ -190,6 +190,10 @@ var commands = []command{
 			application.dark = !application.dark
 			application.applyTheme(context)
 		}},
+	{description: "Larger / smaller code, or its first size (or ⌘ and the wheel over the code)",
+		keys: []pane.Press{{Key: input.KeyPlus, Command: true, Label: "⌘+", Step: 1}, {Key: input.KeyMinus, Command: true, Label: "⌘-", Step: -1},
+			{Key: input.Key0, Command: true, Label: "⌘0", Step: 0}},
+		do: func(application *Window, _ *ui.Context, step int) { application.viewer.Zoom(step) }},
 	{description: "Copy the open file's path", keys: []pane.Press{pane.Key(input.KeyY, "y"), pane.CommandShiftKey(input.KeyC, "⌘⇧C")},
 		do: func(application *Window, context *ui.Context, _ int) { application.copyPath(context) }},
 	{description: "These keys", keys: []pane.Press{{Text: "?", Label: "?"}, pane.Key(input.KeyF1, "F1")},
@@ -230,7 +234,7 @@ var commands = []command{
 	{description: "Scroll sideways", place: inViewer,
 		keys: []pane.Press{pane.StepKey(input.KeyRight, "→", 1), pane.StepKey(input.KeyLeft, "←", -1)},
 		do:   func(application *Window, _ *ui.Context, step int) { application.viewer.ScrollSideways(step) }},
-	{description: "Open a fold in sight", place: inViewer, keys: []pane.Press{pane.Key(input.KeyEnter, "Enter"), pane.CommandKey(input.KeyPlus, "⌘+")},
+	{description: "Open a fold in sight", place: inViewer, keys: []pane.Press{pane.Key(input.KeyEnter, "Enter")},
 		do: func(application *Window, _ *ui.Context, _ int) { application.viewer.OpenFoldInSight() }},
 }
 

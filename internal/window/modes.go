@@ -75,7 +75,7 @@ func (application *Window) modeCommands() []command {
 	}
 	result = append(result, command{
 		description: "The next mode",
-		keys:        []pane.Press{pane.Key(input.KeyC, "c"), pane.CommandKey(input.Key0, "⌘0")},
+		keys:        []pane.Press{pane.Key(input.KeyC, "c"), pane.CommandShiftKey(input.Key0, "⌘⇧0")},
 		do:          func(application *Window, _ *ui.Context, _ int) { application.nextMode() },
 	})
 	return append(result, application.declaredCommands(false)...)

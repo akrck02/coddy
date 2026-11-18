@@ -154,6 +154,9 @@ func (sidebar *Sidebar) tree(window Window, project int) *workspace.Folder {
 			paths = chosen
 		}
 	}
+	if sidebar.hidesDeleted() {
+		paths = withoutDeleted(model, paths)
+	}
 	if key.filter != "" {
 		paths = sidebar.found(paths)
 	}
@@ -614,6 +617,33 @@ const (
 // headerRoom is the width inside the sidebar's header, less a little for the pane's resize edge.
 func (sidebar *Sidebar) headerRoom() float32 {
 	return sidebar.Width - 2*headerPadding - 4
+}
+
+func (sidebar *Sidebar) hidesDeleted() bool {
+	hider, hides := sidebar.Listing.(DeletedHider)
+	return hides && hider.HidesDeleted()
+}
+
+// LeavesOut tells whether a changed file is left out of the list whatever the filters: a file the
+// development deleted, in a mode that hides them.
+func (sidebar *Sidebar) LeavesOut(project *workspace.Project, path string) bool {
+	if !sidebar.hidesDeleted() {
+		return false
+	}
+	change, changed := project.ChangeOf(path)
+	return changed && change.Status == git.Deleted
+}
+
+// withoutDeleted are the paths of the files the development did not delete, in a new slice.
+func withoutDeleted(project *workspace.Project, paths []string) []string {
+	kept := make([]string, 0, len(paths))
+	for _, path := range paths {
+		if change, changed := project.ChangeOf(path); changed && change.Status == git.Deleted {
+			continue
+		}
+		kept = append(kept, path)
+	}
+	return kept
 }
 
 // listsChangesOnly tells whether the tree lists only the changed files: always in a mode of changes

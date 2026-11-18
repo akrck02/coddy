@@ -12,7 +12,7 @@ below, an F-key or `Esc`. `Esc` gives the keyboard back to the sidebar, where th
 | `⌘⇧F` (or `/`) | Find a text in the files of every project; `Tab` in the finder switches between names and content |
 | `n` / `m` (`⌘⇧N` / `⌘⇧M`) | Next / previous changed file, across every project |
 | `F7` / `⇧F7`, `]` / `[` | Next / previous change in the file (the diff, or the marked lines) |
-| `1` / `2` / `3` (`⌘1` / `⌘2` / `⌘3`; `c` or `⌘0` switches) | Files mode / Review mode / Uses mode |
+| `1` / `2` / `3` (`⌘1` / `⌘2` / `⌘3`; `c` or `⌘⇧0` switches) | Files mode / Review mode / Uses mode |
 | `Enter` on a project, `e` (`⌘E`), or its → button | Enter the project: the sidebar lists only its tree, and `n`/`m`/`v` stay in it |
 | `Esc` / `Backspace` | Back to every project |
 | `v` (`⌘⇧V`) | Mark the file as viewed (or not); marking it opens the next file not viewed |
@@ -22,12 +22,13 @@ below, an F-key or `Esc`. `Esc` gives the keyboard back to the sidebar, where th
 | `Tab` (`⌃Tab`) | Move between the sidebar and the editor |
 | `↑ ↓ ← →`, `PgUp PgDn`, `Home End` | Move in the sidebar (←/→ close and open folders), or scroll the file |
 | `j` / `k`, `Space` | Scroll a line, a page |
-| `Enter` (`⌘+` in the editor) | Open a file or a folder (sidebar), open a fold (editor) |
+| `Enter` | Open a file or a folder (sidebar), open a fold (editor) |
 | `g`, `h` (`⌘⇧G`) | Only the changes, projects and files, or everything (sidebar, finder and servers) |
 | `b` (`⌘⇧B`) | Compare against another branch, tag or commit |
 | `w` (`⌘⇧W`) | Count the changes not committed yet, or the commits only |
 | `r` (`⌘R`) | Read every project again |
 | `o` (`⌘⌥O`) | Open a repository or a folder of repositories |
+| `⌘+` / `⌘-`, `⌘0`, or `⌘` and the wheel over the code | Larger / smaller code, or its first size |
 | `y` (`⌘⇧C`) | Copy the open file's path |
 | `t` (`⌘⇧T`) | Light or dark |
 | `l` (`⌘⇧L`) | Read-only, or editing |

@@ -136,6 +136,7 @@ type Viewer struct {
 
 	codeSize    float32
 	rowHeight   float32
+	zoomWheel   float32 // the wheel turned with Command, not yet a step of zoom
 	charWidth   float32
 	codeAscent  float32
 	codeDescent float32
@@ -143,7 +144,7 @@ type Viewer struct {
 
 // New makes a view with no file open.
 func New() Viewer {
-	return Viewer{openedFolds: map[int]bool{}, unfolded: map[Mode]bool{DiffView: true}, codeSize: 13, rowHeight: codeRowHeight, List: pane.Scroller{RowHeight: codeRowHeight},
+	return Viewer{openedFolds: map[int]bool{}, unfolded: map[Mode]bool{DiffView: true}, codeSize: defaultCodeSize, rowHeight: codeRowHeight, List: pane.Scroller{RowHeight: codeRowHeight},
 		ColourPause: colourPause, HoverPause: hoverPause}
 }
 
@@ -471,6 +472,7 @@ func (view *Viewer) Build(context *ui.Context, window Window) {
 // places the caret where the file being edited is clicked.
 func (view *Viewer) followInput(context *ui.Context, window Window) {
 	keys := window.Keys()
+	view.followZoom(context, keys)
 	onBar := view.List.Follow(context, keys, context.Theme.ScrollStep)
 	x, y := context.Pointer()
 	inside := keys.Clicked() && view.List.Area.Contains(x, y)

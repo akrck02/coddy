@@ -17,6 +17,12 @@ type Listing interface {
 	Press(file workspace.FileReference, moveOn bool)
 }
 
+// DeletedHider is a listing that leaves out the files the development deleted: a mode for reading
+// and editing what is there, where a file that is gone is only in the way.
+type DeletedHider interface {
+	HidesDeleted() bool
+}
+
 // Chooser is a listing that lists files of its own, not the projects': the files of a search, say.
 // A project with none of them is left out, and the projects come in the order it gives.
 type Chooser interface {
