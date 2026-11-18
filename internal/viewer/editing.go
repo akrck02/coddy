@@ -121,14 +121,18 @@ func (view *Viewer) fileLineCount() int {
 }
 
 // Apply runs a change on the buffer, as a command of the window does (undo, paste…), then keeps
-// the caret in sight and colours the file again once typing stops.
+// the caret in sight when the change moved it or the text, and colours the file again once typing stops.
 func (view *Viewer) Apply(window Window, change func(buffer *text.Buffer)) {
 	if view.Edit == nil {
 		return
 	}
-	version := view.Edit.Version()
+	version, caret := view.Edit.Version(), view.Edit.Caret()
 	change(view.Edit)
-	view.revealCaret()
+	// only a caret that moved, or a text that changed, is brought into sight: Type runs every frame,
+	// and the code scrolled away from the caret must stay where it was scrolled to
+	if view.Edit.Caret() != caret || view.Edit.Version() != version {
+		view.revealCaret()
+	}
 	if view.Edit.Version() != version {
 		view.colourLater(window)
 	}

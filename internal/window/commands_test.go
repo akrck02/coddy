@@ -121,3 +121,18 @@ func TestEscStopsEditing(test *testing.T) {
 		test.Error("Esc did not give the keyboard to the sidebar")
 	}
 }
+
+func TestTheCodeScrolledAwayFromTheCaretStaysWhereItWasScrolled(test *testing.T) {
+	application, window := editingAFile(test)
+	window.Frames(2)
+	// as the wheel does: the caret, on the first line, goes out of sight
+	application.viewer.List.Offset = 20 * application.viewer.List.RowHeight
+	window.Frames(2)
+	if offset := application.viewer.List.Offset; offset == 0 {
+		test.Error("the code scrolled down went back up to the caret, with no key pressed")
+	}
+	press(window, input.KeyDown)
+	if first, _ := application.viewer.List.Visible(); first > 1 {
+		test.Errorf("the caret moved and the code did not come back to it: the first line in sight is %d", first)
+	}
+}
