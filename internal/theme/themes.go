@@ -3,7 +3,6 @@ package theme
 import (
 	"embed"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -13,6 +12,7 @@ import (
 	"github.com/akrck02/bubble"
 	"github.com/akrck02/code-review/internal/highlight"
 	"github.com/akrck02/go-renderer/draw2d"
+	"github.com/akrck02/go-renderer/failure"
 )
 
 // Theme is a look with a name, as the settings list it: one of the reader's own, or one read from
@@ -75,21 +75,26 @@ func Load(folder string) (themes []Theme, problems []error) {
 	}
 	paths, _ := filepath.Glob(filepath.Join(folder, "*.json"))
 	for _, path := range paths {
-		content, err := os.ReadFile(path)
-		if err == nil {
-			var read []Theme
-			read, err = Read(content)
-			for _, each := range read {
-				each.File = path
-				themes = replaced(themes, each)
-			}
-		}
+		read, err := readFile(path)
 		if err != nil {
-			problems = append(problems, fmt.Errorf("%s: %w", filepath.Base(path), err))
+			problems = append(problems, failure.Wrap(NotAThemeFile, filepath.Base(path), err))
+		}
+		for _, each := range read {
+			each.File = path
+			themes = replaced(themes, each)
 		}
 	}
 	sortThemes(themes)
 	return themes, problems
+}
+
+// readFile reads the themes of a file of the themes folder.
+func readFile(path string) ([]Theme, error) {
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	return Read(content)
 }
 
 // Find is the theme of a name among some, or the first of the right darkness when it is not there.
@@ -124,17 +129,17 @@ func Read(content []byte) ([]Theme, error) {
 		} `json:"themes"`
 	}
 	if err := json.Unmarshal(content, &family); err != nil {
-		return nil, fmt.Errorf("not a theme file: %w", err)
+		return nil, failure.Wrap(NotAThemeFile, "", err)
 	}
 	if len(family.Themes) == 0 {
-		return nil, errors.New(`no theme in it: a theme file lists them under "themes"`)
+		return nil, NoThemes
 	}
 	themes := make([]Theme, 0, len(family.Themes))
 	for _, each := range family.Themes {
 		dark := !strings.EqualFold(each.Appearance, "light")
-		look, err := lookOf(style(each.Style), dark)
-		if err != nil {
-			return nil, fmt.Errorf("%s: %w", each.Name, err)
+		look, found := lookOf(style(each.Style), dark)
+		if !found {
+			return nil, failure.Wrap(MissingColours, each.Name, nil)
 		}
 		themes = append(themes, Theme{Name: each.Name, Dark: dark, Look: look})
 	}
@@ -187,14 +192,30 @@ func (given style) syntax(plain draw2d.Color) map[highlight.Role]draw2d.Color {
 	return colours
 }
 
-// lookOf makes a look of a theme's style: the text and the editor's ground are needed, the rest
-// is made from them when the style leaves it out.
-func lookOf(given style, dark bool) (Look, error) {
+// lookOf makes a look of a theme's style, and tells whether it could: the text and the editor's
+// ground are needed, the rest is made from them when the style leaves it out.
+func lookOf(given style, dark bool) (Look, bool) {
 	ink, hasInk := given.colour("text", "editor.foreground")
 	editor, hasEditor := given.colour("editor.background", "background")
 	if !hasInk || !hasEditor {
-		return Look{}, errors.New(`it needs at least "text" and "editor.background"`)
+		return Look{}, false
 	}
+	colours := paletteOf(given, ink, editor)
+	syntax := given.syntax(ink)
+	if dark {
+		colours.shadow, colours.scrim = draw2d.MustHex("#00000066"), draw2d.MustHex("#0000004d")
+		colours.lineWash, colours.wordWash = 0.12, 0.32
+		return colours.look(bubble.ModeDark, syntax), true
+	}
+	colours.shadow, colours.scrim = draw2d.MustHex("#0000001f"), draw2d.MustHex("#00000026")
+	colours.lineWash, colours.wordWash = 0.14, 0.30
+	colours.deepenInks(syntax)
+	return colours.look(bubble.ModeLight, syntax), true
+}
+
+// paletteOf are the colours of the interface a style gives, those it leaves out made from its ink
+// and its editor's ground; the shadows and washes are the look's darkness's.
+func paletteOf(given style, ink, editor draw2d.Color) palette {
 	surface := given.or(editor, "surface.background", "panel.background", "background")
 	accent := given.or(draw2d.MustHex("#3574f0"), "text.accent", "icon.accent")
 	if cursor, found := given.player("cursor"); found && !has(given, "text.accent", "icon.accent") {
@@ -222,16 +243,7 @@ func lookOf(given style, dark bool) (Look, error) {
 	colours.lineNumber = given.or(colours.inkQuiet, "editor.line_number")
 	colours.activeLineNumber = given.or(ink, "editor.active_line_number")
 	colours.scrollThumb = given.or(ink.WithAlpha(0.3), "scrollbar.thumb.background")
-	syntax := given.syntax(ink)
-	if dark {
-		colours.shadow, colours.scrim = draw2d.MustHex("#00000066"), draw2d.MustHex("#0000004d")
-		colours.lineWash, colours.wordWash = 0.12, 0.32
-		return colours.look(bubble.ModeDark, syntax), nil
-	}
-	colours.shadow, colours.scrim = draw2d.MustHex("#0000001f"), draw2d.MustHex("#00000026")
-	colours.lineWash, colours.wordWash = 0.14, 0.30
-	colours.deepenInks(syntax)
-	return colours.look(bubble.ModeLight, syntax), nil
+	return colours
 }
 
 // has tells whether the style names any of these colours.

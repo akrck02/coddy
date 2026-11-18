@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/akrck02/go-renderer/draw2d"
+	"github.com/akrck02/go-renderer/failure"
 )
 
 func TestAFileIsKnownByItsNameBeforeItsExtension(test *testing.T) {
@@ -77,6 +78,14 @@ func TestAFileThatIsNotAThemeIsToldAndLeftOut(test *testing.T) {
 	themes, problems := Load(folder)
 	if len(problems) != 2 {
 		test.Errorf("reading the folder told %d problems, want 2: %v", len(problems), problems)
+	}
+	for _, problem := range problems {
+		if !failure.Is(problem, NotAThemeFile) {
+			test.Errorf("the problem %v has not the code of a file that is not a theme", problem)
+		}
+	}
+	if len(problems) == 2 && !failure.Is(problems[1], MissingColours) {
+		test.Errorf("the theme without colours is told as %v, not as missing its colours", problems[1])
 	}
 	if len(themes) != len(BuiltIn()) {
 		test.Errorf("the folder gives %d themes, want the reader's %d with Darcula replaced", len(themes), len(BuiltIn()))
