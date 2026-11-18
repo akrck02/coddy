@@ -74,7 +74,7 @@ Commits made with AI carry a `Co-Authored-By: Claude` line.
 <td>Headings, lists, tables and coloured code; the eye in the header shows the text, to edit it.</td>
 </tr>
 <tr>
-<td colspan="3" align="center">Zed's One colours, light and dark, and keys that follow IntelliJ's macOS keymap. All of it is a made-up workspace, captured with <code>-capture</code>.</td>
+<td colspan="3" align="center">Zed's One colours, light and dark (Zed's and IntelliJ's themes in the settings, or your own), and keys that follow IntelliJ's macOS keymap. All of it is a made-up workspace, captured with <code>-capture</code>.</td>
 </tr>
 </table>
 

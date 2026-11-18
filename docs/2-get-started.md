@@ -20,7 +20,7 @@ go build -o bin/code-review ./cmd/code-review
 | `-code-font file.ttf` | Read the code in this TrueType face (default SF Mono, from macOS; Go Mono where there is none) |
 | `-all` | Show every project, not only those with changes |
 | `-read-only` | Start read-only: files are only read, not edited |
-| `-light` | Start in the light theme (dark by default) |
+| `-light` | Start in One Light (the theme is chosen in the settings otherwise, and remembered) |
 | `-width`, `-height`, `-capture shot.png` | go-ui's window flags; `-capture` draws one frame to a picture |
 
 ```bash

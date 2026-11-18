@@ -50,6 +50,7 @@ func (application *Window) Build(context *ui.Context) {
 
 	application.finder.Build(context, application)
 	application.buildBaseDialog(context)
+	application.buildSettings(context)
 	application.buildHelp(context)
 	application.buildServers(context)
 	application.buildPicker(context)
@@ -97,7 +98,7 @@ func (application *Window) applyTheme(context *ui.Context) {
 
 func (application *Window) ModalOpen() bool {
 	asked := application.questions
-	return application.finder.Open || application.base.open || application.helpOpen || application.pickerOpen || application.serversOpen ||
+	return application.finder.Open || application.base.open || application.helpOpen || application.settingsOpen || application.pickerOpen || application.serversOpen ||
 		asked.unsavedOpen || asked.conflictOpen
 }
 
@@ -248,9 +249,8 @@ func (application *Window) buildMenu(context *ui.Context) {
 		if context.MenuItem("folder-open", "Open folder…", "o") {
 			application.pickerOpen = true
 		}
-		if context.MenuItem("sun-moon", "Light or dark", "t") {
-			application.dark = !application.dark
-			application.applyTheme(context)
+		if context.MenuItem("settings", "Settings…", "") {
+			application.settingsOpen = true
 		}
 		if context.MenuItem("keyboard", "Keys", "?") {
 			application.helpOpen = true

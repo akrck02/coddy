@@ -69,6 +69,7 @@ type formatting struct {
 	source    string
 	width     float32
 	look      draw2d.Color
+	syntax    *highlight.Palette // the theme's colours of code, so another theme lays it out again
 	charWidth float32
 	shapes    []shape
 	height    float32
@@ -97,7 +98,7 @@ func (view *Viewer) source() string {
 func (view *Viewer) layOutFormatted(context *ui.Context, window Window, area draw2d.Rectangle) *formatting {
 	width := min(area.Width-2*formattedMargin-pane.ScrollBarWidth, formattedWidth)
 	source, look := view.source(), window.Look()
-	if cached := view.formatting; cached != nil && cached.source == source && cached.width == width && cached.look == look.Editor &&
+	if cached := view.formatting; cached != nil && cached.source == source && cached.width == width && cached.look == look.Editor && cached.syntax == look.Syntax &&
 		cached.charWidth == view.charWidth {
 		return cached
 	}
@@ -108,7 +109,7 @@ func (view *Viewer) layOutFormatted(context *ui.Context, window Window, area dra
 		layout.block(block)
 		layout.gapAfter(blocks, index)
 	}
-	view.formatting = &formatting{source: source, width: width, look: look.Editor, charWidth: view.charWidth, shapes: layout.shapes, height: layout.y}
+	view.formatting = &formatting{source: source, width: width, look: look.Editor, syntax: look.Syntax, charWidth: view.charWidth, shapes: layout.shapes, height: layout.y}
 	return view.formatting
 }
 

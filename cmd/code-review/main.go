@@ -20,6 +20,7 @@ import (
 	"github.com/akrck02/code-review/internal/files"
 	"github.com/akrck02/code-review/internal/lsp"
 	"github.com/akrck02/code-review/internal/review"
+	"github.com/akrck02/code-review/internal/theme"
 	"github.com/akrck02/code-review/internal/uses"
 	"github.com/akrck02/code-review/internal/window"
 	"github.com/akrck02/code-review/internal/workspace"
@@ -34,6 +35,7 @@ const (
 	onlyChangedPreference = "only-changed"
 	readOnlyPreference    = "read-only"
 	serverDataPreference  = "server-data"
+	themePreference       = "theme"
 )
 
 func main() {
@@ -69,7 +71,7 @@ func registerFlags() commandLine {
 	asked := commandLine{
 		base:        flag.String("base", "", "compare every project against this branch, tag or commit (default: each one's main or master)"),
 		committed:   flag.Bool("committed", false, "compare the last commit only, leaving out changes not committed yet"),
-		light:       flag.Bool("light", false, "start in the light theme"),
+		light:       flag.Bool("light", false, "start in the light theme, One Light (the theme is chosen in the settings otherwise, and remembered)"),
 		open:        flag.String("open", "", "open this file at the start, as project/path/in/it"),
 		find:        flag.String("find", "", "open the finder at the start, searching the files' content for this text"),
 		reviewing:   flag.Bool("review", false, "start in the review mode: the changed files, as diffs"),
@@ -98,17 +100,20 @@ func settingsOf(asked commandLine, options platform.Options) window.Settings {
 		}
 	}
 	return window.Settings{
-		Folders:     folders,
-		Base:        *asked.base,
-		WorkingTree: !*asked.committed,
-		Dark:        options.Dark || !*asked.light,
-		OnlyChanged: onlyChanged(*asked.allProjects),
-		Open:        *asked.open,
-		Find:        *asked.find,
-		Mode:        startMode(*asked.reviewing),
-		Synchronous: options.CapturePath != "",
-		ReadOnly:    readOnly(*asked.readOnly),
-		Servers:     serversFor(options.CapturePath, *asked.serverMemory, *asked.keepIndexes),
+		Folders:      folders,
+		Base:         *asked.base,
+		WorkingTree:  !*asked.committed,
+		Theme:        themeName(*asked.light),
+		Dark:         options.Dark || !*asked.light,
+		Themes:       themes(),
+		ThemesFolder: theme.Folder(),
+		OnlyChanged:  onlyChanged(*asked.allProjects),
+		Open:         *asked.open,
+		Find:         *asked.find,
+		Mode:         startMode(*asked.reviewing),
+		Synchronous:  options.CapturePath != "",
+		ReadOnly:     readOnly(*asked.readOnly),
+		Servers:      serversFor(options.CapturePath, *asked.serverMemory, *asked.keepIndexes),
 		// what language servers wrote stays theirs after a restart
 		ServersWrote: workspace.DefaultWrittenPath(),
 		ServerData:   serverData(*asked.serverData),
@@ -142,6 +147,7 @@ func run(options platform.Options, reader *window.Window) {
 		reader.Closed()
 		_ = platform.KeepPreference(onlyChangedPreference, fmt.Sprint(reader.OnlyChanged()))
 		_ = platform.KeepPreference(readOnlyPreference, fmt.Sprint(reader.ReadOnly()))
+		_ = platform.KeepPreference(themePreference, reader.ThemeName())
 		_ = platform.KeepPreference(foldersPreference, strings.Join(reader.Folders(), "\n"))
 	}
 	if err := platform.Run(options, func(context *ui.Context) { reader.Build(context) }); err != nil {
@@ -157,6 +163,26 @@ func onlyChanged(allProjects bool) bool {
 	}
 	remembered, found := platform.Preference(onlyChangedPreference)
 	return !found || remembered != "false"
+}
+
+// themeName is the theme to start in: One Light when -light asks, else the one chosen last time;
+// "" leaves it to the reader (One Dark).
+func themeName(light bool) string {
+	if light {
+		return theme.DefaultLight
+	}
+	remembered, _ := platform.Preference(themePreference)
+	return remembered
+}
+
+// themes are the reader's own themes and the person's, from the themes folder; a file that cannot
+// be read is told, and left out.
+func themes() []theme.Theme {
+	found, problems := theme.Load(theme.Folder())
+	for _, problem := range problems {
+		log.Printf("theme %v", problem)
+	}
+	return found
 }
 
 // serverData is the folder the servers keep their indexes in: the one -server-data names, kept

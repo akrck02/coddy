@@ -26,7 +26,14 @@ type Settings struct {
 	Folders     []string // repositories, or folders of repositories, to open
 	Base        string   // the ref every project is compared against; empty = each one's default branch
 	WorkingTree bool     // count the changes not committed yet
-	Dark        bool
+	// Theme names the theme to start in, among Themes; when it is not there, Dark picks Zed's One
+	// Dark or One Light.
+	Theme string
+	Dark  bool
+	// Themes are the themes the settings offer; nil offers the reader's own.
+	Themes []theme.Theme
+	// ThemesFolder is the folder the settings say a person's own themes are read from.
+	ThemesFolder string
 	// OnlyChanged hides the projects the development did not change, in the sidebar and the finder.
 	OnlyChanged bool
 	// Open names a file to open at the start, as "project/path/in/it".
@@ -87,14 +94,17 @@ type Window struct {
 	// serverDetails are the servers whose card shows its projects and messages, by name
 	serverDetails map[string]bool
 	pickerOpen    bool
-	dark          bool
+	// themes are the themes the settings offer, and theme the one painting the window
+	themes []theme.Theme
+	theme  theme.Theme
+	// settingsOpen shows the settings
+	settingsOpen bool
 	// onlyChanged hides the projects with no changes, in the sidebar and the finder
 	onlyChanged bool
 	// modes are the ways of looking at the workspace, in the rail's order; mode is the one on
-	modes   []mode.Mode
-	mode    mode.Mode
-	look    theme.Look
-	designs theme.Designs
+	modes []mode.Mode
+	mode  mode.Mode
+	look  theme.Look
 	// classKinds are what the Java and Kotlin files declare, read as they come into sight;
 	// kindsWanted are those asked for since the last frame
 	classKinds  map[workspace.FileReference]java.ClassKind
@@ -131,14 +141,18 @@ func New(settings Settings, modes ...mode.Mode) (*Window, error) {
 		work:          newWork(settings.Synchronous),
 		documentCache: map[workspace.FileReference]*workspace.Document{},
 		tap:           &inputTap{},
-		dark:          settings.Dark,
 		onlyChanged:   settings.OnlyChanged,
 		focus:         sidebarPane,
-		designs:       theme.NewDesigns(),
 		servers:       newLanguageServers(settings.Servers, settings.ServersWrote),
 		classKinds:    map[workspace.FileReference]java.ClassKind{},
 	}
 	application.sidebar = sidebar.New()
+	application.themes = settings.Themes
+	if len(application.themes) == 0 {
+		application.themes = theme.BuiltIn()
+	}
+	application.theme = theme.Find(application.themes, settings.Theme, settings.Dark)
+	application.setLook()
 	application.sidebar.SetChangedFilter(settings.OnlyChanged)
 	application.startModes(modes, settings.Mode)
 	application.viewer = viewer.New()
@@ -164,14 +178,11 @@ func (application *Window) Driver() uidrive.Driver { return application.tap }
 // Folders are the folders opened, to remember them for the next time.
 func (application *Window) Folders() []string { return application.folders }
 
-// setLook picks the light or the dark look.
-func (application *Window) setLook() {
-	if application.dark {
-		application.look = application.designs.Dark
-	} else {
-		application.look = application.designs.Light
-	}
-}
+// setLook paints the window in the theme chosen.
+func (application *Window) setLook() { application.look = application.theme.Look }
+
+// ThemeName is the name of the theme chosen, to start in it the next time.
+func (application *Window) ThemeName() string { return application.theme.Name }
 
 // Closed tells the reader its window has closed, so work still running does not wake it, and
 // stops the language servers.

@@ -22,7 +22,7 @@ type window struct {
 	toast    string
 }
 
-func (fake *window) Look() theme.Look                        { return theme.NewDesigns().Dark }
+func (fake *window) Look() theme.Look                        { return theme.BuiltIn()[0].Look }
 func (fake *window) Projects() []*workspace.Project          { return fake.projects }
 func (fake *window) Hidden(*workspace.Project) bool          { return false }
 func (fake *window) ChangedFiles() []workspace.FileReference { return nil }

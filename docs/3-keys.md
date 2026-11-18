@@ -30,7 +30,6 @@ below, an F-key or `Esc`. `Esc` gives the keyboard back to the sidebar, where th
 | `o` (`⌘⌥O`) | Open a repository or a folder of repositories |
 | `⌘+` / `⌘-`, `⌘0`, or `⌘` and the wheel over the code | Larger / smaller code, or its first size |
 | `y` (`⌘⇧C`) | Copy the open file's path |
-| `t` (`⌘⇧T`) | Light or dark |
 | `l` (`⌘⇧L`) | Read-only, or editing |
 | `⌘B` (`F12`), or `⌘`-click | Go to where the name at the caret (or clicked) is declared; on the declaration, its uses |
 | `⌥F7` (`⇧F12`) | Every use of the name at the caret (or clicked), in the uses mode |

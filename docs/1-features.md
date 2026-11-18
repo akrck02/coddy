@@ -129,6 +129,13 @@ The interface follows what review tools have settled on, and keeps colour for me
   for the window and the code alike: neutral greys, the editor a step apart from the panels around
   it, green, amber and red only for added, changed and removed, blue only for where you are.
   Bubble 4 gives the shapes, spacing and type.
+- **Themes**, chosen in the settings (`…` → Settings) and remembered: Zed's One Dark and One Light,
+  and IntelliJ's Dark, Light and Darcula, come with it. Your own are Zed's theme files: drop any
+  of them (a theme family, `.json`) in `~/Library/Application Support/code-review/themes/` and it
+  is listed the next time the reader starts; one with the name of a theme of the reader takes its
+  place. The reader takes the colours it paints with from the file's `style` (`text`,
+  `editor.background`, `created`, `modified`, `deleted`…) and its `syntax`, and makes up those a
+  file leaves out from the text and the editor's ground.
 - **Changes marked in the gutter** while reading a whole file, and a map of them along the scroll
   bar, as [Zed's git integration](https://zed.dev/docs/git.html) does.
 - **Words that changed inside a line** are marked over the line's wash, as most diff tools do; the

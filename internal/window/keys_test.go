@@ -220,8 +220,6 @@ func stateShortcuts() []shortcut {
 			holds: func(application *Window) string {
 				return unless(!application.settings.WorkingTree, "the changes not committed are still counted")
 			}},
-		{name: "t switches the theme", press: pressing(input.KeyT),
-			holds: func(application *Window) string { return unless(application.dark, "the theme is still light") }},
 		{name: "y copies the path of the file open", open: "lighthouse/src/lamp.go", press: pressing(input.KeyY),
 			copies: "lighthouse/src/lamp.go"},
 	}

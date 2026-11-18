@@ -185,11 +185,6 @@ var commands = []command{
 		do: func(application *Window, _ *ui.Context, _ int) {
 			application.setReadOnly(!application.settings.ReadOnly)
 		}},
-	{description: "Light or dark", keys: []pane.Press{pane.Key(input.KeyT, "t"), pane.CommandShiftKey(input.KeyT, "⌘⇧T")},
-		do: func(application *Window, context *ui.Context, _ int) {
-			application.dark = !application.dark
-			application.applyTheme(context)
-		}},
 	{description: "Larger / smaller code, or its first size (or ⌘ and the wheel over the code)",
 		keys: []pane.Press{{Key: input.KeyPlus, Command: true, Label: "⌘+", Step: 1}, {Key: input.KeyMinus, Command: true, Label: "⌘-", Step: -1},
 			{Key: input.Key0, Command: true, Label: "⌘0", Step: 0}},
