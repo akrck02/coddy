@@ -54,6 +54,9 @@ type languageServers struct {
 	// stopping are the servers stopped that have not ended yet, by key: one starts again only once
 	// the other has, as jdtls saves its workspace in the data folder they share as it stops
 	stopping map[string]bool
+	// cannotImport says, by project folder, why a server that imports builds leaves it out ("" for
+	// none), worked out once per project as it reads the disk
+	cannotImport map[string]string
 }
 
 // startWait is how long a server gets to start and answer initialize.
@@ -67,7 +70,7 @@ func newLanguageServers(table []lsp.Server, writtenPath string) languageServers 
 		told: map[string]told{}, missing: map[string]bool{}, failed: map[string]string{}, crashes: map[string]int{}, snapshots: map[string]*workspace.Snapshot{},
 		written: workspace.OpenWritten(writtenPath), adding: map[string]bool{}, roots: map[string]string{},
 		inSight: map[string][]string{}, restarting: map[string]string{}, resting: map[string]string{}, rest: serverRest, usage: map[string]serverUsage{},
-		queued: map[string]string{}, stopping: map[string]bool{}}
+		queued: map[string]string{}, stopping: map[string]bool{}, cannotImport: map[string]string{}}
 }
 
 // serverKey names a server running in a root ("" for one per window).
@@ -346,17 +349,31 @@ func (application *Window) foldersFor(server lsp.Server) []string {
 	folders, worked := application.servers.inSight[server.Name]
 	if !worked {
 		for _, project := range application.projects {
-			if (server.ReadsAll || !application.hidden(project)) && hasFileOf(project, server) {
+			if (server.ReadsAll || !application.hidden(project)) && hasFileOf(project, server) && application.importable(server, project.Path) {
 				folders = append(folders, project.Path)
 			}
 		}
 		application.servers.inSight[server.Name] = folders
 	}
 	view := &application.viewer
-	if view.IsOpen() && view.Project != nil && !slices.Contains(folders, view.Project.Path) {
+	if view.IsOpen() && view.Project != nil && !slices.Contains(folders, view.Project.Path) && application.importable(server, view.Project.Path) {
 		folders = append(slices.Clip(folders), view.Project.Path)
 	}
 	return folders
+}
+
+// importable tells whether a server can read a project: one that imports Gradle builds leaves out
+// those it would fail to import each time it starts (lsp.CannotImport), noting why.
+func (application *Window) importable(server lsp.Server, project string) bool {
+	if !server.OwnGradle {
+		return true
+	}
+	why, known := application.servers.cannotImport[project]
+	if !known {
+		why = lsp.CannotImport(project)
+		application.servers.cannotImport[project] = why
+	}
+	return why == ""
 }
 
 // hasFileOf tells whether a project has a file a server reads.

@@ -35,6 +35,7 @@ const (
 	onlyChangedPreference = "only-changed"
 	readOnlyPreference    = "read-only"
 	serverDataPreference  = "server-data"
+	sidebarPreference     = "sidebar-folded"
 	themePreference       = "theme"
 )
 
@@ -113,7 +114,9 @@ func settingsOf(asked commandLine, options platform.Options) window.Settings {
 		Mode:         startMode(*asked.reviewing),
 		Synchronous:  options.CapturePath != "",
 		ReadOnly:     readOnly(*asked.readOnly),
-		Servers:      serversFor(options.CapturePath, *asked.serverMemory, *asked.keepIndexes),
+		// a capture shows the sidebar, whatever was left last time
+		SidebarFolded: options.CapturePath == "" && remembered(sidebarPreference),
+		Servers:       serversFor(options.CapturePath, *asked.serverMemory, *asked.keepIndexes),
 		// what language servers wrote stays theirs after a restart
 		ServersWrote: workspace.DefaultWrittenPath(),
 		ServerData:   serverData(*asked.serverData),
@@ -147,6 +150,7 @@ func run(options platform.Options, reader *window.Window) {
 		reader.Closed()
 		_ = platform.KeepPreference(onlyChangedPreference, fmt.Sprint(reader.OnlyChanged()))
 		_ = platform.KeepPreference(readOnlyPreference, fmt.Sprint(reader.ReadOnly()))
+		_ = platform.KeepPreference(sidebarPreference, fmt.Sprint(reader.SidebarFolded()))
 		_ = platform.KeepPreference(themePreference, reader.ThemeName())
 		_ = platform.KeepPreference(foldersPreference, strings.Join(reader.Folders(), "\n"))
 	}
@@ -197,6 +201,12 @@ func serverData(asked string) string {
 	}
 	remembered, _ := platform.Preference(serverDataPreference)
 	return remembered
+}
+
+// remembered tells whether a yes-or-no preference was left on last time.
+func remembered(preference string) bool {
+	value, found := platform.Preference(preference)
+	return found && value == "true"
 }
 
 // readOnly tells whether to start read-only: when -read-only asks, or the person chose it last

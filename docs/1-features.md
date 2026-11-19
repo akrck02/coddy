@@ -6,7 +6,7 @@ It has two modes, chosen on the rail at the far left (or with `1`, `2`, `c`):
   ones named in colour (green added, amber modified, red deleted), and a file opens whole with its
   changes marked beside the line numbers, as Zed marks them: a bar for lines added or changed, a
   wedge where lines were removed. A Markdown file opens formatted, as it reads: headings, lists
-  and tasks, quotes, coloured code, tables and links. The eye in its header turns that off, to
+  and tasks, quotes, coloured code, tables and links. The eye in the bar at the top turns that off, to
   read its text, its changes, or to edit it.
 - **Review** is for going through a development: only the changed files, each with the lines it
   adds and removes, opened as diffs. `v` marks the file as viewed and opens the next one not viewed;
@@ -35,6 +35,15 @@ It has two modes, chosen on the rail at the far left (or with `1`, `2`, `c`):
   show every project and file; the choice is remembered.
 - **A filter over the sidebar** (`⌘F`) lists only the files whose path holds each of its words,
   folders open, and the projects it names, whole; Enter takes the keyboard to the first file found.
+- **One bar at the top, for what is in front**: the file open, named by its path with how it
+  changed, or the workspace while none is open; the search in the middle; and the buttons of the
+  mode on. The review's (the changes' arrows, folding, the diff or the whole file, viewed, the
+  changes counted and the base) are there only in the Review mode; the others have the lock.
+- **What is the review's stays in the review**: the Viewed button, `v` and how much was viewed
+  in the status bar exist only in the Review mode.
+- **The sidebar folds away** (`s`, or the panel button at the foot of the rail), and the file takes
+  its room; it comes back when the keyboard goes to it (`Tab`, `⌘F`, `Esc`), and stays folded the
+  next time if it was left so.
 - **Every other file stays readable**: the *Files* mode lists them all, and the finder finds them.
 - **Enter a project** to see only its tree, from its top (Enter on its row, `e`, or the → that
   shows on its row under the pointer); `Esc` goes back to every project.
@@ -65,10 +74,16 @@ It has two modes, chosen on the rail at the far left (or with `1`, `2`, `c`):
   build, minutes the first time) a question waits for it. A bolt at the right of the status bar
   says how names are followed: crossed out and quiet while no server answers and only the text
   is searched, in the accent with a ring of how far the servers are while they read the projects,
-  green once they are ready, with a warning's dot when one cannot run. A click on it lists each
+  green once they are ready, with a warning's dot when one cannot run. Beside it, the first server
+  at work says what it does in a few words (*Kotlin · importing 9/16 · ~1 min*): the time left is
+  told by how long it took the time before, kept in its data folder. A click on it lists each
   server and its state, and *Details…* opens the servers panel: a card for each, with its state, a
-  bar of how far it is, and its projects and last messages under *Show details*. The status bar's
-  left shows, as icons, the files changed, the projects with changes, and how much was viewed. Servers
+  bar of how far it is, how long it took last time, its Gradle daemons running or released, the
+  projects it leaves out with why, and its projects and last messages under *Show details*. A
+  project the servers leave out is told three ways: *N left out* in the status bar, in the warning
+  colour, which opens the panel; a crossed-out bolt on its row in the sidebar, whose note says why
+  and that its uses are found by their text; and the panel's list. The status bar's
+  left shows, as icons, the files changed, the projects with changes, and in the Review mode how much was viewed. Servers
   start once the projects are read, and read only the projects in sight.
 - **A mode for the uses of a name** (`⌥F7`, or `3` once a search was made): the sidebar lists only
   the files that use it, by project, the name's own first, then those with changes, each with its
@@ -89,9 +104,9 @@ It has two modes, chosen on the rail at the far left (or with `1`, `2`, `c`):
   The graphs zoom with the wheel, move with a drag, and `0` fits them in again.
 - **Servers that leave nothing behind**:
   - Indexes go in the reader's own folder, or in the one `-server-data` names (another disk; the
-    choice is remembered). `kotlin-lsp` builds one index per set of projects, about 5 GB for 44
-    repositories, so it reads every Kotlin project of the window, whatever the filter shows, and
-    imports them once. `jdtls` too reads every Java project of the window from its start: it drops
+    choice is remembered). `kotlin-lsp` keeps one index for every set of projects, in its data
+    folder (it would keep one per set in `~/Library/Caches/JetBrains` otherwise), and reads every
+    Kotlin project of the window, whatever the filter shows, importing them once. `jdtls` too reads every Java project of the window from its start: it drops
     from its workspace the projects it was not started with, and would import each again with
     Gradle as a search of uses reached it. The reader keeps the index used last (`-keep-indexes` keeps more), and
     does not start it on a disk with less than 10 GB free, saying why.
@@ -99,11 +114,18 @@ It has two modes, chosen on the rail at the far left (or with `1`, `2`, `c`):
     its data folder, and it builds nothing into `bin/` or `target/`.
   - `kotlin-lsp` imports with a Gradle home of its own, in its data folder, holding only its
     daemons and their settings: its caches, Gradle versions and JDKs are yours, linked, so
-    nothing is downloaded or made twice. Its Gradle daemons stop two minutes after their last
-    build, and with the server, never touching yours.
+    nothing is downloaded or made twice. Its Gradle daemons live through the whole import, and
+    are stopped once the server is ready and quiet for 20 seconds, and with the server, never
+    touching yours.
+  - A server that imports Gradle builds is not given a build it cannot import, which would fail on
+    every start: one needing Gradle 4 or older (it runs on Java 8 to 10 only), or an Android app
+    when the Android SDK is not installed. Text search still reads them.
+  - `kotlin-lsp` answers as soon as it starts and begins importing seconds later, answering with
+    nothing meanwhile: the reader takes it as ready only once that first work is done.
   - Each Java server takes at most 2 GB of memory (`-server-memory` changes it).
   - A server nobody asks anything for 15 minutes rests, giving its memory back; following a name
-    or asking its uses starts it again, from its index. The servers panel shows what each takes,
+    or asking its uses starts it again, from its index. A server still importing never rests, and
+    is not restarted for the projects in sight: a cut import makes the next one start cold. The servers panel shows what each takes,
     memory and index, and stops one.
 - **What a server writes is not your change**: `kotlin-lsp`'s Gradle import writes `.gradle/` and
   `build/`, as a build does, and `jdtls` wrote `.project` and `.classpath` before it was told not
@@ -112,7 +134,7 @@ It has two modes, chosen on the rail at the far left (or with `1`, `2`, `c`):
   counts and the progress. A dashed badge on the project, `kotlin-lsp · 4`, lists those files to open
   them, and the reader remembers them after a restart. Edits a server asks to make
   (`workspace/applyEdit`) are refused.
-- **A read-only mode**: the lock in the title bar, `⌘⇧L` or `-read-only` turn editing off, and
+- **A read-only mode**: the lock in the title bar (in the Files and Uses modes), `⌘⇧L` or `-read-only` turn editing off, and
   the choice is remembered.
 - **Writes a file only when you save it; git only reads.** Language servers may write their own
   files, shown apart as above. It only runs `git cat-file`, `diff`,

@@ -119,6 +119,10 @@ func (uses *Mode) SetUses(name string, home int, found []mode.Use, note string) 
 	uses.window.Relist()
 }
 
+// SetUsesNote says again how the search goes, the uses unchanged: the note changes with the
+// servers' progress, many times a second, and the uses need not be laid out again for it.
+func (uses *Mode) SetUsesNote(note string) { uses.note = note }
+
 // sortUses orders the uses: the name's own project first, then the projects with changes, then
 // the others; in each, by file and line.
 func (uses *Mode) sortUses() {

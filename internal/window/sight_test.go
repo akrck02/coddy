@@ -1,8 +1,10 @@
 package window
 
 import (
+	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -91,5 +93,29 @@ func TestAServerWithAnIndexPerSetReadsEveryProjectWhateverIsInSight(test *testin
 	window.Frames(2)
 	if application.servers.running["fakels"] != first {
 		test.Error("the filter started the server again")
+	}
+}
+
+func TestAServerThatImportsBuildsLeavesOutABuildItCannotImport(test *testing.T) {
+	folder, log := makeRepository(test), filepath.Join(test.TempDir(), "log")
+	addHarbour(test, folder)
+	wrapper := filepath.Join(folder, "harbour", "gradle", "wrapper")
+	_ = os.MkdirAll(wrapper, 0o755)
+	_ = os.WriteFile(filepath.Join(wrapper, "gradle-wrapper.properties"),
+		[]byte("distributionUrl=https\\://services.gradle.org/distributions/gradle-4.10.3-bin.zip\n"), 0o644)
+	servers := []lsp.Server{{Name: "fakels", Command: fakeServer(test), Languages: []string{"go"}, OnePerWindow: true,
+		ReadsAll: true, OwnGradle: true, Environment: []string{"FAKE_LSP_LOG=" + log}}}
+	application := newReader(Settings{Folders: []string{folder}, WorkingTree: true, Synchronous: true,
+		Open: "lighthouse/src/lamp.go", Servers: servers})
+	test.Cleanup(application.stopServers)
+	window := newWindow(test, application)
+	window.Frames(2)
+	client := application.servers.running["fakels"]
+	harbour := filepath.Join(folder, "harbour")
+	if client == nil || slices.Contains(client.Folders(), harbour) || !slices.Contains(client.Folders(), filepath.Join(folder, "lighthouse")) {
+		test.Fatalf("the server reads %v: want lighthouse, without harbour's Gradle 4 build", folderList(client))
+	}
+	if why := application.servers.cannotImport[harbour]; !strings.Contains(why, "Gradle 4.10.3") {
+		test.Errorf("the reader notes harbour is left out for %q", why)
 	}
 }

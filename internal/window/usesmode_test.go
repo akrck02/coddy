@@ -197,3 +197,47 @@ func TestAFileNamesADeclarationByItsImportOrItsPackage(test *testing.T) {
 		}
 	}
 }
+
+// The note of a search changes with each word of a server's progress: saying it again must not lay
+// out the uses, the sidebar and the marks again, which made the uses mode crawl.
+func TestANewNoteAloneDoesNotLayTheUsesOutAgain(test *testing.T) {
+	application, window := readerOfUses(test)
+	search := application.uses
+	if search == nil {
+		test.Fatal("no search of uses")
+	}
+	window.Frames(2)
+	application.sidebar.Stale = false
+	search.unchecked++ // the note says one more place no server reads; the uses are the same
+	application.noteUses(search)
+	if application.sidebar.Stale {
+		test.Error("a new note laid the uses out again: the sidebar is listed again")
+	}
+	holder, _ := application.usesHolder()
+	if holder == nil || !strings.Contains(search.noted, "in files no server reads") {
+		test.Errorf("the note shown is %q", search.noted)
+	}
+	search.found["somewhere:9"] = lsp.Location{}
+	application.noteUses(search)
+	if !application.sidebar.Stale {
+		test.Error("a use found was not laid out")
+	}
+}
+
+// A long note on the search is cut before the views' buttons: it pushed them out of the window.
+func TestALongNoteLeavesTheViewsButtonsInSight(test *testing.T) {
+	application, window := readerOfUses(test)
+	holder, held := application.usesHolder()
+	if !held {
+		test.Fatal("the uses mode is not on")
+	}
+	holder.SetUsesNote(strings.Repeat("some wait for kotlin-lsp · importing platform.libs.utils (4 of 17) · ", 6))
+	window.Frames(2)
+	button, err := window.Element("Who uses the name (⇧2)")
+	if err != nil {
+		test.Fatalf("the views' graph button is not there: %v", err)
+	}
+	if right := button.Rect.X + button.Rect.Width; right > 1200 {
+		test.Errorf("the views' graph button ends at %v, past the window's 1200", right)
+	}
+}

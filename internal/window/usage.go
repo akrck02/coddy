@@ -11,6 +11,7 @@ import (
 type serverUsage struct {
 	memory, index int64
 	indexKnown    bool
+	daemons       int // the Gradle daemons of its own Gradle home running
 }
 
 // measureEvery is how often the servers panel measures the servers again.
@@ -33,6 +34,9 @@ func (application *Window) measureServers(now time.Time) {
 		for key, client := range clients {
 			usage := before[key]
 			usage.memory = lsp.MemoryOf(client.Process())
+			if client.Server.OwnGradle && client.DataFolder() != "" {
+				usage.daemons = lsp.GradleDaemons(client.DataFolder())
+			}
 			if !usage.indexKnown {
 				usage.index, usage.indexKnown = lsp.IndexesSize(client.DataFolder(), client.Server), true
 			}

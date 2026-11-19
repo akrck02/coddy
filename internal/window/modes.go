@@ -103,18 +103,27 @@ func (application *Window) declaredCommands(own bool) []command {
 	return result
 }
 
+// ownCommands are the keys of the mode on that are kept to it, for the help.
+func (application *Window) ownCommands() []command {
+	var own []command
+	for _, each := range application.declaredCommands(true) {
+		if each.applies(application) {
+			own = append(own, each)
+		}
+	}
+	return own
+}
+
 // allCommands are the keys of the mode that is on kept to it, then the window's, then the modes'.
 func (application *Window) allCommands() []command {
 	return append(append(application.declaredCommands(true), commands...), application.modeCommands()...)
 }
 
-// progress is how far the first mode with work to count has gone, for the status bar, with the
-// words the mode says it in.
+// progress is how far the mode on has gone in its work, for the status bar, with the words the
+// mode says it in; a mode with no work to count shows none.
 func (application *Window) progress() (done, total int, words string) {
-	for _, each := range application.modes {
-		if done, total = each.Progress(); total > 0 {
-			return done, total, each.Header()
-		}
+	if done, total = application.mode.Progress(); total > 0 {
+		return done, total, application.mode.Header()
 	}
 	return 0, 0, ""
 }

@@ -59,6 +59,9 @@ func TestTheHelpListsEveryCommand(test *testing.T) {
 	press(window, input.KeyF1)
 	shown := strings.Join(strings.Fields(strings.Join(window.Texts(), " ")), " ")
 	for _, command := range application.allCommands() {
+		if command.applies != nil && !command.applies(application) {
+			continue // a key of another mode, listed while that mode is on
+		}
 		if !strings.Contains(shown, command.description) {
 			test.Errorf("the help does not say %q", command.description)
 		}

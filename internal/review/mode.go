@@ -176,6 +176,8 @@ func (review *Mode) Commands() []mode.Command {
 	return []mode.Command{{
 		Description: "Mark the file as viewed and open the next one not viewed",
 		Keys:        []pane.Press{pane.Key(input.KeyV, "v"), pane.CommandShiftKey(input.KeyV, "⌘⇧V")},
+		// marking is the review's: the other modes have no viewed files
+		OnlyWhenOn: true,
 		Do: func(int) {
 			if file, inViewer, found := review.window.Target(); found {
 				review.Press(file, inViewer)

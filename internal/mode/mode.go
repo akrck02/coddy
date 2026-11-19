@@ -62,14 +62,19 @@ type UsesHolder interface {
 	// SetUses gives the uses of a name found so far, in the order to go through them, and a note
 	// on how the search goes; home is the project the name was asked in.
 	SetUses(name string, home int, uses []Use, note string)
+	// SetUsesNote says again how the search goes, the uses unchanged.
+	SetUsesNote(note string)
 	// UsesIn are the uses of a file to mark, by line from 1.
 	UsesIn(file workspace.FileReference) map[int][]workspace.Span
 }
 
-// Cover is a mode that may show something of its own over the viewer, such as a graph; it tells
-// whether it did.
+// Cover is a mode that may show something of its own over the viewer, such as a graph;
+// BuildOverViewer tells whether it did.
 type Cover interface {
 	BuildOverViewer(context *ui.Context) bool
+	// Covers tells whether the mode shows something of its own over the viewer now, the file
+	// out of sight.
+	Covers() bool
 }
 
 // Window is what a mode needs from the window it works in.

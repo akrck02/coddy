@@ -25,6 +25,10 @@ type Server struct {
 	// projects (jdtls's ServiceReady); until then requests wait. Without it, a server is ready
 	// once initialized.
 	ReadyStatus string
+	// ReadyAfterWork makes a server without ReadyStatus ready once the first work it reports ends
+	// (kotlin-lsp, whose import begins seconds after it is initialized, and which answers with
+	// nothing meanwhile), or after workGrace if it reports none.
+	ReadyAfterWork bool
 	// Options are the server's own initializationOptions, as it documents them.
 	Options map[string]any
 	// Settings are the server's settings, by section as workspace/configuration asks them
@@ -42,6 +46,11 @@ type Server struct {
 	// last and removes the others before it starts the server.
 	Indexes     string
 	KeepIndexes int
+	// IndexOption, when set, is the initialization option that names where the server keeps its
+	// indexes: the reader gives it its data folder. kotlin-lsp 271 keeps them in the person's
+	// caches otherwise (~/Library/Caches/JetBrains/IntelliJServer), whatever --system-path says,
+	// where the reader neither keeps one nor removes the old.
+	IndexOption string
 	// OwnGradle gives a server that imports Gradle builds a Gradle home of its own, in its data
 	// folder, whose daemons stop soon after it and with it (gradle.go).
 	OwnGradle bool
@@ -85,18 +94,19 @@ var Servers = []Server{
 		Memory: "2g", MemoryFlag: "--jvm-arg=-Xmx", OwnGradle: true},
 	// JetBrains' server, still a preview. It imports each Gradle build first (minutes, cold) and
 	// answers with nothing meanwhile, telling its work by $/progress; a name in a jar answers
-	// jar:///…!/package/Class.class. Its index goes in the system path; Gradle's import writes
-	// .gradle/ and build/ in the project, as a build does. It follows workspace folders added and
-	// removed, keeping the index of the set it started with.
+	// jar:///…!/package/Class.class. Gradle's import writes .gradle/ and build/ in the project, as
+	// a build does. It follows workspace folders added and removed.
 	{Name: "kotlin-lsp", Command: "kotlin-lsp", Arguments: []string{"--stdio"}, DataFlag: "--system-path",
 		Languages: []string{"kotlin"}, OnePerWindow: true, Install: "brew install JetBrains/utils/kotlin-lsp",
-		// an index per set of projects it starts with, about 5 GB for 44 repositories: it reads them all,
-		// whatever is in sight, so one index serves, and the reader keeps the one used last
-		Indexes: "workspaces", KeepIndexes: 1, ReadsAll: true, OwnGradle: true, NeedsFree: 10 << 30,
-		Memory: "2g", MemoryVariable: "IJ_JAVA_OPTIONS", After: []string{"jdtls"},
-		// it imports every Gradle build at once, each in a daemon of its own that no import
-		// uses again: told so, each daemon stops as its import ends, instead of idling
-		JVMOptions: []string{"-Dcom.jetbrains.ls.imports.gradle.daemon.no.idle.timeout=true"}},
+		// up to 263 it built an index per set of projects it started with, in the system path's
+		// workspaces/; since 271 that went to the person's caches, ~/Library/Caches/JetBrains/
+		// IntelliJServer/workspaces, one per set again, 12 GB in a day. Given indexDir it keeps one
+		// database for every set, rocks/, in the reader's data folder
+		Indexes: "rocks", KeepIndexes: 1, IndexOption: "indexDir", ReadsAll: true, OwnGradle: true, NeedsFree: 10 << 30, ReadyAfterWork: true,
+		// no -Dcom.jetbrains.ls.imports.gradle.daemon.no.idle.timeout: it gives each daemon an idle
+		// time of 1 ms, so none was used twice (148 times on the big workspace); the reader stops its daemons
+		// itself once the import is done (gradle.go)
+		Memory: "2g", MemoryVariable: "IJ_JAVA_OPTIONS", After: []string{"jdtls"}},
 }
 
 // setting is the value of a section of settings, "java" or "java.import", if there is one.

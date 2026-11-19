@@ -71,6 +71,12 @@ func (client *Client) noteProgress(params json.RawMessage) {
 		return
 	}
 	token, value := string(progress.Token), progress.Value
+	finished := false
+	defer func() { // after the lock is let go: becoming ready takes it
+		if finished && client.Server.ReadyAfterWork {
+			client.becomeReady()
+		}
+	}()
 	client.lock.Lock()
 	defer client.lock.Unlock()
 	defer client.changed()
@@ -80,7 +86,7 @@ func (client *Client) noteProgress(params json.RawMessage) {
 	case "end":
 		delete(client.working, token)
 		if len(client.working) == 0 {
-			client.idleAt = time.Now()
+			client.idleAt, finished = time.Now(), true
 		}
 		return
 	}
@@ -356,4 +362,26 @@ func (client *Client) QuietSince() time.Time {
 		}
 	}
 	return quiet
+}
+
+// workGrace is how long a server ready after its first work (ReadyAfterWork) may take to begin
+// it: kotlin-lsp began importing 10 to 24 s after it was initialized on the big workspace.
+const workGrace = 45 * time.Second
+
+// readyWithoutWork makes a server ready after its first work ready anyway when, workGrace after it
+// started, it has begun none: it has nothing to import.
+func (client *Client) readyWithoutWork() {
+	timer := time.NewTimer(workGrace)
+	defer timer.Stop()
+	select {
+	case <-client.exited:
+		return
+	case <-timer.C:
+	}
+	client.lock.Lock()
+	begun := len(client.working) > 0 || len(client.imported) > 0
+	client.lock.Unlock()
+	if !begun {
+		client.becomeReady()
+	}
 }

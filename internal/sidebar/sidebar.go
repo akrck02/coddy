@@ -84,7 +84,9 @@ type Sidebar struct {
 	trees    map[treeKey]*workspace.Folder
 	Rows     []Row
 	// badges are where each project's badge of server files was painted last, by row
-	badges   map[int][2]float32
+	badges map[int][2]float32
+	// leftOut are where each project's mark of being left out of the servers was painted last
+	leftOut  map[int][2]float32
 	Stale    bool
 	Selected int
 	list     pane.Scroller
@@ -545,6 +547,8 @@ func (sidebar *Sidebar) followPointer(context *ui.Context, window Window) {
 	switch {
 	case sidebar.onBadge(index, x):
 		window.ShowServerFiles(row.Project)
+	case sidebar.onLeftOutMark(index, x):
+		window.(LeftOuter).ShowServers()
 	case sidebar.onEnter(index, x):
 		sidebar.Enter(window, row.Project)
 	case sidebar.onCheck(index, x):

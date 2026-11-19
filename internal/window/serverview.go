@@ -33,6 +33,7 @@ type serverView struct {
 	fraction  float32 // how far, from 0 to 1; -1 when it cannot be told
 	progress  lsp.Progress
 	why       string // why it does not run, for one that does not
+	leftOut   []leftOutProject
 }
 
 // serverViews are every server the window knows of, running first, each once, by name.
@@ -46,7 +47,9 @@ func (application *Window) serverViews() []serverView {
 		}
 	}
 	for key, client := range servers.running {
-		add(runningView(key, client))
+		view := runningView(key, client)
+		view.leftOut = application.leftOutOf(client.Server)
+		add(view)
 	}
 	for key := range servers.starting {
 		add(serverView{key: key, name: strings.Fields(key)[0], state: serverStarting, headline: "Starting", fraction: -1})

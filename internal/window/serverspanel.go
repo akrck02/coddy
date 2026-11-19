@@ -1,6 +1,7 @@
 package window
 
 import (
+	"fmt"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -101,6 +102,8 @@ func (application *Window) buildServerCard(context *ui.Context, view serverView)
 			return
 		}
 		context.Text(application.cardFacts(view), quiet)
+		application.buildGradleLine(context, view)
+		buildLeftOut(context, view.leftOut)
 		if activity := strings.TrimSpace(view.progress.Detail); activity != "" && view.state != serverReady {
 			if fitted := theme.FitText(context, activity, quiet, serversPanelWidth-80); fitted != "" {
 				context.Text(fitted, ui.TextStyle{Size: palette.SmallTextSize, Color: palette.InkQuiet})
@@ -121,6 +124,9 @@ func (application *Window) buildCardHead(context *ui.Context, view serverView) {
 		context.Text(view.headline, ui.TextStyle{Color: palette.InkSoft})
 		context.Spacer()
 		if elapsed := view.elapsed(time.Now()); elapsed != "" {
+			if last := lastTime(view); last != "" {
+				elapsed += " · " + last
+			}
 			context.Text(elapsed, ui.TextStyle{Size: palette.SmallTextSize, Color: palette.InkQuiet, Weight: draw2d.Mono})
 		}
 		if view.client != nil && context.Button("Stop##"+view.key) {
@@ -205,4 +211,54 @@ func plural(count int, thing string) string {
 		return "1 " + thing
 	}
 	return strconv.Itoa(count) + " " + thing + "s"
+}
+
+// buildGradleLine says what a server that imports Gradle builds does with Gradle: its daemons
+// running, or those the reader stopped once it was done importing.
+func (application *Window) buildGradleLine(context *ui.Context, view serverView) {
+	if !view.client.Server.OwnGradle {
+		return
+	}
+	palette := context.Theme
+	quiet := ui.TextStyle{Size: palette.SmallTextSize, Color: palette.InkSoft}
+	running := application.servers.usage[view.key].daemons
+	released, at := view.client.Released()
+	switch {
+	case running > 0:
+		context.Box(ui.Layout{Gap: 6, AlignY: ui.Center}, func() {
+			context.IconSized("cog", 12, palette.InkSoft)
+			context.Text(fmt.Sprintf("Gradle: %s of its own running, stopped once it is done; yours are left alone", plural(running, "daemon")), quiet)
+		})
+	case released > 0:
+		context.Box(ui.Layout{Gap: 6, AlignY: ui.Center}, func() {
+			context.IconSized("check", 12, palette.Positive)
+			context.Text(fmt.Sprintf("Gradle stopped once done: %s released at %s", plural(released, "daemon"), at.Format("15:04")), quiet)
+		})
+	}
+}
+
+// buildLeftOut lists the projects a server leaves out, each with why: their uses are found by
+// their text only.
+func buildLeftOut(context *ui.Context, left []leftOutProject) {
+	if len(left) == 0 {
+		return
+	}
+	palette := context.Theme
+	context.Frame(ui.Layout{Width: ui.Grow(), Height: ui.Fixed(1)}, ui.Look{Fill: palette.Line}, nil)
+	context.Box(ui.Layout{Gap: 6, AlignY: ui.Center}, func() {
+		context.IconSized("zap-off", 12, palette.Warning)
+		context.Text(fmt.Sprintf("Left out of this server (%d): text only", len(left)), ui.TextStyle{Size: palette.SmallTextSize, Weight: draw2d.Medium, Color: palette.Warning})
+	})
+	small := ui.TextStyle{Size: palette.SmallTextSize, Color: palette.InkSoft}
+	measure := func(text string) float32 { return theme.TextWidth(context, text, small) }
+	for _, project := range left {
+		context.Box(ui.Layout{Width: ui.Grow(), Gap: 12}, func() {
+			context.Box(ui.Layout{Width: ui.Fixed(200)}, func() { context.Text(project.name, ui.TextStyle{Size: palette.SmallTextSize}) })
+			context.Box(ui.Layout{Direction: ui.Vertical, Width: ui.Grow()}, func() {
+				for _, line := range wrapLines([]string{capitalised(project.why) + "."}, serversPanelWidth-290, measure) {
+					context.Text(line, small)
+				}
+			})
+		})
+	}
 }

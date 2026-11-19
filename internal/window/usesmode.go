@@ -22,7 +22,7 @@ func (application *Window) usesHolder() (mode.UsesHolder, bool) {
 // (opening), or in the finder.
 func (application *Window) showUses(search *usesSearch, opening bool) {
 	note := application.usesNote(search)
-	search.noted = note
+	search.noted, search.shownUses = note, usesShown(search)
 	holder, held := application.usesHolder()
 	if !held {
 		if opening {
@@ -41,10 +41,29 @@ func (application *Window) showUses(search *usesSearch, opening bool) {
 }
 
 // noteUses says again how the search goes, when that changed.
+// Only a change of the uses lays them out again: the note alone changes with each word of a
+// server's progress, and laying out hundreds of uses, the sidebar and the marks for it each frame
+// made the uses mode crawl while kotlin-lsp imported.
 func (application *Window) noteUses(search *usesSearch) {
-	if application.usesNote(search) != search.noted {
+	if usesShown(search) != search.shownUses {
 		application.showUses(search, false)
+		return
 	}
+	note := application.usesNote(search)
+	if note == search.noted {
+		return
+	}
+	search.noted = note
+	if holder, held := application.usesHolder(); held {
+		holder.SetUsesNote(note)
+		return
+	}
+	application.finder.Note = note
+}
+
+// usesShown tells which uses a search has: how many found, probable and checked.
+func usesShown(search *usesSearch) [3]int {
+	return [3]int{len(search.found), len(search.probable), search.checked}
 }
 
 // modeUses are the uses found, as the uses mode keeps them, and the probable ones not checked yet.

@@ -392,16 +392,29 @@ func startIn(reviewing bool) string {
 	return ""
 }
 
-func TestAChangedFileCanBeMarkedAsViewedFromTheFilesMode(test *testing.T) {
+func TestTheFilesModeHasNothingOfTheReview(test *testing.T) {
 	application := newReader(Settings{Folders: []string{makeRepository(test)}, WorkingTree: true, Synchronous: true,
 		Open: "lighthouse/src/lamp.go"})
-	newWindow(test, application)
+	window := newWindow(test, application)
 	file := workspace.FileReference{Project: 0, Path: "src/lamp.go"}
 	if application.mode.Name() != "Files" {
 		test.Fatalf("the reader started in the %s mode, want Files", application.mode.Name())
 	}
-	button, shown := application.FileButton(file)
-	if !shown || button.Tip != "Viewed (v)" {
-		test.Errorf("the files mode shows %+v (shown %t) in the header, want the Viewed button", button, shown)
+	if button, shown := application.FileButton(file); shown {
+		test.Errorf("the files mode shows the review's %q in the bar", button.Tip)
+	}
+	if _, total, _ := application.progress(); total > 0 {
+		test.Error("the files mode counts the files viewed in the status bar")
+	}
+	var reviewing *review.Mode
+	for _, each := range application.modes {
+		if found, isReview := each.(*review.Mode); isReview {
+			reviewing = found
+		}
+	}
+	application.focus = viewerPane
+	press(window, input.KeyV)
+	if reviewing.IsViewed(file) {
+		test.Error("v marked the file as viewed in the files mode")
 	}
 }

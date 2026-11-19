@@ -46,6 +46,11 @@ type Client struct {
 	// followsFolders tells whether the server says it follows workspace folders added and removed
 	// while it runs; one that does not reads those it started with.
 	followsFolders bool
+	// lastReading is how long the server took to read the projects the time before, to say how
+	// long it may take now; released, the Gradle daemons it stopped last, and when
+	lastReading time.Duration
+	released    int
+	releasedAt  time.Time
 }
 
 // Start runs a server in a root (or, with folders, for those workspace folders) and initializes
@@ -65,7 +70,7 @@ func Start(ctx context.Context, server Server, root string, folders []string, da
 	client := &Client{Server: server, Root: root, command: command, exited: make(chan struct{}), data: dataFolder, versions: map[string]int{}, folders: map[string]bool{},
 		ready: make(chan struct{}), working: map[string]*work{}, started: time.Now(), statusSince: time.Now(),
 		imported: map[string]time.Time{}, changes: make(chan struct{}, 1)}
-	if server.ReadyStatus == "" {
+	if server.ReadyStatus == "" && !server.ReadyAfterWork {
 		client.becomeReady()
 	}
 	client.conn = NewConn(output, input, client.handle)
@@ -76,6 +81,16 @@ func Start(ctx context.Context, server Server, root string, folders []string, da
 	if err := client.initialize(ctx, root, folders); err != nil {
 		client.kill()
 		return nil, err
+	}
+	if server.OwnGradle && dataFolder != "" {
+		go client.releaseGradle()
+	}
+	if server.ReadyAfterWork {
+		go client.readyWithoutWork()
+	}
+	if dataFolder != "" {
+		client.lastReading = LastReading(dataFolder)
+		go client.rememberReading()
 	}
 	return client, nil
 }
@@ -151,7 +166,8 @@ func (client *Client) initialize(ctx context.Context, root string, folders []str
 // workspace folders for a server that reads them there.
 func (client *Client) initializationOptions(folders []string) map[string]any {
 	server := client.Server
-	if server.Settings == nil && !server.FoldersInOptions {
+	ownIndex := server.IndexOption != "" && client.data != ""
+	if server.Settings == nil && !server.FoldersInOptions && !ownIndex {
 		return server.Options
 	}
 	options := maps.Clone(server.Options)
@@ -160,6 +176,9 @@ func (client *Client) initializationOptions(folders []string) map[string]any {
 	}
 	if server.Settings != nil {
 		options["settings"] = server.Settings
+	}
+	if ownIndex {
+		options[server.IndexOption] = client.data
 	}
 	if server.FoldersInOptions {
 		uris := make([]string, len(folders))

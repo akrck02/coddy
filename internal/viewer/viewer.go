@@ -437,8 +437,9 @@ func (view *Viewer) openFold(index int) {
 	view.layOut()
 }
 
-// Build adds the view: a header naming the file, and its text. With no file open it shows how to
-// start, unless the window has something of its own to show there.
+// Build adds the view: the file's text (the window's bar names it, with BuildTitle and
+// BuildButtons). With no file open it shows how to start, unless the window has something of its
+// own to show there.
 func (view *Viewer) Build(context *ui.Context, window Window) {
 	look := window.Look()
 	context.Frame(ui.Layout{Direction: ui.Vertical, Width: ui.Grow(), Height: ui.Grow()}, ui.Look{Fill: look.Editor}, func() {
@@ -449,8 +450,6 @@ func (view *Viewer) Build(context *ui.Context, window Window) {
 			view.buildEmpty(context, window)
 			return
 		}
-		view.buildHeader(context, window)
-		context.Frame(ui.Layout{Width: ui.Grow(), Height: ui.Fixed(1)}, ui.Look{Fill: look.Hover}, nil)
 		view.measure(context)
 		if view.Formatted() {
 			view.buildFormatted(context, window)
@@ -522,83 +521,6 @@ func (view *Viewer) buildEmpty(context *ui.Context, window Window) {
 			}
 		})
 	})
-}
-
-// buildHeader names the file as a path to it, the folders quiet and the name plain, and says how it
-// changed; on its right, the ways to show it.
-func (view *Viewer) buildHeader(context *ui.Context, window Window) {
-	context.Box(ui.Layout{Width: ui.Grow(), Height: ui.Fixed(40), Padding: ui.PadXY(16, 0), Gap: 6, AlignY: ui.Center}, func() {
-		document := view.Document
-		// a narrow view keeps the file's name and its buttons, and drops the project, the
-		// status's word and the language; the folder takes what is left, cut from its start
-		compact := view.List.Area.Width > 0 && view.List.Area.Width < 700
-		view.buildPath(context, compact)
-		if document == nil {
-			context.Caption("Reading…")
-			return
-		}
-		if document.Changed {
-			view.buildChange(context, compact)
-		}
-		context.Spacer()
-		if !compact {
-			context.Text(document.Language, ui.TextStyle{Size: context.Theme.SmallTextSize, Color: context.Theme.InkQuiet})
-		}
-		if view.IsMarkdown() && !document.Binary {
-			view.buildFormatSwitch(context)
-		}
-		if document.Changed && !view.Formatted() {
-			view.buildViewButtons(context, window, compact)
-		}
-	})
-}
-
-// pathRoom is the width left for the file's folder once the rest of the header has its room.
-func (view *Viewer) pathRoom(context *ui.Context, name string, compact bool) float32 {
-	palette := context.Theme
-	document := view.Document
-	room := view.List.Area.Width - 32 - theme.TextWidth(context, name, ui.TextStyle{Weight: draw2d.Medium}) - 40
-	if !compact {
-		room -= theme.TextWidth(context, view.Project.Name, ui.TextStyle{Color: palette.InkQuiet}) + 20
-	}
-	if document == nil {
-		return room
-	}
-	if !compact {
-		room -= theme.TextWidth(context, document.Language, ui.TextStyle{Size: palette.SmallTextSize}) + 12
-	}
-	if document.Changed {
-		room -= 330 // the counts, the arrows, the fold, view and viewed buttons
-		if !compact {
-			room -= 70 // the status's word
-		}
-	}
-	return room
-}
-
-// buildPath writes the project, the folder and the file's name, coloured by how it changed.
-func (view *Viewer) buildPath(context *ui.Context, compact bool) {
-	palette := context.Theme
-	document := view.Document
-	folder, name := splitPath(view.Reference.Path)
-	quiet := ui.TextStyle{Color: palette.InkQuiet}
-	room := view.pathRoom(context, name, compact)
-	if !compact {
-		context.Text(view.Project.Name, quiet)
-		context.IconSized("chevron-right", 12, palette.InkQuiet.WithAlpha(0.6))
-	}
-	if folder = theme.FitTextEnd(context, folder, quiet, room); len([]rune(folder)) > 3 {
-		context.Text(folder, quiet)
-		context.IconSized("chevron-right", 12, palette.InkQuiet.WithAlpha(0.6))
-	}
-	nameInk := palette.Ink
-	if document != nil && document.Changed {
-		nameInk = theme.StatusColour(palette, document.Change.Status)
-	}
-	context.Text(name, ui.TextStyle{Weight: draw2d.Medium, Color: nameInk})
-	if view.Unsaved() {
-		context.Text("●", ui.TextStyle{Color: palette.InkSoft}) // changes not saved
-	}
 }
 
 // buildChange says how the file changed: its status, the path it came from, the lines added and

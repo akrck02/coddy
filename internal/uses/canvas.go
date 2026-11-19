@@ -63,6 +63,23 @@ const (
 	wheelZoom   = 1.12
 )
 
+// textSizes are the sizes a box's text is drawn at, whatever the zoom: the renderer draws each
+// letter once per size and keeps it, so a size for every step of the wheel drew every letter
+// again on each step, and sent the letters' picture to the graphics card again, megabytes a frame.
+var textSizes = []float32{6, 7, 8, 9, 10, 11, 12, 13, 14, 16, 18, 20, 22, 24}
+
+// textSize is the size a box's text is drawn at for a zoom: the largest of textSizes that is not
+// larger than the label scaled, so it stays in its box; 0 when it would be too small to read.
+func textSize(zoom float32) float32 {
+	scaled, chosen := boxText*zoom, float32(0)
+	for _, size := range textSizes {
+		if size <= scaled {
+			chosen = size
+		}
+	}
+	return chosen
+}
+
 // textWidth is how wide a label is drawn, roughly, in the canvas's units.
 func textWidth(text string) float32 { return float32(len([]rune(text))) * 7.2 }
 
@@ -191,8 +208,8 @@ func (canvas *canvas) paintBox(drawing *draw2d.List, look theme.Look, each box, 
 		fill = look.Hover
 	}
 	drawing.Rectangle(area, 6*canvas.zoom, fill, edge, max(canvas.zoom, 1))
-	size := boxText * canvas.zoom
-	if size < 6 {
+	size := textSize(canvas.zoom)
+	if size == 0 {
 		return // too small to read
 	}
 	baseline := top + (each.height*canvas.zoom+size*0.7)/2

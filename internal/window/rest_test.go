@@ -94,3 +94,24 @@ func TestAServerWokenWhileTheOneBeforeSavesStartsOnceItHasEnded(test *testing.T)
 		test.Errorf("the server woke before the one resting had saved: it logged %q", content)
 	}
 }
+
+func TestAServerStillImportingNeverRests(test *testing.T) {
+	log := filepath.Join(test.TempDir(), "log")
+	servers := fakeGo(test, log)
+	servers[0].ReadyStatus = "ServiceReady" // never sent: it imports for as long as the test runs
+	application := readerWithServers(test, "lighthouse/src/lamp.go", servers)
+	application.servers.rest = 100 * time.Millisecond
+	window := newWindow(test, application)
+	key := "fakels " + application.projects[0].Path
+	importing := application.servers.running[key]
+	if importing == nil {
+		test.Fatal("no server runs for lamp.go")
+	}
+	for attempt := 0; attempt < 60; attempt++ {
+		time.Sleep(10 * time.Millisecond)
+		window.Frames(1)
+	}
+	if application.servers.running[key] != importing {
+		test.Error("a server still importing the projects was stopped to rest, throwing its import away")
+	}
+}

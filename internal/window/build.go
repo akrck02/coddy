@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/akrck02/code-review/internal/finder"
 	"github.com/akrck02/code-review/internal/pane"
 	"github.com/akrck02/code-review/internal/theme"
 	"github.com/akrck02/code-review/internal/viewer"
@@ -35,6 +34,7 @@ func (application *Window) Build(context *ui.Context) {
 	application.work.take()
 	application.readClassKinds()
 	application.typeInTheFile(context, application.handleKeys(context))
+	application.unfoldForTheKeyboard()
 	application.serveOpenFile()
 	application.advanceUses()
 
@@ -55,30 +55,23 @@ func (application *Window) Build(context *ui.Context) {
 	application.buildServers(context)
 	application.buildPicker(context)
 	application.buildQuestions(context)
-	application.buildHover(context)
+	application.buildNotes(context)
 	application.pointerX, application.pointerY = context.Pointer()
 	if application.showToast(context, time.Now()) {
 		return
 	}
 	if waiting := application.waiting; waiting != nil && !waiting.Ready() {
-		context.Toast("Waiting for "+statusOf(waiting.Server.Name, waiting.Progress(), time.Now()), false)
+		context.Toast(waitingWords(waiting, time.Now()), false)
 	}
 }
 
-// buildPanes lays the mode rail, the sidebar and the viewer side by side.
+// buildPanes lays the mode rail, the sidebar (unless it is folded away) and the viewer side by side.
 func (application *Window) buildPanes(context *ui.Context) {
 	application.buildModeRail(context)
 	context.Frame(ui.Layout{Width: ui.Fixed(1), Height: ui.Grow()}, ui.Look{Fill: context.Theme.Line}, nil)
-	// the sidebar never takes more than two fifths of the window, so the code keeps its room
-	// when the window is made narrow
-	windowWidth, _ := context.Size()
-	widest := min(max(windowWidth*0.4, 220), 720)
-	application.sidebar.Width = min(application.sidebar.Width, widest)
-	context.Resizable("sidebar", ui.RightSide, &application.sidebar.Width, 220, widest,
-		ui.Layout{Direction: ui.Vertical, Height: ui.Grow()}, func() {
-			application.sidebar.Build(context, application)
-		})
-	context.Frame(ui.Layout{Width: ui.Fixed(1), Height: ui.Grow()}, ui.Look{Fill: context.Theme.Line}, nil)
+	if !application.sidebarFolded {
+		application.buildSidebar(context)
+	}
 	cover, covers := application.mode.(mode.Cover)
 	if !covers {
 		application.viewer.Build(context, application)
@@ -89,6 +82,20 @@ func (application *Window) buildPanes(context *ui.Context) {
 			application.viewer.Build(context, application)
 		}
 	})
+}
+
+// buildSidebar is the sidebar, as wide as it was left, with the line after it.
+func (application *Window) buildSidebar(context *ui.Context) {
+	// the sidebar never takes more than two fifths of the window, so the code keeps its room
+	// when the window is made narrow
+	windowWidth, _ := context.Size()
+	widest := min(max(windowWidth*0.4, 220), 720)
+	application.sidebar.Width = min(application.sidebar.Width, widest)
+	context.Resizable("sidebar", ui.RightSide, &application.sidebar.Width, 220, widest,
+		ui.Layout{Direction: ui.Vertical, Height: ui.Grow()}, func() {
+			application.sidebar.Build(context, application)
+		})
+	context.Frame(ui.Layout{Width: ui.Fixed(1), Height: ui.Grow()}, ui.Look{Fill: context.Theme.Line}, nil)
 }
 
 func (application *Window) applyTheme(context *ui.Context) {
@@ -174,73 +181,11 @@ func (application *Window) buildModeRail(context *ui.Context) {
 			context.Tooltip(place.Description())
 		}
 		context.Spacer()
+		application.buildFoldButton(context)
 		if theme.ToolButton(context, "Keys (?)", "keyboard", false) {
 			application.helpOpen = true
 		}
 	})
-}
-
-// buildTitleBar is the top of the window: the workspace on the left, a search field in the middle
-// that opens the finder, and the comparison's settings on the right, as icons.
-func (application *Window) buildTitleBar(context *ui.Context) {
-	palette := context.Theme
-	context.Box(ui.Layout{Width: ui.Grow(), Height: ui.Fixed(44), Padding: ui.PadXY(14, 0), Gap: 8, AlignY: ui.Center}, func() {
-		context.Box(ui.Layout{Width: ui.Grow(), Gap: 8, AlignY: ui.Center}, func() {
-			context.Text(application.title(), ui.TextStyle{Weight: draw2d.Medium})
-			if base := application.settings.Base; base != "" {
-				context.Text("against "+base, ui.TextStyle{Size: palette.SmallTextSize, Color: palette.InkQuiet})
-			}
-		})
-		application.buildSearchField(context)
-		context.Box(ui.Layout{Width: ui.Grow(), Gap: 4, AlignY: ui.Center}, func() {
-			context.Spacer()
-			application.buildSettingButtons(context)
-			application.buildMenu(context)
-		})
-	})
-}
-
-// buildSearchField is a pill, a shade off the bar with a hairline edge, lit towards the accent under
-// the pointer, that opens the finder; the shortcut sits in a key cap of its own.
-func (application *Window) buildSearchField(context *ui.Context) {
-	palette := context.Theme
-	look := application.look
-	normal := ui.Look{Fill: look.Hover.WithAlpha(0.7), Radius: 17, Border: look.Chosen.WithAlpha(0.6), BorderWidth: 1}
-	hovered := normal
-	hovered.Fill, hovered.Border = look.Hover, palette.Primary.WithAlpha(0.45)
-	search := ui.Layout{Width: ui.Fixed(400), Height: ui.Fixed(34), Padding: ui.Padding{Left: 14, Right: 6}, Gap: 10, AlignY: ui.Center}
-	if context.Clickable("search files", search, ui.Looks{Normal: normal, Hovered: hovered, Pressed: hovered}, func() {
-		context.IconSized("search", 15, palette.InkSoft)
-		context.Text("Search files", ui.TextStyle{Color: palette.InkQuiet})
-		context.Spacer()
-		keyCap := ui.Look{Fill: look.Chosen.WithAlpha(0.55), Radius: 11}
-		context.Frame(ui.Layout{Height: ui.Fixed(22), Padding: ui.PadXY(9, 0), AlignY: ui.Center}, keyCap, func() {
-			context.Text("⌘P", ui.TextStyle{Size: palette.SmallTextSize, Color: palette.InkSoft, Weight: draw2d.Medium})
-		})
-	}) {
-		application.finder.Show(finder.NamesScope)
-	}
-}
-
-// buildSettingButtons are the window's settings: the projects listed, the changes counted, the
-// base, and reading again.
-func (application *Window) buildSettingButtons(context *ui.Context) {
-	if theme.ToolButton(context, "Count the changes not committed yet (w)", "file-pen-line", application.settings.WorkingTree) {
-		application.keepingEdits(application.toggleWorkingTree)
-	}
-	if theme.ToolButton(context, "Compare against another branch, tag or commit (b)", "git-branch", false) {
-		application.openBaseDialog()
-	}
-	if theme.ToolButton(context, "Read the projects again (r)", "refresh-cw", false) {
-		application.reloadAll()
-	}
-	lock, tip := "lock-open", "Read-only: off, files can be edited (⌘⇧L)"
-	if application.settings.ReadOnly {
-		lock, tip = "lock", "Read-only: on, files are only read (⌘⇧L)"
-	}
-	if theme.ToolButton(context, tip, lock, application.settings.ReadOnly) {
-		application.setReadOnly(!application.settings.ReadOnly)
-	}
 }
 
 // buildMenu is the menu of what is done less often: opening a folder, the theme, the keys, closing.
@@ -451,6 +396,9 @@ func (application *Window) buildHelp(context *ui.Context) {
 				context.Box(ui.Layout{Direction: ui.Vertical, Gap: 16}, func() {
 					application.buildHelpColumn(context, "Anywhere", helpRows(commands, anywhere))
 					application.buildHelpColumn(context, "Modes", helpRows(application.modeCommands(), anywhere))
+					if own := application.ownCommands(); len(own) > 0 {
+						application.buildHelpColumn(context, "In the "+application.mode.Name()+" mode", helpRows(own, anywhere))
+					}
 				})
 				context.Box(ui.Layout{Direction: ui.Vertical, Gap: 16}, func() {
 					application.buildHelpColumn(context, "In the sidebar", helpRows(commands, inSidebar))

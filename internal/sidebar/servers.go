@@ -61,3 +61,43 @@ func (sidebar *Sidebar) onBadge(index int, x float32) bool {
 	span, shown := sidebar.badges[index]
 	return shown && sidebar.Rows[index].Kind == ProjectRow && x >= span[0] && x <= span[1]
 }
+
+// LeftOuter is a window whose language servers leave some projects out: the sidebar marks them.
+type LeftOuter interface {
+	// LeftOut says why the servers leave a project out; "" when none does.
+	LeftOut(project int) string
+	// ShowServers shows the servers panel, which lists them.
+	ShowServers()
+}
+
+// leftOutIcon is the side of the mark of a project left out of the servers.
+const leftOutIcon = 13
+
+// paintLeftOutMark draws the crossed-out bolt of a project the servers leave out, keeps where it
+// is for the pointer, and moves the row's right side left of it.
+func (sidebar *Sidebar) paintLeftOutMark(side *rightSide, row Row, index int, top float32) {
+	window, marks := side.painter.window.(LeftOuter)
+	if !marks || window.LeftOut(row.Project) == "" {
+		return
+	}
+	x := side.right - leftOutIcon
+	side.painter.drawing.Icon("zap-off", x, top+(RowHeight-leftOutIcon)/2, leftOutIcon, side.painter.context.Theme.Warning)
+	sidebar.leftOut[index] = [2]float32{x - 3, x + leftOutIcon + 3}
+	side.right = x - 8
+}
+
+// onLeftOutMark tells whether x on a row falls on its project's mark of being left out.
+func (sidebar *Sidebar) onLeftOutMark(index int, x float32) bool {
+	span, shown := sidebar.leftOut[index]
+	return shown && index < len(sidebar.Rows) && sidebar.Rows[index].Kind == ProjectRow && x >= span[0] && x <= span[1]
+}
+
+// PointedLeftOut is the project whose mark of being left out of the servers is under the pointer,
+// for the window to say why; false for none.
+func (sidebar *Sidebar) PointedLeftOut(x, y float32) (project int, found bool) {
+	index := sidebar.list.RowAt(x, y)
+	if index < 0 || !sidebar.onLeftOutMark(index, x) {
+		return -1, false
+	}
+	return sidebar.Rows[index].Project, true
+}

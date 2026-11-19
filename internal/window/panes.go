@@ -137,11 +137,6 @@ func (application *Window) buttonOwner(file workspace.FileReference) mode.Mode {
 	if _, shown := application.mode.FileButton(file); shown {
 		return application.mode
 	}
-	for _, each := range application.modes {
-		if _, shown := each.FileButton(file); shown {
-			return each
-		}
-	}
 	return nil
 }
 

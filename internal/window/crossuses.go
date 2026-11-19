@@ -41,6 +41,8 @@ type usesSearch struct {
 	left      int             // places past the limit, not checked
 	unchecked int             // places no server reads
 	noted     string          // the note shown last
+	// shownUses tells which uses were shown last: how many found, probable and checked
+	shownUses [3]int
 	// waitingFor is a server still reading the projects that places wait for: asked now, it would
 	// answer nothing, and a use be lost
 	waitingFor *lsp.Client

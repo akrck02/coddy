@@ -30,11 +30,13 @@ func (application *Window) watchRest() {
 	})
 }
 
-// restServers stops the servers that reported no work and were not asked anything for a while.
+// restServers stops the servers that were not asked anything for a while, once they have read the
+// projects and report no work: one stopped while it imports throws its import away, and kotlin-lsp
+// its index too (the big workspace: a cold index of six minutes after each import cut short).
 func (application *Window) restServers(now time.Time) {
 	servers := &application.servers
 	for key, client := range servers.running {
-		if client.Busy() || now.Sub(client.QuietSince()) < servers.rest {
+		if !client.Ready() || now.Sub(client.QuietSince()) < servers.rest {
 			continue
 		}
 		application.restServer(key, client)

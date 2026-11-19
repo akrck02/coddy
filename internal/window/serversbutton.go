@@ -3,6 +3,7 @@ package window
 import (
 	"math"
 	"strconv"
+	"time"
 
 	"github.com/akrck02/go-renderer/draw2d"
 	ui "github.com/akrck02/go-ui"
@@ -77,9 +78,7 @@ func (application *Window) buildServersButton(context *ui.Context) {
 	layout := ui.Layout{Padding: ui.PadXY(6, 2), Gap: 5, AlignY: ui.Center}
 	if context.Clickable("Language servers", layout, ui.Looks{Hovered: hovered, Pressed: hovered}, func() {
 		application.buildModeMark(context, mode, fraction, broken)
-		if mode == serversLoading && fraction >= 0 {
-			context.Text(strconv.Itoa(int(fraction*100))+" %", ui.TextStyle{Size: palette.SmallTextSize, Color: palette.InkSoft})
-		}
+		application.buildWorkWords(context, views)
 	}) {
 		application.serversListed = !application.serversListed
 	}
@@ -89,6 +88,49 @@ func (application *Window) buildServersButton(context *ui.Context) {
 	if !application.serversListed {
 		context.Tooltip(modeWords(mode))
 	}
+	application.buildLeftOutCount(context)
+}
+
+// buildWorkWords says beside the mark what the first server at work does, how far it is and about
+// how long it has left: "Kotlin · importing 9/16 · ~1 min", "+1" when another works too.
+func (application *Window) buildWorkWords(context *ui.Context, views []serverView) {
+	palette := context.Theme
+	var working []serverView
+	for _, view := range views {
+		if view.client != nil && (view.state == serverWorking || view.state == serverStarting) {
+			working = append(working, view)
+		}
+	}
+	if len(working) == 0 {
+		return
+	}
+	context.Text(application.shortStatus(working[0]), ui.TextStyle{Size: palette.SmallTextSize, Color: palette.InkSoft})
+	quiet := ui.TextStyle{Size: palette.SmallTextSize, Color: palette.InkQuiet}
+	if left := timeLeft(working[0], time.Now()); left != "" {
+		context.Text(left, quiet)
+	}
+	if len(working) > 1 {
+		context.Text("+"+strconv.Itoa(len(working)-1), quiet)
+	}
+}
+
+// buildLeftOutCount warns, beside the servers' button, of the projects the servers leave out; a
+// click shows the servers panel, which says why.
+func (application *Window) buildLeftOutCount(context *ui.Context) {
+	count := application.leftOutCount()
+	if count == 0 {
+		return
+	}
+	palette := context.Theme
+	hovered := ui.Look{Fill: application.look.Hover, Radius: 4}
+	layout := ui.Layout{Padding: ui.PadXY(6, 2), Gap: 5, AlignY: ui.Center}
+	if context.Clickable("Projects left out", layout, ui.Looks{Hovered: hovered, Pressed: hovered}, func() {
+		context.IconSized("triangle-alert", 13, palette.Warning)
+		context.Text(strconv.Itoa(count)+" left out", ui.TextStyle{Size: palette.SmallTextSize, Color: palette.Warning})
+	}) {
+		application.serversOpen = true
+	}
+	context.Tooltip(plural(count, "project") + " the language servers cannot read: their uses are found by their text")
 }
 
 // markSize is the side of the servers' mark: its ring, with the bolt inside.

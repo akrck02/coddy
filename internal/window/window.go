@@ -47,6 +47,8 @@ type Settings struct {
 	Synchronous bool
 	// ReadOnly stops editing: files are only read, as before editing came.
 	ReadOnly bool
+	// SidebarFolded starts with the sidebar folded away, the file taking the window's width.
+	SidebarFolded bool
 	// Servers are the language servers to run; nil runs lsp.Servers, found on the PATH.
 	Servers []lsp.Server
 	// ServersWrote is the file that keeps what servers wrote in the repositories, in the reader's
@@ -85,6 +87,10 @@ type Window struct {
 	finder  finder.Finder
 	base    baseDialog
 	focus   focusedPane
+	// sidebarFolded hides the sidebar; focusBefore is where the keyboard was in the last frame, to
+	// bring the sidebar back when the keyboard goes to it
+	sidebarFolded bool
+	focusBefore   focusedPane
 
 	helpOpen bool
 	// serversOpen shows the servers panel: what each language server does, project by project
@@ -143,6 +149,7 @@ func New(settings Settings, modes ...mode.Mode) (*Window, error) {
 		tap:           &inputTap{},
 		onlyChanged:   settings.OnlyChanged,
 		focus:         sidebarPane,
+		sidebarFolded: settings.SidebarFolded,
 		servers:       newLanguageServers(settings.Servers, settings.ServersWrote),
 		classKinds:    map[workspace.FileReference]java.ClassKind{},
 	}
@@ -160,7 +167,6 @@ func New(settings Settings, modes ...mode.Mode) (*Window, error) {
 		application.viewer.ColourPause = 0 // one frame, or a test: colour at once
 		application.viewer.HoverPause = 0
 	}
-	application.setLook()
 	application.openFolders(settings.Folders)
 	if settings.Open != "" {
 		application.openByLabel(settings.Open)

@@ -58,7 +58,7 @@ func (sidebar *Sidebar) paint(context *ui.Context, window Window, drawing *draw2
 // row under the pointer, if no dialog takes the pointer.
 func (sidebar *Sidebar) startPainting(context *ui.Context, window Window, drawing *draw2d.List) painting {
 	pointerX, pointerY := context.Pointer()
-	sidebar.badges = map[int][2]float32{}
+	sidebar.badges, sidebar.leftOut = map[int][2]float32{}, map[int][2]float32{}
 	hovered := -1
 	if !window.ModalOpen() {
 		hovered = sidebar.list.RowAt(pointerX, pointerY)
@@ -244,6 +244,7 @@ func (sidebar *Sidebar) paintRight(painter painting, row Row, index int, right, 
 			return side.right
 		}
 		sidebar.paintServerBadge(side, row, index, top)
+		sidebar.paintLeftOutMark(side, row, index, top)
 		if row.Changed == 0 {
 			return side.right
 		}

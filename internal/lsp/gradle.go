@@ -11,16 +11,20 @@ import (
 	"time"
 )
 
-// A server that imports Gradle builds (kotlin-lsp) leaves Gradle daemons behind, one per Gradle
-// version, each waiting three hours for another build. Given a Gradle home of its own, in its data
-// folder, its daemons stop after two minutes without a build, and the reader stops them with it,
-// never touching those of the person's builds or IDE. That home holds only what makes its daemons
+// A server that imports Gradle builds (jdtls, kotlin-lsp) leaves Gradle daemons behind, one per
+// Gradle version, each waiting three hours for another build. Given a Gradle home of its own, in
+// its data folder, its daemons are the reader's: they wait long enough to serve the whole import
+// (jdtls goes through the builds one by one, coming back to a Gradle version minutes later), the
+// reader stops them once the server has imported (releaseGradle), and with the server, never
+// touching those of the person's builds or IDE. That home holds only what makes its daemons
 // its own: the rest are links to the person's Gradle home, so nothing Gradle downloads or makes,
 // the Gradle versions, their generated API, the jars it transforms, is made twice, and it goes on
 // the person's disk.
 
-// gradleIdle is how long a daemon of a server's Gradle home waits for another build, in milliseconds.
-const gradleIdle = 120000
+// gradleIdle is how long a daemon of a server's Gradle home waits for another build, in milliseconds:
+// longer than an import of every project takes, so a daemon is started once per Gradle version.
+// Two minutes, as before, restarted daemons in the middle of jdtls's import on the big workspace.
+const gradleIdle = 30 * 60 * 1000
 
 // sharedGradle are the folders of a server's Gradle home that are the person's: all but daemon/.
 // Gradle locks what is in them file by file, across processes, as for builds run at once.
@@ -126,4 +130,68 @@ func anyRuns(processes []int) bool {
 		}
 	}
 	return false
+}
+
+// Once a server has imported the projects, its Gradle daemons only wait, half a gigabyte or more
+// each, for an import that may never come: the reader stops them, and a later import starts them
+// again.
+const (
+	// gradleCheck is how often a server is looked at for daemons to stop
+	gradleCheck = 5 * time.Second
+	// gradleSettle is how long a server must have been ready, with no work running, before its
+	// daemons are stopped: between two steps of an import it may report none for a moment
+	gradleSettle = 20 * time.Second
+)
+
+// releaseGradle stops the Gradle daemons of a server each time it is done importing, until it ends.
+func (client *Client) releaseGradle() {
+	ticker := time.NewTicker(gradleCheck)
+	defer ticker.Stop()
+	importing := true // a server imports as it starts
+	for {
+		select {
+		case <-client.exited:
+			return
+		case <-ticker.C:
+		}
+		if client.Busy() {
+			importing = true
+			continue
+		}
+		if importing && client.settled(time.Now()) {
+			importing = false
+			stopped := StopGradleDaemons(client.data)
+			client.lock.Lock()
+			client.released, client.releasedAt = stopped, time.Now()
+			client.lock.Unlock()
+			client.changed()
+		}
+	}
+}
+
+// settled tells whether a server is ready, with no work running, and has been for gradleSettle,
+// nor begun importing a project meanwhile: kotlin-lsp is ready as it starts, and imports before
+// it reports any work.
+func (client *Client) settled(now time.Time) bool {
+	client.lock.Lock()
+	defer client.lock.Unlock()
+	if !client.isReady() || len(client.working) > 0 {
+		return false
+	}
+	quiet := later(client.readyAt, client.idleAt)
+	for _, began := range client.imported {
+		quiet = later(quiet, began)
+	}
+	return now.Sub(quiet) >= gradleSettle
+}
+
+// GradleDaemons tells how many Gradle daemons of a server's own Gradle home run now.
+func GradleDaemons(dataFolder string) int { return len(runningDaemons(dataFolder)) }
+
+// Released are the Gradle daemons the reader stopped once the server was done importing last, and
+// when; none before.
+func (client *Client) Released() (int, time.Time) {
+	client.lock.Lock()
+	defer client.lock.Unlock()
+	return client.released, client.releasedAt
 }

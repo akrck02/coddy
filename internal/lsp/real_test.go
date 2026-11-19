@@ -129,6 +129,11 @@ func TestKotlinLspFollowsANameAcrossFiles(test *testing.T) {
 		test.Errorf("beam is declared at %+v (%v), want Lamp.kt", declared, err)
 	}
 	test.Logf("kotlin-lsp wrote: %v", newFiles(before, filesIn(test, folder)))
+	// its index in the folder the reader gives it, one for every set of projects; not in the
+	// person's caches, where the reader removes nothing
+	if indexes, _ := filepath.Glob(filepath.Join(data, server.Indexes, "*")); len(indexes) == 0 {
+		test.Errorf("kotlin-lsp built no index in its data folder's %s: it went elsewhere (%v)", server.Indexes, entriesOf(data))
+	}
 }
 
 // theDaemonsStopped stops a server and checks it imported with its own Gradle home, whose daemons

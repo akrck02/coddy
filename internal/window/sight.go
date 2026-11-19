@@ -28,6 +28,9 @@ func (application *Window) followSight(client *lsp.Client, server lsp.Server, ke
 	if application.Loading() || slices.Equal(wanted, reading) || application.servers.restarting[key] == set {
 		return
 	}
+	if !client.Ready() {
+		return // never in the middle of an import, which a restart throws away: once it is done
+	}
 	application.servers.restarting[key] = set
 	application.work.run("restart "+key, func(stop cancellation) func() {
 		if !application.work.synchronous {

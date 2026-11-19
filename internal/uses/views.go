@@ -39,6 +39,9 @@ func (uses *Mode) BuildOverViewer(context *ui.Context) bool {
 	return false
 }
 
+// Covers tells whether a graph takes the viewer's place.
+func (uses *Mode) Covers() bool { return uses.name != "" && uses.view != listView }
+
 // buildTabs is the bar over the viewer: the name searched, how far the search is, and the views.
 func (uses *Mode) buildTabs(context *ui.Context) {
 	palette := context.Theme
@@ -48,10 +51,7 @@ func (uses *Mode) buildTabs(context *ui.Context) {
 		context.Text(uses.name, ui.TextStyle{Weight: draw2d.Bold})
 		context.Text(fmt.Sprintf("%d uses in %d files · %s", len(uses.uses), len(uses.byFile), uses.Header()),
 			ui.TextStyle{Size: palette.SmallTextSize, Color: palette.InkSoft})
-		if uses.note != "" {
-			context.Text(uses.note, ui.TextStyle{Size: palette.SmallTextSize, Color: palette.Primary})
-		}
-		context.Spacer()
+		uses.buildNote(context)
 		chosen := int(uses.view)
 		if theme.IconSwitch(context, "uses view", &chosen, []theme.IconChoice{
 			{Icon: "list", Name: "The uses, file by file (⇧1)"},
@@ -81,4 +81,25 @@ func (uses *Mode) BuildInsteadOfAFile(context *ui.Context) bool {
 			context.Caption("n / ⇧N go through the uses · v ticks one as seen · r searches again · ⇧1 ⇧2 ⇧3 the list and the graphs")
 		})
 	return true
+}
+
+// buildNote says how the search goes in the room left before the views' buttons, cut with "…"
+// when it is longer, its whole in a tooltip: it grows with each server's progress and pushed the
+// buttons out of the window.
+func (uses *Mode) buildNote(context *ui.Context) {
+	if uses.note == "" {
+		context.Spacer()
+		return
+	}
+	palette := context.Theme
+	style := ui.TextStyle{Size: palette.SmallTextSize, Color: palette.Primary}
+	height := palette.SmallTextSize * 1.6
+	context.Clickable("uses note", ui.Layout{Width: ui.Grow(), Height: ui.Fixed(height)}, ui.Looks{}, func() {
+		context.Paint(ui.Layout{Width: ui.Grow(), Height: ui.Fixed(height)}, func(area draw2d.Rectangle, drawing *draw2d.List) {
+			if fitted := theme.FitText(context, uses.note, style, area.Width); fitted != "" {
+				drawing.Text(fitted, area.X, area.Y+(area.Height+style.Size*0.7)/2, style.Size, draw2d.Regular, style.Color)
+			}
+		})
+	})
+	context.Tooltip(uses.note)
 }

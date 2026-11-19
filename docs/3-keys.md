@@ -15,10 +15,11 @@ below, an F-key or `Esc`. `Esc` gives the keyboard back to the sidebar, where th
 | `1` / `2` / `3` (`⌘1` / `⌘2` / `⌘3`; `c` or `⌘⇧0` switches) | Files mode / Review mode / Uses mode |
 | `Enter` on a project, `e` (`⌘E`), or its → button | Enter the project: the sidebar lists only its tree, and `n`/`m`/`v` stay in it |
 | `Esc` / `Backspace` | Back to every project |
-| `v` (`⌘⇧V`) | Mark the file as viewed (or not); marking it opens the next file not viewed |
+| `v` (`⌘⇧V`) | In the Review mode: mark the file as viewed (or not); marking it opens the next file not viewed |
 | `d` (`⌘D`) | Diff, or the whole file |
 | `f` (`⌘U`) | Fold the unchanged lines, or show them all again (a diff opens whole) |
 | `⌘⇧-` / `⌘⇧+` | Fold every unchanged line / show them all |
+| `s` (`⌘⇧E`), or the rail's panel button | Hide the sidebar, the file taking its room, or show it again; it comes back when the keyboard goes to it |
 | `Tab` (`⌃Tab`) | Move between the sidebar and the editor |
 | `↑ ↓ ← →`, `PgUp PgDn`, `Home End` | Move in the sidebar (←/→ close and open folders), or scroll the file |
 | `j` / `k`, `Space` | Scroll a line, a page |

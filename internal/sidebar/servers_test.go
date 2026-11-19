@@ -26,3 +26,12 @@ func TestAClickOnTheBadgeIsOnlyOnIt(test *testing.T) {
 		test.Error("a click lands on the badge outside it, or misses it inside it")
 	}
 }
+
+func TestThePointerOnTheMarkOfAProjectLeftOutFindsIt(test *testing.T) {
+	sidebar := New()
+	sidebar.Rows = []Row{{Kind: ProjectRow, Project: 3}, {Kind: FileRow}}
+	sidebar.leftOut = map[int][2]float32{0: {200, 219}}
+	if !sidebar.onLeftOutMark(0, 210) || sidebar.onLeftOutMark(0, 230) || sidebar.onLeftOutMark(1, 210) {
+		test.Error("the pointer lands on the mark outside it, or misses it inside it")
+	}
+}

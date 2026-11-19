@@ -212,3 +212,21 @@ func TestUsesNoServerConfirmedAreCountedApart(test *testing.T) {
 		test.Errorf("Pier.kt's box says %q, drawn as %d", uses.fileCount(pier), uses.fileKind(pier))
 	}
 }
+
+// Zooming draws the graph's text at a few sizes only, each drawn once and kept by the renderer.
+func TestTheGraphsTextTakesFewSizesWhateverTheZoom(test *testing.T) {
+	sizes := map[float32]bool{}
+	for zoom := float32(0.05); zoom <= 4; zoom *= 1.01 {
+		size := textSize(zoom)
+		sizes[size] = true
+		if size > boxText*zoom {
+			test.Errorf("at zoom %.2f the text is %v, larger than its box's %v", zoom, size, boxText*zoom)
+		}
+	}
+	if len(sizes) > len(textSizes)+1 {
+		test.Errorf("zooming draws the text at %d sizes", len(sizes))
+	}
+	if textSize(0.3) != 0 {
+		test.Error("text too small to read is drawn")
+	}
+}
