@@ -54,6 +54,7 @@ type canvas struct {
 	dragging         bool
 	lastX, lastY     float32
 	hovered          int
+	pieces           map[pieceKey]*draw2d.Image // the arrows' pieces drawn, by zoom level (arrows.go)
 }
 
 const (
@@ -221,23 +222,6 @@ func (canvas *canvas) paintBox(drawing *draw2d.List, look theme.Look, each box, 
 		x := left + area.Width - (textWidth(each.detail)+10)*canvas.zoom
 		drawing.Text(each.detail, x, baseline, size, draw2d.Mono, palette.InkQuiet)
 	}
-}
-
-// paintArrow draws an arrow from a box's edge to another's, with its head at the second.
-func (canvas *canvas) paintArrow(drawing *draw2d.List, look theme.Look, from, to box) {
-	startX, startY := edgeToward(from, to.x+to.width/2, to.y+to.height/2)
-	endX, endY := edgeToward(to, from.x+from.width/2, from.y+from.height/2)
-	colour := look.Theme.InkQuiet.WithAlpha(0.55)
-	line := &draw2d.Path{}
-	line.MoveTo(startX, startY)
-	line.LineTo(endX, endY)
-	angle := math.Atan2(float64(endY-startY), float64(endX-startX))
-	for _, side := range []float64{-0.45, 0.45} {
-		line.MoveTo(endX, endY)
-		line.LineTo(endX-9*float32(math.Cos(angle+side)), endY-9*float32(math.Sin(angle+side)))
-	}
-	x, y := canvas.toScreen(0, 0)
-	drawing.Stroke(line, x, y, canvas.zoom, max(canvas.zoom, 0.6), colour)
 }
 
 // edgeToward is where the line from a box's centre toward a point leaves the box.

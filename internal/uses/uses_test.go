@@ -230,3 +230,43 @@ func TestTheGraphsTextTakesFewSizesWhateverTheZoom(test *testing.T) {
 		test.Error("text too small to read is drawn")
 	}
 }
+
+// The arrows are drawn as small pictures kept from frame to frame: drawing again, or zooming a step
+// within a level, draws none anew, and none is large however far the graph is zoomed in.
+func TestTheGraphsArrowsAreDrawnOnceAndKept(test *testing.T) {
+	graph := scene{boxes: []box{{x: 0, y: 0, width: 120, height: 40}, {x: 900, y: 700, width: 120, height: 40}}, arrows: []arrow{{0, 1}}}
+	look := theme.BuiltIn()[0].Look
+	shown := &canvas{zoom: 1, area: draw2d.Rectangle{Width: 1200, Height: 900}}
+	pictures := func() map[*draw2d.Image]bool {
+		drawing := &draw2d.List{}
+		shown.paint(drawing, look, graph)
+		found := map[*draw2d.Image]bool{}
+		for _, command := range drawing.Commands {
+			if command.Kind == draw2d.ImageKind {
+				found[command.Picture] = true
+			}
+		}
+		return found
+	}
+	shown.zoom = 1.2
+	_ = pictures()
+	drawn := len(shown.pieces)
+	if drawn == 0 {
+		test.Fatal("no arrow was drawn")
+	}
+	for _, zoom := range []float32{1.2, 1.3, 1.4} { // the same frame again, then wheel steps within a level
+		shown.zoom = zoom
+		_ = pictures()
+		if len(shown.pieces) != drawn {
+			test.Errorf("at zoom %.2f, %d pieces were drawn anew", zoom, len(shown.pieces)-drawn)
+		}
+	}
+	for zoom := float32(0.1); zoom <= 4; zoom *= 1.12 {
+		shown.zoom = zoom
+		for picture := range pictures() {
+			if width, height := picture.Size(); width*height > 160*160 {
+				test.Errorf("at zoom %.2f a piece of an arrow is %d×%d", zoom, width, height)
+			}
+		}
+	}
+}
