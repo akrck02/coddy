@@ -1,6 +1,6 @@
 # 9. Servers that import faster
 
-> Status: in progress (block 1 built) · Author's approval: proposal ☑ plan ☑
+> Status: in progress (block 1 built; block 2 being built) · Author's approval: proposal ☑ plan ☑ (block 1) · block 2 plan ☑
 
 ## Why
 
@@ -57,7 +57,7 @@ can do.
 - [x] T2 No rest and no restart in the middle of an import. (R2)
 - [x] T3 Builds that cannot be imported are left out, with their reason. (R3)
 - [x] T4 Measure block 1 on the big workspace: time to ready, daemons during and after. (R1–R3)
-- [ ] T5 Block 2: try `exportWorkspace`, `buildTools` and `lsp-router`; plan R4.
+- [x] T5 Block 2: try `exportWorkspace`, `buildTools` and `lsp-router`; plan R4.
 - [ ] T6 Block 3 with the person. (R5)
 - [x] T7 Design how the servers' work and the projects left out are shown, and build it. (R6)
 
@@ -110,3 +110,66 @@ Designed on a canvas with the author and built as drawn, at three levels:
 - **The detail, the servers panel**: each card says how long the server took last time, its
   Gradle daemons running, or those released once it was done and when, and *Left out of this
   server* with each project and why.
+
+## T5: block 2, tried (19 November 2026)
+
+Tried by hand with a small client (`warmup.py`'s way) on the 19 Kotlin repositories of the big workspace that
+are not Android apps, with the reader's Gradle home.
+
+**What kotlin-lsp 271 has** (seen in its jars):
+
+- An importer `json` (`JsonDriver`): it reads `workspace.json` in a workspace folder, and is
+  chosen for a folder by `initializationOptions.buildTools` (`{folder URI: "json"}`).
+- A command `exportWorkspace <folder>`: it writes the model it imported (modules, libraries, SDKs,
+  Kotlin and Java settings) to `<folder>/workspace.json`, every path absolute. For the 19
+  repositories: 114 modules, 1,331 libraries, 5 MB.
+- So the file can live in the reader's data folder, in a folder standing in for the repositories:
+  given that folder, kotlin-lsp reads the real files by their absolute paths, and a definition in a
+  library answers as with Gradle. Nothing is written in a repository.
+- `intellij/ready-for-test`, a notification once the index is built and saved: a truer "ready"
+  than the end of its work (`ReadyAfterWork`), not sent when there is nothing to index.
+- `lsp-router` keeps one server alive across editors, by workspace. Not tried: it keeps a JVM of
+  2 GB when the reader is closed.
+
+**Found on the way, fixed**: the index keeps the model with paths by the place of each folder
+among those the server started with (`$WORKSPACE_7$/src/main`). Started with fewer folders than
+the model names, kotlin-lsp cannot read it and hangs, answering nothing (30 minutes, 374 errors
+in its log). One index for every set of projects, built this morning, did that: back to one per
+set, now in `indexes/<hash of the folders>`, the last kept; `rocks/` is removed.
+
+| 19 repositories | Gradle (today) | `workspace.json` |
+|---|---|---|
+| Ready, index built | 452 s | **12.6 s** |
+| Ready, cold | 254 s to 459 s (16 repositories) | 102 s |
+| Gradle daemons | 16 | 0 |
+| A definition in a library | answers | answers the same |
+
+## Plan of block 2 (R4), approved 20 November 2026
+
+- **R4.1** For each repository a server imports with Gradle, the reader keeps its part of the
+  model, `workspace.json`, in the server's data folder, with a fingerprint of its build files
+  (`settings.gradle*`, `build.gradle*` at any depth, `gradle.properties`,
+  `gradle/libs.versions.toml`, `gradle/wrapper/gradle-wrapper.properties`).
+- **R4.2** kotlin-lsp starts with one stand-in folder per repository whose model is current
+  (`buildTools: json`), and the real folder, with Gradle, for each one without a model or whose
+  fingerprint changed.
+- **R4.3** Once a start with Gradle is ready, the reader asks `exportWorkspace`, splits the model
+  by repository (the modules under its folder and the libraries and SDKs they use) and keeps each
+  part with its fingerprint.
+- **R4.4** A build file changed while the server runs marks that repository's model old: the next
+  start imports it with Gradle (kotlin-lsp already re-imports it then, as now).
+- **R4.5** The servers panel says how each repository was read: from its model (and since when)
+  or with Gradle.
+
+Tasks:
+
+- [ ] T8 Fingerprint of a repository's build files, and the model kept with it. (R4.1)
+- [ ] T9 Stand-in folders and `buildTools` at start; real folders for the old ones. (R4.2)
+- [ ] T10 Export once ready, split by repository. (R4.3, R4.4)
+- [ ] T11 Say it in the panel. (R4.5)
+- [ ] T12 Measure on the big workspace: first start (Gradle), second (models), one build file changed.
+
+Risks: the importer and the command are not documented and may change with kotlin-lsp; the
+reader checks the export's shape and falls back to Gradle when a model cannot be read. Each new set
+of stand-in folders is a new index (cold, about 100 s): the folders are named by repository, so
+a repository changing between Gradle and its model does change the set once.

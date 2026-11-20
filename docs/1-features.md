@@ -104,9 +104,10 @@ It has two modes, chosen on the rail at the far left (or with `1`, `2`, `c`):
   The graphs zoom with the wheel, move with a drag, and `0` fits them in again.
 - **Servers that leave nothing behind**:
   - Indexes go in the reader's own folder, or in the one `-server-data` names (another disk; the
-    choice is remembered). `kotlin-lsp` keeps one index for every set of projects, in its data
-    folder (it would keep one per set in `~/Library/Caches/JetBrains` otherwise), and reads every
-    Kotlin project of the window, whatever the filter shows, importing them once. `jdtls` too reads every Java project of the window from its start: it drops
+    choice is remembered). `kotlin-lsp` keeps one index per set of projects, in its data folder's
+    `indexes/` (it would keep them in `~/Library/Caches/JetBrains` otherwise, where nothing removes
+    them): one index for every set hung it when started with fewer projects than the index knew.
+    It reads every Kotlin project of the window, whatever the filter shows, importing them once. `jdtls` too reads every Java project of the window from its start: it drops
     from its workspace the projects it was not started with, and would import each again with
     Gradle as a search of uses reached it. The reader keeps the index used last (`-keep-indexes` keeps more), and
     does not start it on a disk with less than 10 GB free, saying why.

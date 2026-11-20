@@ -1,15 +1,19 @@
 package lsp
 
 import (
+	"crypto/md5"
+	"encoding/hex"
 	"os"
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strings"
 	"time"
 )
 
-// indexName is how a server names the index of one set of workspace folders: kotlin-lsp names it
-// by a hash, 32 hexadecimal digits. Nothing else in its data folder is ever removed.
+// indexName is how the index of one set of workspace folders is named: by a hash, 32 hexadecimal
+// digits, as kotlin-lsp named them itself and the reader names those it places (indexFolder).
+// Nothing else in a data folder is ever removed, but its RetiredIndexes.
 var indexName = regexp.MustCompile(`^[0-9a-f]{32}$`)
 
 // indexRest is how long an index must have gone unwritten before it may be removed: one a server
@@ -24,15 +28,38 @@ func PruneIndexes(dataFolder string, server Server, now time.Time) ([]string, er
 	if dataFolder == "" || server.Indexes == "" || server.KeepIndexes <= 0 {
 		return nil, nil
 	}
-	folder := filepath.Join(dataFolder, server.Indexes)
-	entries, err := os.ReadDir(folder)
-	if err != nil {
-		return nil, nil // no index yet
+	indexes := indexesOf(filepath.Join(dataFolder, server.Indexes))
+	sort.Slice(indexes, func(first, second int) bool { return indexes[first].used.After(indexes[second].used) })
+	old := indexes[min(server.KeepIndexes, len(indexes)):]
+	for _, name := range server.RetiredIndexes {
+		if path := filepath.Join(dataFolder, name); name != "" && name != server.Indexes {
+			if _, err := os.Stat(path); err == nil {
+				old = append(old, index{path, lastWritten(path)})
+			}
+		}
 	}
-	type index struct {
-		path string
-		used time.Time
+	var removed []string
+	for _, each := range old {
+		if now.Sub(each.used) < indexRest {
+			continue
+		}
+		if err := os.RemoveAll(each.path); err != nil {
+			return removed, err
+		}
+		removed = append(removed, each.path)
 	}
+	return removed, nil
+}
+
+// index is an index of a data folder and when it was last written.
+type index struct {
+	path string
+	used time.Time
+}
+
+// indexesOf are the indexes in a folder of indexes, none when there is no such folder yet.
+func indexesOf(folder string) []index {
+	entries, _ := os.ReadDir(folder)
 	var indexes []index
 	for _, entry := range entries {
 		if entry.IsDir() && indexName.MatchString(entry.Name()) {
@@ -40,18 +67,18 @@ func PruneIndexes(dataFolder string, server Server, now time.Time) ([]string, er
 			indexes = append(indexes, index{path, lastWritten(path)})
 		}
 	}
-	sort.Slice(indexes, func(first, second int) bool { return indexes[first].used.After(indexes[second].used) })
-	var removed []string
-	for _, old := range indexes[min(server.KeepIndexes, len(indexes)):] {
-		if now.Sub(old.used) < indexRest {
-			continue
-		}
-		if err := os.RemoveAll(old.path); err != nil {
-			return removed, err
-		}
-		removed = append(removed, old.path)
+	return indexes
+}
+
+// indexFolder is where a server that is told where to keep its index (IndexOption) keeps the one
+// of the folders it starts with, in that order: a folder of its Indexes named by their hash; its
+// data folder when it has no Indexes.
+func indexFolder(dataFolder string, server Server, folders []string) string {
+	if server.Indexes == "" {
+		return dataFolder
 	}
-	return removed, nil
+	hash := md5.Sum([]byte(strings.Join(folders, "\n")))
+	return filepath.Join(dataFolder, server.Indexes, hex.EncodeToString(hash[:]))
 }
 
 // lastWritten is when anything in a folder, three levels down, was written last: an index's

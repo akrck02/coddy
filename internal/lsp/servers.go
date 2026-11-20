@@ -47,10 +47,14 @@ type Server struct {
 	Indexes     string
 	KeepIndexes int
 	// IndexOption, when set, is the initialization option that names where the server keeps its
-	// indexes: the reader gives it its data folder. kotlin-lsp 271 keeps them in the person's
-	// caches otherwise (~/Library/Caches/JetBrains/IntelliJServer), whatever --system-path says,
-	// where the reader neither keeps one nor removes the old.
+	// index: the reader gives it a folder of Indexes named after the set of folders it starts with
+	// (indexFolder). kotlin-lsp 271 keeps them in the person's caches otherwise
+	// (~/Library/Caches/JetBrains/IntelliJServer), whatever --system-path says, where the reader
+	// neither keeps one nor removes the old.
 	IndexOption string
+	// RetiredIndexes are folders of its data folder where an older reader kept its indexes, removed
+	// as old indexes are.
+	RetiredIndexes []string
 	// OwnGradle gives a server that imports Gradle builds a Gradle home of its own, in its data
 	// folder, whose daemons stop soon after it and with it (gradle.go).
 	OwnGradle bool
@@ -100,9 +104,12 @@ var Servers = []Server{
 		Languages: []string{"kotlin"}, OnePerWindow: true, Install: "brew install JetBrains/utils/kotlin-lsp",
 		// up to 263 it built an index per set of projects it started with, in the system path's
 		// workspaces/; since 271 that went to the person's caches, ~/Library/Caches/JetBrains/
-		// IntelliJServer/workspaces, one per set again, 12 GB in a day. Given indexDir it keeps one
-		// database for every set, rocks/, in the reader's data folder
-		Indexes: "rocks", KeepIndexes: 1, IndexOption: "indexDir", ReadsAll: true, OwnGradle: true, NeedsFree: 10 << 30, ReadyAfterWork: true,
+		// IntelliJServer/workspaces, one per set again, 12 GB in a day. Given indexDir it keeps its
+		// database there. One database for every set does not do: it keeps the projects' model with
+		// paths by the place of their folder among those it started with ($WORKSPACE_7$/src/main),
+		// and started with fewer folders it cannot read them and hangs, answering nothing. So one
+		// per set, in indexes/, the last kept; rocks/ was the one for every set
+		Indexes: "indexes", KeepIndexes: 1, IndexOption: "indexDir", RetiredIndexes: []string{"rocks"}, ReadsAll: true, OwnGradle: true, NeedsFree: 10 << 30, ReadyAfterWork: true,
 		// no -Dcom.jetbrains.ls.imports.gradle.daemon.no.idle.timeout: it gives each daemon an idle
 		// time of 1 ms, so none was used twice (148 times on the big workspace); the reader stops its daemons
 		// itself once the import is done (gradle.go)

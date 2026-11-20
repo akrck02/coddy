@@ -178,7 +178,7 @@ func (client *Client) initializationOptions(folders []string) map[string]any {
 		options["settings"] = server.Settings
 	}
 	if ownIndex {
-		options[server.IndexOption] = client.data
+		options[server.IndexOption] = indexFolder(client.data, server, folders)
 	}
 	if server.FoldersInOptions {
 		uris := make([]string, len(folders))

@@ -48,3 +48,41 @@ func TestAnIndexWrittenAMomentAgoIsKept(test *testing.T) {
 		test.Errorf("an index another window may be writing was removed: %v", removed)
 	}
 }
+
+// A server told where to keep its index keeps one per set of folders: started with fewer folders
+// than the model in its index names, kotlin-lsp hangs.
+func TestEachSetOfFoldersHasAnIndexOfItsOwn(test *testing.T) {
+	server, _ := serverNamed("kotlin-lsp")
+	data := "/data"
+	both := indexFolder(data, server, []string{"/code/lamp", "/code/keeper"})
+	if both != indexFolder(data, server, []string{"/code/lamp", "/code/keeper"}) {
+		test.Error("the same folders were given two indexes")
+	}
+	if both == indexFolder(data, server, []string{"/code/lamp"}) {
+		test.Error("fewer folders were given the index of more")
+	}
+	if filepath.Dir(both) != filepath.Join(data, server.Indexes) || !indexName.MatchString(filepath.Base(both)) {
+		test.Errorf("the index is at %s, not one PruneIndexes knows", both)
+	}
+	options := (&Client{Server: server, data: data}).initializationOptions([]string{"/code/lamp"})
+	if options[server.IndexOption] != indexFolder(data, server, []string{"/code/lamp"}) {
+		test.Errorf("the server is told to keep its index at %v", options[server.IndexOption])
+	}
+}
+
+// The folder where an older reader kept a server's index is removed once unused a while.
+func TestARetiredIndexIsRemoved(test *testing.T) {
+	data, now := test.TempDir(), time.Now()
+	old := filepath.Join(data, "rocks", "v241")
+	os.MkdirAll(old, 0o755)
+	for _, path := range []string{old, filepath.Dir(old)} {
+		os.Chtimes(path, now.Add(-time.Hour), now.Add(-time.Hour))
+	}
+	server := Server{Indexes: "indexes", KeepIndexes: 1, RetiredIndexes: []string{"rocks"}}
+	if removed, err := PruneIndexes(data, server, now); err != nil || len(removed) != 1 {
+		test.Fatalf("removed %v (%v), want rocks", removed, err)
+	}
+	if _, err := os.Stat(filepath.Join(data, "rocks")); err == nil {
+		test.Error("the retired index is still there")
+	}
+}
