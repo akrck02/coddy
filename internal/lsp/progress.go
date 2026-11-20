@@ -151,8 +151,9 @@ func (client *Client) noteImport(params json.RawMessage) {
 	}
 	client.lock.Lock()
 	defer client.lock.Unlock()
-	client.imported[strings.TrimSpace(folder)] = time.Now()
-	client.importing = filepath.Base(strings.TrimSpace(folder))
+	project := client.projectOf(strings.TrimSpace(folder))
+	client.imported[project] = time.Now()
+	client.importing = filepath.Base(project)
 }
 
 // noteLog keeps a message a server logged or showed (window/logMessage, window/showMessage).
@@ -191,7 +192,8 @@ func (client *Client) Progress() Progress {
 	defer client.lock.Unlock()
 	progress := Progress{Phase: "ready", Percent: -1, Started: client.started, Since: client.started,
 		Log: append([]Message(nil), client.log...)}
-	progress.Done, progress.Total = len(client.imported), len(client.folders)
+	// a project read from its model is not imported: it counts as done from the start
+	progress.Done, progress.Total = min(len(client.imported)+len(client.standIns), len(client.folders)), len(client.folders)
 	progress.Projects = client.projectStates(time.Now())
 	if latest := client.latestWork(); latest != nil {
 		progress.Phase, progress.Detail = phaseOf(latest.title), latest.message

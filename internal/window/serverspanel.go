@@ -103,6 +103,7 @@ func (application *Window) buildServerCard(context *ui.Context, view serverView)
 		}
 		context.Text(application.cardFacts(view), quiet)
 		application.buildGradleLine(context, view)
+		buildModelsLine(context, view)
 		buildLeftOut(context, view.leftOut)
 		if activity := strings.TrimSpace(view.progress.Detail); activity != "" && view.state != serverReady {
 			if fitted := theme.FitText(context, activity, quiet, serversPanelWidth-80); fitted != "" {
@@ -235,6 +236,46 @@ func (application *Window) buildGradleLine(context *ui.Context, view serverView)
 			context.Text(fmt.Sprintf("Gradle stopped once done: %s released at %s", plural(released, "daemon"), at.Format("15:04")), quiet)
 		})
 	}
+}
+
+// buildModelsLine says, for a server given the models of its projects, how it read them: from
+// their models, or imported with Gradle and their models kept.
+func buildModelsLine(context *ui.Context, view serverView) {
+	if !view.client.Server.Models {
+		return
+	}
+	words, trouble := modelWords(view.client.Models())
+	if words == "" {
+		return
+	}
+	palette := context.Theme
+	icon, colour := "check", palette.Positive
+	if trouble {
+		icon, colour = "triangle-alert", palette.Warning
+	}
+	context.Box(ui.Layout{Gap: 6, AlignY: ui.Center}, func() {
+		context.IconSized(icon, 12, colour)
+		context.Text(words, ui.TextStyle{Size: palette.SmallTextSize, Color: palette.InkSoft})
+	})
+}
+
+// modelWords say how a server read its projects, and whether their models could not be kept:
+// "16 projects from their models · 3 imported with Gradle, models kept at 15:04".
+func modelWords(fromModel, imported int, keptAt time.Time, why string) (string, bool) {
+	var parts []string
+	if fromModel > 0 {
+		parts = append(parts, plural(fromModel, "project")+" from their models, no Gradle")
+	}
+	switch {
+	case imported == 0:
+	case why != "":
+		parts = append(parts, plural(imported, "project")+" imported with Gradle; their models could not be kept: "+why)
+	case keptAt.IsZero():
+		parts = append(parts, plural(imported, "project")+" imported with Gradle; their models are kept once it is done")
+	default:
+		parts = append(parts, plural(imported, "project")+" imported with Gradle, models kept at "+keptAt.Format("15:04"))
+	}
+	return strings.Join(parts, " · "), why != ""
 }
 
 // buildLeftOut lists the projects a server leaves out, each with why: their uses are found by

@@ -67,6 +67,8 @@ func TestOnlyTheSaveWritesInARepository(test *testing.T) {
 		filepath.Join(moduleRoot, "internal/lsp/gradle.go"): true,
 		// how long a server took to read the projects, in its data folder
 		filepath.Join(moduleRoot, "internal/lsp/reading.go"): true,
+		// the models of the projects a server imported, in its data folder
+		filepath.Join(moduleRoot, "internal/lsp/models.go"): true,
 	}
 	writers := []string{"os.WriteFile(", "os.Create(", "os.CreateTemp(", "os.OpenFile(", "os.Rename(",
 		"os.Remove(", "os.RemoveAll(", "os.Mkdir(", "os.MkdirAll(", "os.Chmod(", "os.Truncate(",

@@ -107,7 +107,12 @@ It has two modes, chosen on the rail at the far left (or with `1`, `2`, `c`):
     choice is remembered). `kotlin-lsp` keeps one index per set of projects, in its data folder's
     `indexes/` (it would keep them in `~/Library/Caches/JetBrains` otherwise, where nothing removes
     them): one index for every set hung it when started with fewer projects than the index knew.
-    It reads every Kotlin project of the window, whatever the filter shows, importing them once. `jdtls` too reads every Java project of the window from its start: it drops
+    It reads every Kotlin project of the window, whatever the filter shows, importing them once.
+    Once it has imported a project with Gradle the reader keeps the project's model (kotlin-lsp's
+    `workspace.json`, in `models/`) with a fingerprint of its build files; the next start reads the
+    project from that model, through a folder standing in for it, with no Gradle at all, until a
+    build file changes (`settings.gradle*`, `build.gradle*`, `gradle.properties`,
+    `libs.versions.toml`, the wrapper's version). The servers panel says how many were read each way. `jdtls` too reads every Java project of the window from its start: it drops
     from its workspace the projects it was not started with, and would import each again with
     Gradle as a search of uses reached it. The reader keeps the index used last (`-keep-indexes` keeps more), and
     does not start it on a disk with less than 10 GB free, saying why.

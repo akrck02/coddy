@@ -69,3 +69,24 @@ func TestAProjectLeftOutOfTheServersIsToldWithWhy(test *testing.T) {
 		test.Errorf("the servers panel lists as left out %+v", views)
 	}
 }
+
+func TestThePanelSaysHowTheProjectsWereRead(test *testing.T) {
+	at := time.Date(2026, 11, 20, 15, 4, 0, 0, time.Local)
+	cases := []struct {
+		fromModel, imported int
+		kept                time.Time
+		why, want           string
+		trouble             bool
+	}{
+		{0, 0, time.Time{}, "", "", false},
+		{19, 0, time.Time{}, "", "19 projects from their models, no Gradle", false},
+		{0, 3, time.Time{}, "", "3 projects imported with Gradle; their models are kept once it is done", false},
+		{16, 3, at, "", "16 projects from their models, no Gradle · 3 projects imported with Gradle, models kept at 15:04", false},
+		{0, 1, at, "disk full", "1 project imported with Gradle; their models could not be kept: disk full", true},
+	}
+	for _, each := range cases {
+		if words, trouble := modelWords(each.fromModel, each.imported, each.kept, each.why); words != each.want || trouble != each.trouble {
+			test.Errorf("%+v says %q (%v)", each, words, trouble)
+		}
+	}
+}

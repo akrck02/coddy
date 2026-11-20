@@ -55,6 +55,10 @@ type Server struct {
 	// RetiredIndexes are folders of its data folder where an older reader kept its indexes, removed
 	// as old indexes are.
 	RetiredIndexes []string
+	// Models keeps, for each project the server imports with Gradle, the model it imported, and
+	// starts it with that model instead while the project's build files do not change: kotlin-lsp's
+	// json importer and its exportWorkspace (models.go).
+	Models bool
 	// OwnGradle gives a server that imports Gradle builds a Gradle home of its own, in its data
 	// folder, whose daemons stop soon after it and with it (gradle.go).
 	OwnGradle bool
@@ -109,7 +113,7 @@ var Servers = []Server{
 		// paths by the place of their folder among those it started with ($WORKSPACE_7$/src/main),
 		// and started with fewer folders it cannot read them and hangs, answering nothing. So one
 		// per set, in indexes/, the last kept; rocks/ was the one for every set
-		Indexes: "indexes", KeepIndexes: 1, IndexOption: "indexDir", RetiredIndexes: []string{"rocks"}, ReadsAll: true, OwnGradle: true, NeedsFree: 10 << 30, ReadyAfterWork: true,
+		Indexes: "indexes", KeepIndexes: 1, IndexOption: "indexDir", RetiredIndexes: []string{"rocks"}, ReadsAll: true, Models: true, OwnGradle: true, NeedsFree: 10 << 30, ReadyAfterWork: true,
 		// no -Dcom.jetbrains.ls.imports.gradle.daemon.no.idle.timeout: it gives each daemon an idle
 		// time of 1 ms, so none was used twice (148 times on the big workspace); the reader stops its daemons
 		// itself once the import is done (gradle.go)

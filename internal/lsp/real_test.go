@@ -136,6 +136,59 @@ func TestKotlinLspFollowsANameAcrossFiles(test *testing.T) {
 	}
 }
 
+// kotlin-lsp imports a project with Gradle the first time and keeps its model; the second time it
+// reads it from the model, with no Gradle daemon, and follows a name as well.
+func TestKotlinLspReadsAProjectFromItsModelTheSecondTime(test *testing.T) {
+	server := realServer(test, "kotlin-lsp")
+	folder := project(test, map[string]string{
+		"settings.gradle.kts":              "rootProject.name = \"lamp\"\n",
+		"build.gradle.kts":                 "plugins { kotlin(\"jvm\") version \"2.1.0\" }\n\nrepositories { mavenCentral() }\n",
+		"src/main/kotlin/lamp/Lamp.kt":     "package lamp\n\nobject Lamp {\n    fun beam() = 2\n}\n",
+		"src/main/kotlin/keeper/Keeper.kt": "package keeper\n\nimport lamp.Lamp\n\nclass Keeper {\n    val light = Lamp.beam()\n}\n",
+	})
+	data := test.TempDir()
+	first := startedAndFollowing(test, server, folder, data)
+	for wait := 0; wait < 120; wait++ {
+		if _, _, kept, _ := first.Models(); !kept.IsZero() {
+			break
+		}
+		time.Sleep(time.Second)
+	}
+	fromModel, imported, kept, why := first.Models()
+	first.Stop()
+	if kept.IsZero() || why != "" || imported != 1 || fromModel != 0 {
+		test.Fatalf("first start: %d from a model, %d imported, kept at %v (%s)", fromModel, imported, kept, why)
+	}
+	daemons, _ := filepath.Glob(filepath.Join(data, "gradle", "daemon", "*", "daemon-*.out.log"))
+	second := startedAndFollowing(test, server, folder, data)
+	defer second.Stop()
+	if fromModel, imported, _, _ := second.Models(); fromModel != 1 || imported != 0 {
+		test.Errorf("second start: %d from a model, %d imported", fromModel, imported)
+	}
+	if again, _ := filepath.Glob(filepath.Join(data, "gradle", "daemon", "*", "daemon-*.out.log")); len(again) != len(daemons) {
+		test.Errorf("reading from the model ran %d Gradle daemons", len(again)-len(daemons))
+	}
+}
+
+// startedAndFollowing starts a server for a project and checks it follows Keeper's use of beam to
+// Lamp.kt, once it is ready.
+func startedAndFollowing(test *testing.T, server Server, folder, data string) *Client {
+	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Minute)
+	defer cancel()
+	client, err := Start(ctx, server, "", []string{folder}, data)
+	if err != nil {
+		test.Fatal(err)
+	}
+	use := filepath.Join(folder, "src", "main", "kotlin", "keeper", "Keeper.kt")
+	content, _ := os.ReadFile(use)
+	client.Tell(use, string(content), 1)
+	declared, err := client.Definition(ctx, use, placeOf(test, use, "beam("))
+	if err != nil || len(declared) == 0 || filepath.Base(PathOf(declared[0].URI)) != "Lamp.kt" {
+		test.Errorf("beam is declared at %+v (%v), want Lamp.kt", declared, err)
+	}
+	return client
+}
+
 // theDaemonsStopped stops a server and checks it imported with its own Gradle home, whose daemons
 // stopped with it.
 func theDaemonsStopped(test *testing.T, client *Client, data string) {

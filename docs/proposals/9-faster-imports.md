@@ -1,6 +1,6 @@
 # 9. Servers that import faster
 
-> Status: in progress (block 1 built; block 2 being built) · Author's approval: proposal ☑ plan ☑ (block 1) · block 2 plan ☑
+> Status: in progress (blocks 1 and 2 built; block 3 is the person's) · Author's approval: proposal ☑ plan ☑ (block 1) · block 2 plan ☑
 
 ## Why
 
@@ -163,11 +163,51 @@ set, now in `indexes/<hash of the folders>`, the last kept; `rocks/` is removed.
 
 Tasks:
 
-- [ ] T8 Fingerprint of a repository's build files, and the model kept with it. (R4.1)
-- [ ] T9 Stand-in folders and `buildTools` at start; real folders for the old ones. (R4.2)
-- [ ] T10 Export once ready, split by repository. (R4.3, R4.4)
-- [ ] T11 Say it in the panel. (R4.5)
-- [ ] T12 Measure on the big workspace: first start (Gradle), second (models), one build file changed.
+- [x] T8 Fingerprint of a repository's build files, and the model kept with it. (R4.1)
+- [x] T9 Stand-in folders and `buildTools` at start; real folders for the old ones. (R4.2)
+- [x] T10 Export once ready, split by repository. (R4.3, R4.4)
+- [x] T11 Say it in the panel. (R4.5)
+- [x] T12 Measure on the big workspace: first start (Gradle), second (models), one build file changed.
+
+Notes while building:
+
+- **T8–T10** (`lsp/models.go`): a model is kept in `models/<hash of the project's path>/`, the
+  folder that then stands in for the project, beside `build-files`, the fingerprint. The
+  fingerprint is taken as the server starts, so a build file changed during the import makes the
+  model old at once. The whole model is exported once the server is done importing (ready and
+  quiet 20 s, as for its daemons), to `models/export/`, removed after. A module is the project's
+  whose content root is in it (a build copied from another checkout names that one, two of the big workspace)
+  given as it is or with its links resolved: kotlin-lsp resolved `~/Code`, a link to the USB disk,
+  and left `/var` as it was. A project of no module, its import failed, is imported again.
+- **The index is the projects'**, a stand-in taking its project's place among the folders: one
+  build changing does not make another index (trial 3 showed a stand-in where its project was
+  works). By hand, 19 models side by side: ready in 14.2 s with the index, 84 s cold, no error.
+- Real tests: the model kept on the first start, the second reads it with no Gradle daemon and
+  follows a name.
+
+## Result of block 2 (T12, on the big workspace, 20 November 2026)
+
+The 19 Kotlin repositories that are not Android apps, through the reader's client (`lsp.Start`),
+with the index of their set built; time to ready and quiet.
+
+| Start | Ready | Read from their models | Imported with Gradle |
+|---|---|---|---|
+| First, no models (Gradle's caches warm) | 90 s | 0 | 19 |
+| Second, the models just kept | 53 s | 17 | 2 |
+| Next ones | **18 to 19 s** | 17 | 2 |
+| One build file changed | 28 s | 16 | 3 |
+| The start after that | 141 s, once | 17 | 2 |
+
+- A project going from Gradle to its model is indexed again by kotlin-lsp once: the second start,
+  and the one after a build changed. Then 18 to 19 s.
+- Two repositories (`platform.api.graphics`, `platform.api.planning`) fail their Gradle import on
+  every start, so they have no model and are imported again each time: two daemons and a few
+  seconds. Their failure is a build matter; the reader could keep it with the fingerprint and not
+  try again until the build changes, if it is worth it.
+- Found while measuring: kotlin-lsp writes a path in the person's home as `<HOME>/…` in the model
+  (it had written them resolved when given resolved folders); the reader expands it to match a
+  module to its project, and keeps the model as written, which kotlin-lsp reads back. An export
+  where no project of the server has a module is an error, said in the panel.
 
 Risks: the importer and the command are not documented and may change with kotlin-lsp; the
 reader checks the export's shape and falls back to Gradle when a model cannot be read. Each new set

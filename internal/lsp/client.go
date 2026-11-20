@@ -51,6 +51,13 @@ type Client struct {
 	lastReading time.Duration
 	released    int
 	releasedAt  time.Time
+	// for a server that is given the models of its projects (Models): the folder standing in for
+	// each project read from its model, and the fingerprint of the build files of each project it
+	// imports with Gradle, to keep its model once imported (models.go)
+	standIns  map[string]string
+	toImport  map[string]string
+	modelsAt  time.Time // when the models were last kept
+	modelsErr string    // why they could not be, "" when they were
 }
 
 // Start runs a server in a root (or, with folders, for those workspace folders) and initializes
@@ -70,6 +77,9 @@ func Start(ctx context.Context, server Server, root string, folders []string, da
 	client := &Client{Server: server, Root: root, command: command, exited: make(chan struct{}), data: dataFolder, versions: map[string]int{}, folders: map[string]bool{},
 		ready: make(chan struct{}), working: map[string]*work{}, started: time.Now(), statusSince: time.Now(),
 		imported: map[string]time.Time{}, changes: make(chan struct{}, 1)}
+	if server.Models && dataFolder != "" && root == "" {
+		client.chooseModels(folders)
+	}
 	if server.ReadyStatus == "" && !server.ReadyAfterWork {
 		client.becomeReady()
 	}
@@ -82,17 +92,27 @@ func Start(ctx context.Context, server Server, root string, folders []string, da
 		client.kill()
 		return nil, err
 	}
-	if server.OwnGradle && dataFolder != "" {
+	client.watch()
+	return client, nil
+}
+
+// watch starts, once a server is initialized, what follows it while it runs: its readiness, its
+// Gradle daemons, the models of the projects it imports, how long it takes to read them.
+func (client *Client) watch() {
+	server := client.Server
+	if server.OwnGradle && client.data != "" {
 		go client.releaseGradle()
 	}
 	if server.ReadyAfterWork {
 		go client.readyWithoutWork()
 	}
-	if dataFolder != "" {
-		client.lastReading = LastReading(dataFolder)
+	if len(client.toImport) > 0 {
+		go client.keepModels()
+	}
+	if client.data != "" {
+		client.lastReading = LastReading(client.data)
 		go client.rememberReading()
 	}
-	return client, nil
 }
 
 // commandOf is the command that runs a server: its arguments, its data folder, its memory and its
@@ -131,15 +151,16 @@ func (client *Client) initialize(ctx context.Context, root string, folders []str
 	if root != "" {
 		folders = []string{root}
 	}
-	workspaceFolders := make([]map[string]string, len(folders))
+	workspaceFolders, given := make([]map[string]string, len(folders)), make([]string, len(folders))
 	for index, folder := range folders {
-		workspaceFolders[index] = map[string]string{"uri": FileURI(folder), "name": filepath.Base(folder)}
+		given[index] = client.serverFolder(folder)
+		workspaceFolders[index] = map[string]string{"uri": FileURI(given[index]), "name": filepath.Base(folder)}
 		client.folders[folder] = true
 	}
 	params := map[string]any{
 		"processId":        os.Getpid(),
 		"clientInfo":       map[string]string{"name": "code-review"},
-		"rootUri":          FileURI(firstOf(root, folders)),
+		"rootUri":          FileURI(firstOf(root, given)),
 		"workspaceFolders": workspaceFolders,
 		"capabilities":     capabilities,
 	}
@@ -163,11 +184,13 @@ func (client *Client) initialize(ctx context.Context, root string, folders []str
 }
 
 // initializationOptions are the server's own options, with its settings when it has some, and its
-// workspace folders for a server that reads them there.
+// workspace folders for a server that reads them there. Its index is the projects', whether each
+// is read from its model or imported: a stand-in takes its project's place among the folders, and
+// one project's build changing does not make another index.
 func (client *Client) initializationOptions(folders []string) map[string]any {
 	server := client.Server
 	ownIndex := server.IndexOption != "" && client.data != ""
-	if server.Settings == nil && !server.FoldersInOptions && !ownIndex {
+	if server.Settings == nil && !server.FoldersInOptions && !ownIndex && len(client.standIns) == 0 {
 		return server.Options
 	}
 	options := maps.Clone(server.Options)
@@ -180,10 +203,13 @@ func (client *Client) initializationOptions(folders []string) map[string]any {
 	if ownIndex {
 		options[server.IndexOption] = indexFolder(client.data, server, folders)
 	}
+	if len(client.standIns) > 0 {
+		options["buildTools"] = client.buildTools()
+	}
 	if server.FoldersInOptions {
 		uris := make([]string, len(folders))
 		for index, folder := range folders {
-			uris[index] = FileURI(folder)
+			uris[index] = FileURI(client.serverFolder(folder))
 		}
 		options["workspaceFolders"] = uris
 	}
@@ -341,7 +367,7 @@ func (client *Client) changeFolder(folder string, add bool) error {
 	if known == add {
 		return nil
 	}
-	changed := []map[string]string{{"uri": FileURI(folder), "name": filepath.Base(folder)}}
+	changed := []map[string]string{{"uri": FileURI(client.serverFolder(folder)), "name": filepath.Base(folder)}}
 	event := map[string]any{"added": changed, "removed": []map[string]string{}}
 	if !add {
 		event = map[string]any{"added": []map[string]string{}, "removed": changed}
