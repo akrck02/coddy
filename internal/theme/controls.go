@@ -117,22 +117,3 @@ func TextWidth(context *ui.Context, text string, style ui.TextStyle) float32 {
 	}
 	return context.Measurer().MeasureText(text, size, style.Weight, 1).Width
 }
-
-// FitTextEnd shortens a text from its start, keeping its end: a folder's path is told apart by its
-// last folders.
-func FitTextEnd(context *ui.Context, text string, style ui.TextStyle, width float32) string {
-	if width <= 0 {
-		return ""
-	}
-	if TextWidth(context, text, style) <= width {
-		return text
-	}
-	runes := []rune(text)
-	for cut := 1; cut < len(runes); cut++ {
-		shortened := "…" + string(runes[cut:])
-		if TextWidth(context, shortened, style) <= width {
-			return shortened
-		}
-	}
-	return ""
-}

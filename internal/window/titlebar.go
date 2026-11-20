@@ -9,18 +9,22 @@ import (
 )
 
 const (
-	// compactWindow is the window's width under which the bar drops words to keep its buttons
-	compactWindow = 1100
+	// compactBar is the bar's width under which it drops words to keep its buttons
+	compactBar = 760
 	// toolWidth is a tool button's width and the gap after it
 	toolWidth = 34
+	// titleBarHeight is the bar's height, and searchHeight its search field's
+	titleBarHeight = 36
+	searchHeight   = 26
 )
 
-// buildTitleBar is the top of the window, and follows what is in front: the file open, named by
-// its path, or else the workspace; the search; the file's buttons; the mode's own buttons and the
-// menu.
+// buildTitleBar is the top of the viewer's side, right of the rail and the sidebar, and follows
+// what is in front: the file open, named by its path, or else the workspace; the search; the
+// file's buttons; the mode's own buttons and the menu.
 func (application *Window) buildTitleBar(context *ui.Context) {
 	windowWidth, _ := context.Size()
-	compact := windowWidth < compactWindow
+	barWidth := application.viewerWidth(windowWidth)
+	compact := barWidth < compactBar
 	search := float32(360)
 	if compact {
 		search = 220
@@ -31,15 +35,15 @@ func (application *Window) buildTitleBar(context *ui.Context) {
 		buttons += application.viewer.ButtonsWidth(context, compact, application.mode.ShowsChanges()) + 13
 	}
 	// the search stays in the middle while the buttons fit in their half; it moves aside otherwise
-	half := (windowWidth - 28 - 16 - search) / 2
+	half := (barWidth - 24 - 16 - search) / 2
 	room, left := half, ui.Fixed(half)
 	if buttons > half {
 		room, left = 2*half-buttons, ui.Grow()
 	}
-	context.Box(ui.Layout{Width: ui.Grow(), Height: ui.Fixed(44), Padding: ui.PadXY(14, 0), Gap: 8, AlignY: ui.Center}, func() {
+	context.Box(ui.Layout{Width: ui.Grow(), Height: ui.Fixed(titleBarHeight), Padding: ui.PadXY(12, 0), Gap: 8, AlignY: ui.Center}, func() {
 		context.Box(ui.Layout{Width: left, Gap: 6, AlignY: ui.Center}, func() {
 			if file {
-				application.viewer.BuildTitle(context, room, compact)
+				application.viewer.BuildTitle(context, application, room, compact)
 				return
 			}
 			application.buildWorkspaceTitle(context)
@@ -79,16 +83,16 @@ func (application *Window) buildWorkspaceTitle(context *ui.Context) {
 func (application *Window) buildSearchField(context *ui.Context, width float32) {
 	palette := context.Theme
 	look := application.look
-	normal := ui.Look{Fill: look.Hover.WithAlpha(0.7), Radius: 17, Border: look.Chosen.WithAlpha(0.6), BorderWidth: 1}
+	normal := ui.Look{Fill: look.Hover.WithAlpha(0.7), Radius: searchHeight / 2, Border: look.Chosen.WithAlpha(0.6), BorderWidth: 1}
 	hovered := normal
 	hovered.Fill, hovered.Border = look.Hover, palette.Primary.WithAlpha(0.45)
-	search := ui.Layout{Width: ui.Fixed(width), Height: ui.Fixed(34), Padding: ui.Padding{Left: 14, Right: 6}, Gap: 10, AlignY: ui.Center}
+	search := ui.Layout{Width: ui.Fixed(width), Height: ui.Fixed(searchHeight), Padding: ui.Padding{Left: 12, Right: 4}, Gap: 8, AlignY: ui.Center}
 	if context.Clickable("search files", search, ui.Looks{Normal: normal, Hovered: hovered, Pressed: hovered}, func() {
-		context.IconSized("search", 15, palette.InkSoft)
+		context.IconSized("search", 14, palette.InkSoft)
 		context.Text("Search files", ui.TextStyle{Color: palette.InkQuiet})
 		context.Spacer()
-		keyCap := ui.Look{Fill: look.Chosen.WithAlpha(0.55), Radius: 11}
-		context.Frame(ui.Layout{Height: ui.Fixed(22), Padding: ui.PadXY(9, 0), AlignY: ui.Center}, keyCap, func() {
+		keyCap := ui.Look{Fill: look.Chosen.WithAlpha(0.55), Radius: 9}
+		context.Frame(ui.Layout{Height: ui.Fixed(18), Padding: ui.PadXY(7, 0), AlignY: ui.Center}, keyCap, func() {
 			context.Text("⌘P", ui.TextStyle{Size: palette.SmallTextSize, Color: palette.InkSoft, Weight: draw2d.Medium})
 		})
 	}) {

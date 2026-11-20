@@ -40,6 +40,8 @@ type Window interface {
 	FocusViewer()
 	HasProjects() bool
 	OpenFolder()
+	// RevealFolder shows a folder of a project in the sidebar, "" the project.
+	RevealFolder(project int, folder string)
 	// FileButton is the button the mode that is on puts in the header, such as Viewed;
 	// PressFileButton presses it.
 	FileButton(file workspace.FileReference) (Button, bool)

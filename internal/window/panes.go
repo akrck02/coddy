@@ -165,6 +165,13 @@ func (application *Window) Reveal(file workspace.FileReference) {
 	application.sidebar.RevealFile(application, file)
 }
 
+// RevealFolder shows a folder of a project in the sidebar, with the keyboard, and brings the
+// sidebar back if it was folded away.
+func (application *Window) RevealFolder(project int, folder string) {
+	application.sidebar.RevealFolder(application, project, folder)
+	application.focus = sidebarPane
+}
+
 // Target is the file a key acts on: the one selected in the sidebar while it has the keyboard,
 // else the one open. inViewer tells whether it is the one open, or the viewer has the keyboard.
 func (application *Window) Target() (file workspace.FileReference, inViewer bool, found bool) {

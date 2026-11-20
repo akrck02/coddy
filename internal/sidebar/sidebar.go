@@ -345,12 +345,48 @@ func (sidebar *Sidebar) RevealFile(window Window, reference workspace.FileRefere
 	if sidebar.Listing.ChangesOnly() && !changed {
 		window.ListEveryFile()
 	}
-	sidebar.expanded[sidebar.expandedKey(reference.Project, "")] = true
-	folder := sidebar.tree(window, reference.Project)
-	for {
+	sidebar.expandTo(window, reference.Project, reference.Path)
+	sidebar.Rebuild(window)
+	sidebar.selectRow(FileRow, reference.Project, reference.Path)
+}
+
+// RevealFolder opens a project's folders down to one and selects it: the row of a chain of lone
+// folders it is in, if it is one of the chain's, or the project's row for "".
+func (sidebar *Sidebar) RevealFolder(window Window, project int, folder string) {
+	if project < 0 || project >= len(window.Projects()) {
+		return
+	}
+	if sidebar.Entered != "" && sidebar.Entered != window.Projects()[project].Path {
+		sidebar.Entered = ""
+	}
+	row := sidebar.expandTo(window, project, folder)
+	kind := FolderRow
+	if row == "" {
+		kind = ProjectRow
+	}
+	sidebar.Rebuild(window)
+	if sidebar.selectRow(kind, project, row) {
+		return
+	}
+	if sidebar.onlyChanged { // a folder with no change, hidden by the filters
+		window.ShowEveryProject()
+	}
+	if sidebar.Listing.ChangesOnly() {
+		window.ListEveryFile()
+	}
+	sidebar.Rebuild(window)
+	sidebar.selectRow(kind, project, row)
+}
+
+// expandTo opens a project and its folders around a path, a file's or a folder's, and gives the
+// deepest folder row the path is in or is: a row of a chain of lone folders names the whole chain.
+func (sidebar *Sidebar) expandTo(window Window, project int, path string) string {
+	sidebar.expanded[sidebar.expandedKey(project, "")] = true
+	folder, row := sidebar.tree(window, project), ""
+	for strings.HasPrefix(path, row+"/") || row == "" {
 		var inside *workspace.Folder
 		for _, child := range folder.Folders {
-			if strings.HasPrefix(reference.Path, child.Path+"/") {
+			if child.Path == path || strings.HasPrefix(path, child.Path+"/") || strings.HasPrefix(child.Path, path+"/") {
 				inside = child
 				break
 			}
@@ -358,17 +394,23 @@ func (sidebar *Sidebar) RevealFile(window Window, reference workspace.FileRefere
 		if inside == nil {
 			break
 		}
-		sidebar.expanded[sidebar.expandedKey(reference.Project, inside.Path)] = true
-		folder = inside
+		sidebar.expanded[sidebar.expandedKey(project, inside.Path)] = true
+		folder, row = inside, inside.Path
 	}
-	sidebar.Rebuild(window)
+	return row
+}
+
+// selectRow selects the row of a kind, project and path, a project's whatever its path, and
+// brings it into sight; it tells whether there was one.
+func (sidebar *Sidebar) selectRow(kind RowKind, project int, path string) bool {
 	for index, row := range sidebar.Rows {
-		if row.Kind == FileRow && row.Project == reference.Project && row.Path == reference.Path {
+		if row.Kind == kind && row.Project == project && (kind == ProjectRow || row.Path == path) {
 			sidebar.Selected = index
 			sidebar.list.Reveal(index)
-			return
+			return true
 		}
 	}
+	return false
 }
 
 // activate does what Enter or a click does on a row: open a file, open or close a folder.

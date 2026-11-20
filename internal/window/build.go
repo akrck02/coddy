@@ -39,8 +39,6 @@ func (application *Window) Build(context *ui.Context) {
 	application.advanceUses()
 
 	context.Frame(ui.Layout{Direction: ui.Vertical, Width: ui.Grow(), Height: ui.Grow()}, ui.Look{Fill: context.Theme.Background}, func() {
-		application.buildTitleBar(context)
-		context.Frame(ui.Layout{Width: ui.Grow(), Height: ui.Fixed(1)}, ui.Look{Fill: context.Theme.Line}, nil)
 		context.Box(ui.Layout{Width: ui.Grow(), Height: ui.Grow()}, func() {
 			application.buildPanes(context)
 		})
@@ -65,23 +63,34 @@ func (application *Window) Build(context *ui.Context) {
 	}
 }
 
-// buildPanes lays the mode rail, the sidebar (unless it is folded away) and the viewer side by side.
+// buildPanes lays the mode rail, the sidebar (unless it is folded away) and the viewer side by side,
+// the rail and the sidebar from the top of the window, the title bar over the viewer alone.
 func (application *Window) buildPanes(context *ui.Context) {
 	application.buildModeRail(context)
 	context.Frame(ui.Layout{Width: ui.Fixed(1), Height: ui.Grow()}, ui.Look{Fill: context.Theme.Line}, nil)
 	if !application.sidebarFolded {
 		application.buildSidebar(context)
 	}
-	cover, covers := application.mode.(mode.Cover)
-	if !covers {
-		application.viewer.Build(context, application)
-		return
-	}
 	context.Box(ui.Layout{Direction: ui.Vertical, Width: ui.Grow(), Height: ui.Grow()}, func() {
-		if !cover.BuildOverViewer(context) {
+		application.buildTitleBar(context)
+		context.Frame(ui.Layout{Width: ui.Grow(), Height: ui.Fixed(1)}, ui.Look{Fill: context.Theme.Line}, nil)
+		if cover, covers := application.mode.(mode.Cover); !covers || !cover.BuildOverViewer(context) {
 			application.viewer.Build(context, application)
 		}
 	})
+}
+
+// modeRailWidth is the mode rail's width.
+const modeRailWidth = 48
+
+// viewerWidth is how wide the side right of the rail and the sidebar is, in a window of a width:
+// the title bar's.
+func (application *Window) viewerWidth(windowWidth float32) float32 {
+	width := windowWidth - modeRailWidth - 1
+	if !application.sidebarFolded {
+		width -= application.sidebar.Width + 1
+	}
+	return max(width, 0)
 }
 
 // buildSidebar is the sidebar, as wide as it was left, with the line after it.
@@ -161,7 +170,7 @@ func (application *Window) copyPath(context *ui.Context) {
 // the files or reviewing the changes: one place per mode, always in sight, one key each.
 func (application *Window) buildModeRail(context *ui.Context) {
 	palette := context.Theme
-	context.Box(ui.Layout{Direction: ui.Vertical, Width: ui.Fixed(48), Height: ui.Grow(), Padding: ui.PadXY(0, 10), Gap: 6, AlignX: ui.Center}, func() {
+	context.Box(ui.Layout{Direction: ui.Vertical, Width: ui.Fixed(modeRailWidth), Height: ui.Grow(), Padding: ui.PadXY(0, 10), Gap: 6, AlignX: ui.Center}, func() {
 		for _, place := range application.modes {
 			chosen := application.mode == place
 			ink, normal := palette.InkQuiet, ui.Look{Radius: 8}
