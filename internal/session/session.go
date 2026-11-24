@@ -28,7 +28,7 @@ type Session struct {
 
 // New is a session with nothing open, comparing against base.
 func New(base string, workingTree bool) Session {
-	return Session{Base: base, WorkingTree: workingTree, bases: map[string]string{}, documents: newDocumentCache(documentCacheBytes)}
+	return Session{Base: base, WorkingTree: workingTree, bases: map[string]string{}, documents: newDocumentCache(DefaultDocumentMegabytes * bytesPerMegabyte)}
 }
 
 // AddFolders remembers folders and adds the repositories inside them not open yet, in the order
@@ -52,6 +52,26 @@ func (session *Session) AddFolders(folders []string) {
 		return strings.ToLower(session.Projects[first].Name) < strings.ToLower(session.Projects[second].Name)
 	})
 	session.documents.forgetAll()
+}
+
+// DocumentMegabytes is how much memory, in megabytes, the documents kept may take.
+func (session *Session) DocumentMegabytes() int {
+	return session.documents.budget / bytesPerMegabyte
+}
+
+// SetDocumentMegabytes changes how much memory, in megabytes, the documents kept may take, and
+// forgets the least recently opened at once until they fit. A budget that is not one of
+// DocumentMegabyteChoices (a preference written by hand, or none) is taken as the default.
+func (session *Session) SetDocumentMegabytes(megabytes int) {
+	if !slices.Contains(DocumentMegabyteChoices, megabytes) {
+		megabytes = DefaultDocumentMegabytes
+	}
+	session.documents.setBudget(megabytes * bytesPerMegabyte)
+}
+
+// DocumentUse is how many documents are kept, and about how many bytes they take.
+func (session *Session) DocumentUse() (documents, bytes int) {
+	return session.documents.order.Len(), session.documents.used
 }
 
 // Clear forgets every folder, project and document.

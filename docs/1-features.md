@@ -181,8 +181,9 @@ The interface follows what review tools have settled on, and keeps colour for me
 - **The settings are a screen of their own**, in place of the sidebar and the file, opened from
   the gear in the bar over the file (`⌘,`; `?` opens them on the keys) and closed with Esc. Their
   sections are listed on the left: *Appearance*, each theme as a small window painted in it and
-  each icon theme as a card of a few of its icons, and
-  *Keys*, every command with its keys drawn as caps.
+  each icon theme as a card of a few of its icons; *Memory*, how much memory the files you
+  open may keep (32, 64, 128 or 256 MB, 64 to start with, remembered), so going back to one is
+  instant; and *Keys*, every command with its keys drawn as caps.
 - **Themes**, chosen in the settings (the gear in the bar, or `⌘,`) and remembered: Zed's One Dark and One Light,
   IntelliJ's Dark and Light, Visual Studio Code's Dark Modern (its colours, from
   [microsoft/vscode](https://github.com/microsoft/vscode), MIT), and [Dracula](https://draculatheme.com/)'s Dracula Solid

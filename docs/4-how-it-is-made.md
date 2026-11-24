@@ -99,8 +99,10 @@ What is kept, and what makes it stale:
 
 Two of these deserve a word more.
 
-**The documents** are kept up to about 64 MB (`documentCacheBytes` in
-`internal/session/cache.go`), and the least recently opened go first. Their size is an estimate
+**The documents** are kept up to a budget a person chooses in *Settings › Memory* (32, 64, 128
+or 256 MB; `DefaultDocumentMegabytes`, 64, until then, in `internal/session/cache.go`), and the
+least recently opened go first, at once when the budget shrinks. A file of code takes about 100
+to 350 KB once read: its two versions, its diff and its colours weigh far more than its text. Their size is an estimate
 from their text and lines, not a measure. Each remembers its file's time and size, so a file
 changed by another program is read again when it is opened, never in a frame.
 

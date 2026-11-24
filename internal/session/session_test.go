@@ -3,6 +3,7 @@ package session
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/akrck02/code-review/internal/workspace"
@@ -53,6 +54,27 @@ func TestACacheOverItsBudgetForgetsTheLeastRecentlyUsedDocument(test *testing.T)
 	}
 	if cache.used != 2*size {
 		test.Errorf("the cache counts %d bytes, want %d", cache.used, 2*size)
+	}
+}
+
+func TestASmallerBudgetForgetsTheLeastRecentlyUsedDocumentsAtOnce(test *testing.T) {
+	opened := New("", true)
+	opened.SetDocumentMegabytes(64)
+	text := strings.Repeat("a line of text that fills the cache\n", 30000) // about a megabyte
+	references := []workspace.FileReference{{Path: "first"}, {Path: "second"}, {Path: "third"}}
+	for _, reference := range references {
+		opened.documents.keep(Read{Reference: reference, Document: &workspace.Document{Text: text}})
+	}
+	opened.documents.setBudget(2 * sizeOf(&workspace.Document{Text: text}))
+	if documents, _ := opened.DocumentUse(); documents != 2 {
+		test.Fatalf("after the budget shrank to two documents, %d are kept", documents)
+	}
+	if _, kept := opened.documents.take(references[0], diskStamp{}); kept {
+		test.Error("the document opened longest ago is kept")
+	}
+	opened.SetDocumentMegabytes(1000)
+	if opened.DocumentMegabytes() != DefaultDocumentMegabytes {
+		test.Errorf("a budget that is not a choice gives %d MB, want the default %d", opened.DocumentMegabytes(), DefaultDocumentMegabytes)
 	}
 }
 

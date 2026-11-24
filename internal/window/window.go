@@ -76,6 +76,9 @@ type Settings struct {
 	// ServerData is the folder the servers keep their indexes in, one folder each; "" is the
 	// reader's own folder. kotlin-lsp's take gigabytes: another disk may be better.
 	ServerData string
+	// DocumentMegabytes is how much memory the files read may keep, one of
+	// session.DocumentMegabyteChoices; any other value (0 included) keeps the default.
+	DocumentMegabytes int
 }
 
 // focusedPane is the part of the window the keyboard moves in.
@@ -188,6 +191,7 @@ func New(settings Settings, modes ...mode.Mode) (*Window, error) {
 		sidebarFolded: settings.SidebarFolded,
 		classKinds:    map[workspace.FileReference]java.ClassKind{},
 	}
+	application.session.SetDocumentMegabytes(settings.DocumentMegabytes)
 	application.servers = servers.New(servers.Settings{Table: settings.Servers, Wrote: settings.ServersWrote, Data: settings.ServerData},
 		application, application.work, wake)
 	application.overlays = overlaysOf(application)

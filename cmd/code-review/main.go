@@ -15,6 +15,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/akrck02/code-review/internal/files"
@@ -32,6 +33,7 @@ import (
 )
 
 const (
+	documentsPreference   = "document-cache"
 	foldersPreference     = "folders"
 	iconThemePreference   = "icon-theme"
 	onlyChangedPreference = "only-changed"
@@ -129,6 +131,8 @@ func settingsOf(asked commandLine, options platform.Options) window.Settings {
 		// what language servers wrote stays theirs after a restart
 		ServersWrote: workspace.DefaultWrittenPath(),
 		ServerData:   serverData(*asked.serverData),
+		// a missing or unknown budget keeps the default
+		DocumentMegabytes: rememberedNumber(documentsPreference),
 	}
 }
 
@@ -163,6 +167,7 @@ func run(options platform.Options, reader *window.Window) {
 		keepPreference(statusPreference, fmt.Sprint(reader.HidesStatus()))
 		keepPreference(themePreference, reader.ThemeName())
 		keepPreference(iconThemePreference, reader.IconThemeName())
+		keepPreference(documentsPreference, strconv.Itoa(reader.DocumentMegabytes()))
 		keepPreference(foldersPreference, strings.Join(reader.Folders(), "\n"))
 	}
 	if err := platform.Run(options, func(context *ui.Context) { reader.Build(context) }); err != nil {
@@ -218,6 +223,15 @@ func iconThemes() []icons.Theme {
 func rememberedText(name string) string {
 	remembered, _ := platform.Preference(name)
 	return remembered
+}
+
+// rememberedNumber is a number remembered as a preference; 0 when it is missing or not a number.
+func rememberedNumber(name string) int {
+	number, err := strconv.Atoi(rememberedText(name))
+	if err != nil {
+		return 0 // missing or written by hand: the caller's default holds
+	}
+	return number
 }
 
 // keepPreference keeps a preference for the next time; one that cannot be kept is logged, as the

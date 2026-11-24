@@ -17,6 +17,7 @@ type Section int
 
 const (
 	Appearance Section = iota // the themes and the icon themes
+	Memory                    // how much memory the files read may keep
 	Keys                      // every command with its keys
 )
 
@@ -26,6 +27,7 @@ var sections = []struct {
 	name, icon string
 }{
 	{Appearance, "Appearance", "palette"},
+	{Memory, "Memory", "memory-stick"},
 	{Keys, "Keys", "keyboard"},
 }
 
@@ -49,12 +51,19 @@ type Window interface {
 	IconThemesFolder() string
 	// KeyGroups are the commands' keys, a group for each place they work in
 	KeyGroups() []KeyGroup
+	// DocumentMegabytes is how much memory the files read may keep, ChooseDocumentMegabytes
+	// changes it, and DocumentUse is how many are kept and about how many bytes they take
+	DocumentMegabytes() int
+	ChooseDocumentMegabytes(megabytes int)
+	DocumentUse() (documents, bytes int)
 }
 
 // Screen is the settings' screen: whether it shows, and at which section.
 type Screen struct {
 	Open    bool
 	Section Section
+	// useWords are the memory section's words on what the files kept take, made when it changes
+	useWords pane.Words[documentUse]
 }
 
 const (
@@ -96,6 +105,8 @@ func (screen *Screen) Build(context *ui.Context, window Window) {
 				switch screen.Section {
 				case Keys:
 					buildKeys(context, window)
+				case Memory:
+					screen.buildMemory(context, window)
 				default:
 					buildAppearance(context, window)
 				}

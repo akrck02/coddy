@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/akrck02/code-review/internal/icons"
+	"github.com/akrck02/code-review/internal/session"
 	"github.com/akrck02/code-review/internal/settings"
 	"github.com/akrck02/code-review/internal/theme"
 	"github.com/akrck02/go-renderer/draw2d"
@@ -176,5 +177,35 @@ func TestANameTooLongForItsCardEndsInAnEllipsis(test *testing.T) {
 	}
 	if name == long || !strings.HasSuffix(name, "…") {
 		test.Errorf("the name is drawn as %q, past its card %v", name, card.Rect)
+	}
+}
+
+func TestChoosingABudgetInTheSettingsChangesTheCacheAndIsRemembered(test *testing.T) {
+	application := newReader(Settings{Folders: []string{makeRepository(test)}, Synchronous: true, Open: "lighthouse/src/lamp.go"})
+	window := newWindow(test, application)
+	if application.DocumentMegabytes() != session.DefaultDocumentMegabytes {
+		test.Fatalf("with no budget chosen the files may keep %d MB, want %d", application.DocumentMegabytes(), session.DefaultDocumentMegabytes)
+	}
+	if err := window.Click("Settings (⌘,)"); err != nil {
+		test.Fatal(err)
+	}
+	window.Frames(2)
+	if err := window.Click("Memory"); err != nil {
+		test.Fatal(err)
+	}
+	window.Frames(2)
+	if err := window.Click("Keep 128 MB of files"); err != nil {
+		test.Fatal(err)
+	}
+	window.Frames(2)
+	if application.DocumentMegabytes() != 128 {
+		test.Fatalf("after choosing 128 MB the files may keep %d MB", application.DocumentMegabytes())
+	}
+	if documents, _ := application.DocumentUse(); documents == 0 {
+		test.Error("the file open is not kept")
+	}
+	reopened := newReader(Settings{Synchronous: true, DocumentMegabytes: application.DocumentMegabytes()})
+	if reopened.DocumentMegabytes() != 128 {
+		test.Errorf("the reader started with the budget kept starts with %d MB, want 128", reopened.DocumentMegabytes())
 	}
 }

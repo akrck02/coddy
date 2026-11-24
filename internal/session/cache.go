@@ -7,9 +7,16 @@ import (
 	"github.com/akrck02/code-review/internal/workspace"
 )
 
-// documentCacheBytes is about how much memory the documents kept may take: 64 MB, a few hundred
-// files of a usual size. The author has still to choose the budget (proposal 11, decision 4).
-const documentCacheBytes = 64 << 20
+// DefaultDocumentMegabytes is how much memory, in megabytes, the documents kept may take unless
+// the person chooses otherwise: a few hundred files of a usual size, as a file of code takes about
+// 100 to 350 KB once read with its two versions, its diff and its colours.
+const DefaultDocumentMegabytes = 64
+
+// DocumentMegabyteChoices are the budgets of the documents kept a person may choose, in megabytes.
+var DocumentMegabyteChoices = []int{32, 64, 128, 256}
+
+// bytesPerMegabyte is how many bytes a megabyte holds.
+const bytesPerMegabyte = 1 << 20
 
 // About how many bytes the parts of a document take besides their text, measured roughly on
 // 64-bit Go: a document's fields, a coloured line's slice and columns, a span's column, kind and
@@ -45,9 +52,7 @@ func (cache *documentCache) keep(read Read) {
 	entry := &cached{read: read, bytes: sizeOf(read.Document)}
 	cache.entries[read.Reference] = cache.order.PushFront(entry)
 	cache.used += entry.bytes
-	for cache.used > cache.budget && cache.order.Len() > 1 {
-		cache.forget(cache.order.Back().Value.(*cached).read.Reference)
-	}
+	cache.setBudget(cache.budget)
 }
 
 // take gives a document kept, and puts it first, unless its file is no longer what it was on disk:
@@ -64,6 +69,15 @@ func (cache *documentCache) take(reference workspace.FileReference, now diskStam
 	}
 	cache.order.MoveToFront(element)
 	return entry.read.Document, true
+}
+
+// setBudget changes how many bytes the documents kept may take, forgetting the least recently
+// opened at once until they fit. The most recent one stays, as keep leaves it, whatever its size.
+func (cache *documentCache) setBudget(budget int) {
+	cache.budget = budget
+	for cache.used > cache.budget && cache.order.Len() > 1 {
+		cache.forget(cache.order.Back().Value.(*cached).read.Reference)
+	}
 }
 
 // forget forgets the document of one file, if kept.

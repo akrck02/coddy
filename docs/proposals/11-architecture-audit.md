@@ -169,8 +169,8 @@ go in before the code that moves it (the viewer and sidebar have few: about 190 
    every import. It is optional. Answered "yes, split" (2026-11-24): `icons` holds Lucide's kinds, Zed's
    icon themes and their pictures; `theme` keeps the colours and joins them to the icons in
    `FileIcon`, `FolderIcon` and `DrawIcon`, as only it knows the look.
-4. The budget of the document cache, in megabytes. Built with 64 MB as the default
-   (`session.documentCacheBytes`); say if another.
+4. The budget of the document cache, in megabytes. Answered (2026-11-24): a setting,
+   *Settings › Memory* (32, 64, 128 or 256 MB), 64 MB by default and remembered.
 
 ## Result
 
@@ -219,8 +219,8 @@ fixed, each with its test or rule:
 
 **What a person still has to review:**
 
-- The budget of the document cache, 64 MB (decision 4), and that a document's size is an estimate
-  from its text, not a measure.
+- That a document's size is an estimate from its text, not a measure: the budget of
+  *Settings › Memory* (decision 4) counts by it.
 - T5 moved "a new note alone does not lay the uses out again" to a fake host: it no longer checks
   that the sidebar itself goes stale, only how many times the uses are shown.
 - Seen on screen: T12 gives the finder the settings' raised key caps and the sidebar's focus edge
