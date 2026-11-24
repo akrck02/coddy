@@ -85,7 +85,7 @@ func indexFolder(dataFolder string, server Server, folders []string) string {
 // database files change while a server reads with it.
 func lastWritten(folder string) time.Time {
 	var last time.Time
-	_ = filepath.WalkDir(folder, func(path string, entry os.DirEntry, err error) error {
+	_ = filepath.WalkDir(folder, func(path string, entry os.DirEntry, err error) error { // skips what it cannot read
 		if err != nil {
 			return nil
 		}

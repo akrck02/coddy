@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -25,6 +26,9 @@ func goSources(test *testing.T) map[string]string {
 		}
 		if entry.IsDir() && entry.Name() == "testdata" {
 			return filepath.SkipDir // programs for the tests, which Go leaves out of the build too
+		}
+		if entry.IsDir() && path != moduleRoot && strings.HasPrefix(entry.Name(), ".") {
+			return filepath.SkipDir // not the module's: tools' folders, such as other checkouts
 		}
 		if !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
 			return nil
@@ -48,6 +52,20 @@ func TestNoErrorIsMadeWithoutACode(test *testing.T) {
 		for _, maker := range []string{"errors.New(", "fmt.Errorf("} {
 			if strings.Contains(source, maker) {
 				test.Errorf("%s makes an error with %s; declare a code in its errors.go", path, maker)
+			}
+		}
+	}
+}
+
+// droppedError is a line that throws away what a call gives back: `_ = f()` or `_, _ = f()`.
+var droppedError = regexp.MustCompile(`^\s*_(, _)* = `)
+
+// An error thrown away says why on its line, so a reader sees it was meant.
+func TestNoErrorIsDroppedWithoutAReasonOnItsLine(test *testing.T) {
+	for path, source := range goSources(test) {
+		for number, line := range strings.Split(source, "\n") {
+			if droppedError.MatchString(line) && !strings.Contains(line, "//") {
+				test.Errorf("%s:%d drops what it is given without saying why: %s", path, number+1, strings.TrimSpace(line))
 			}
 		}
 	}

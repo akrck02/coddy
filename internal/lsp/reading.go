@@ -53,7 +53,7 @@ func (client *Client) rememberReading() {
 				continue
 			}
 			took := int(readyAt.Sub(client.started).Seconds())
-			_ = os.WriteFile(filepath.Join(client.data, readingFile), []byte(strconv.Itoa(max(took, 1))), 0o644)
+			_ = os.WriteFile(filepath.Join(client.data, readingFile), []byte(strconv.Itoa(max(took, 1))), 0o644) // only a guess for next time
 			return
 		}
 	}

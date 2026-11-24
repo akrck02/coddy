@@ -28,7 +28,8 @@ type Document struct {
 	Diff     []git.DiffLine   // every line of both sides, in order, when it changed
 
 	Binary bool
-	Error  string
+	// Error is why the file cannot be shown, with its code; nil when it can
+	Error error
 
 	// Editable tells whether the file can be edited: read from disk, as UTF-8 text. Text is then
 	// the file as read, and Stamp what it was, so saving can tell whether it changed since.
@@ -49,7 +50,7 @@ func OpenDocument(project *Project, path string, workingTree bool) *Document {
 		newContent, newError = nil, nil
 	}
 	if newError != nil {
-		document.Error = newError.Error()
+		document.Error = newError
 	}
 	oldContent := document.readBase(project)
 	if isBinary(newContent) || isBinary(oldContent) {
@@ -57,7 +58,7 @@ func OpenDocument(project *Project, path string, workingTree bool) *Document {
 		return document
 	}
 	if len(newContent) > largestShown || len(oldContent) > largestShown {
-		document.Error = "the file is too large to show"
+		document.Error = TooLarge
 		return document
 	}
 	sample := newContent
@@ -80,8 +81,8 @@ func (document *Document) readBase(project *Project) []byte {
 		return nil
 	}
 	content, err := git.ReadAtRevision(project.Path, project.MergeBase, document.Change.OldPath)
-	if err != nil && document.Error == "" {
-		document.Error = err.Error()
+	if err != nil && document.Error == nil {
+		document.Error = err
 	}
 	return content
 }
@@ -115,7 +116,7 @@ func (document *Document) diffLines(project *Project, workingTree bool) []git.Di
 	}
 	diff, err := git.Diff(project.Path, project.Comparison(workingTree), document.Change)
 	if err != nil {
-		document.Error = err.Error()
+		document.Error = err
 		return nil
 	}
 	if diff.Binary {

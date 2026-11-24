@@ -93,7 +93,7 @@ func (client *Client) keepModels() {
 // imported with Gradle again next time.
 func (client *Client) exportModels() error {
 	folder := gradle.ExportFolder(client.data)
-	_ = os.RemoveAll(folder)
+	_ = os.RemoveAll(folder) // what is left is written over; MkdirAll says if the folder cannot be made
 	if err := os.MkdirAll(folder, 0o755); err != nil {
 		return failure.Wrap(BadModel, folder, err)
 	}

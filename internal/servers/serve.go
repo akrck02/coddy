@@ -113,8 +113,7 @@ func (fleet *Fleet) tell(client *lsp.Client, key string, open OpenFile) int {
 	fleet.told[key] = now
 	fleet.work.Run("", func(context.Context) func() {
 		if last.path != "" && last.path != now.path {
-			// a server that stopped meanwhile has nothing open to close
-			_ = client.CloseOlder(last.path, last.version)
+			_ = client.CloseOlder(last.path, last.version) // a server that stopped meanwhile has nothing open to close
 		}
 		_ = client.Tell(now.path, text, now.version) // an older text, sent late, is dropped
 		return nil

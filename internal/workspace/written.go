@@ -1,6 +1,7 @@
 package workspace
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -64,7 +65,7 @@ func OpenWritten(path string) *Written {
 		return written
 	}
 	if content, err := os.ReadFile(path); err == nil {
-		_ = json.Unmarshal(content, &written.files)
+		_ = json.Unmarshal(content, &written.files) // a broken file starts empty: what servers wrote is a hint, kept again on close
 	}
 	if written.files == nil {
 		written.files = map[string]map[string]ServerFile{}
@@ -122,7 +123,7 @@ func (written *Written) SortOut(project *Project, snapshot *Snapshot, workingTre
 // notCommitted are the files of a repository that differ from its last commit on disk, or that git
 // does not know yet; none when git cannot tell, so nothing is taken for a server's.
 func notCommitted(repository string) map[string]bool {
-	changes, err := git.Changes(repository, git.Comparison{MergeBase: "HEAD", WorkingTree: true})
+	changes, err := git.Changes(context.Background(), repository, git.Comparison{MergeBase: "HEAD", WorkingTree: true})
 	paths := map[string]bool{}
 	if err != nil {
 		return paths

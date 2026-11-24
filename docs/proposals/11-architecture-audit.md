@@ -158,7 +158,7 @@ go in before the code that moves it (the viewer and sidebar have few: about 190 
 - [x] T10 — sidebar split into rows, expansion, filter, selection, header; trees per filter bounded · `sidebar` · R4, R8
 - [x] T11 — `finder.source`; `workspace.Layout`; `builds.Reader`; `gradle` out of `lsp` · R6
 - [x] T12 — shared pieces: breadcrumb, folder icon, key cap, row background, `path` · R4
-- [ ] T13 — errors and context: codes kept to the interface, git and servers cancelled, named limits · R9
+- [x] T13 — errors and context: codes kept to the interface, git and servers cancelled, named limits · R9
 - [ ] T14 — docs: how a frame is built, threads, caches, the package diagram, how to add a language, server, theme, mode; the rules of `rules_test` · `docs/4-how-it-is-made.md`, `docs/8-contributing.md` · R10
 
 ## Decisions for the author

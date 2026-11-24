@@ -33,10 +33,10 @@ func (view *Viewer) paint(context *ui.Context, window Window, drawing *draw2d.Li
 	if document == nil {
 		return
 	}
-	if document.Binary || (document.Error != "" && view.RowCount() == 0) {
+	if document.Binary || (document.Error != nil && view.RowCount() == 0) {
 		message := "A binary file: nothing to show"
 		if !document.Binary {
-			message = document.Error
+			message = view.problem.Of(document, func(document *workspace.Document) string { return document.Error.Error() })
 		}
 		drawing.Text(message, view.List.Area.X+24, view.List.Area.Y+32, context.Theme.TextSize, draw2d.Regular, context.Theme.InkQuiet)
 		return

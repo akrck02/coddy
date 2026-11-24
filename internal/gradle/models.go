@@ -52,7 +52,7 @@ var notBuildFolders = []string{"build", "out", "target", "node_modules"}
 // was found.
 func Fingerprint(project string) string {
 	hash, found := md5.New(), false
-	_ = filepath.WalkDir(project, func(path string, entry fs.DirEntry, err error) error {
+	_ = filepath.WalkDir(project, func(path string, entry fs.DirEntry, err error) error { // skips what it cannot read
 		switch {
 		case err != nil:
 			return nil

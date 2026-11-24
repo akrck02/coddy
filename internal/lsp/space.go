@@ -27,7 +27,7 @@ func FreeSpace(folder string) (uint64, error) {
 // FolderSize is how many bytes the files under a folder take; 0 when there is none.
 func FolderSize(folder string) int64 {
 	var size int64
-	_ = filepath.WalkDir(folder, func(_ string, entry fs.DirEntry, err error) error {
+	_ = filepath.WalkDir(folder, func(_ string, entry fs.DirEntry, err error) error { // skips what it cannot read, so never fails
 		if err != nil || entry.IsDir() {
 			return nil
 		}

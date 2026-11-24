@@ -3,6 +3,7 @@ package git
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"strconv"
 	"strings"
 
@@ -58,13 +59,14 @@ type Comparison struct {
 	WorkingTree bool
 }
 
-// Changes lists the files a development changed since it left the base.
-func Changes(repository string, comparison Comparison) ([]Change, error) {
+// Changes lists the files a development changed since it left the base; git stops once stop is
+// cancelled.
+func Changes(stop context.Context, repository string, comparison Comparison) ([]Change, error) {
 	arguments := []string{"diff", "--name-status", "-z", "-M", "--no-ext-diff", "--no-textconv", comparison.MergeBase}
 	if !comparison.WorkingTree {
 		arguments = append(arguments, "HEAD")
 	}
-	output, err := run(repository, append(arguments, "--")...)
+	output, err := runStoppable(stop, repository, append(arguments, "--")...)
 	if err != nil {
 		return nil, err
 	}
@@ -72,7 +74,7 @@ func Changes(repository string, comparison Comparison) ([]Change, error) {
 	if !comparison.WorkingTree {
 		return changes, nil
 	}
-	untracked, err := run(repository, "ls-files", "-z", "--others", "--exclude-standard")
+	untracked, err := runStoppable(stop, repository, "ls-files", "-z", "--others", "--exclude-standard")
 	if err != nil {
 		return changes, err
 	}
@@ -260,13 +262,14 @@ type LineCounts struct {
 }
 
 // CountLines counts the lines each changed file adds and removes, by its path now. New files git
-// does not know yet are not counted here: they are counted from their text.
-func CountLines(repository string, comparison Comparison) (map[string]LineCounts, error) {
+// does not know yet are not counted here: they are counted from their text. Git stops once stop is
+// cancelled.
+func CountLines(stop context.Context, repository string, comparison Comparison) (map[string]LineCounts, error) {
 	arguments := []string{"diff", "--numstat", "-z", "-M", "--no-ext-diff", "--no-textconv", comparison.MergeBase}
 	if !comparison.WorkingTree {
 		arguments = append(arguments, "HEAD")
 	}
-	output, err := run(repository, append(arguments, "--")...)
+	output, err := runStoppable(stop, repository, append(arguments, "--")...)
 	if err != nil {
 		return nil, err
 	}
@@ -302,9 +305,9 @@ func parseNumStat(fields []string) map[string]LineCounts {
 }
 
 // BlobsAt lists the content id of every file in a commit, by path: two files with the same id
-// have the same text.
-func BlobsAt(repository, revision string) (map[string]string, error) {
-	output, err := run(repository, "ls-tree", "-r", "-z", "--full-tree", "--end-of-options", revision)
+// have the same text. Git stops once stop is cancelled.
+func BlobsAt(stop context.Context, repository, revision string) (map[string]string, error) {
+	output, err := runStoppable(stop, repository, "ls-tree", "-r", "-z", "--full-tree", "--end-of-options", revision)
 	if err != nil {
 		return nil, err
 	}

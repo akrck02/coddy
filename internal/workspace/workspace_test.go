@@ -1,6 +1,7 @@
 package workspace
 
 import (
+	"context"
 	"os"
 	"testing"
 
@@ -14,7 +15,7 @@ func TestARealRepositoryIsReadWithItsChanges(test *testing.T) {
 	if path == "" {
 		test.Skip("set REVIEW_REPOSITORY to a repository to read")
 	}
-	project := LoadProject(path, LoadOptions{WorkingTree: true})
+	project := LoadProject(context.Background(), path, LoadOptions{WorkingTree: true})
 	test.Logf("%s on %s against %s (%s), %d commits ahead, %d changed of %d files, error %q",
 		project.Name, project.Branch, project.Base, project.MergeBase, project.Ahead,
 		len(project.Changes), len(project.Files), project.Error)
@@ -29,7 +30,7 @@ func TestARealRepositoryIsReadWithItsChanges(test *testing.T) {
 	}
 }
 
-func context(count int) []git.DiffLine {
+func unchangedLines(count int) []git.DiffLine {
 	lines := make([]git.DiffLine, count)
 	for index := range lines {
 		lines[index] = git.DiffLine{Kind: git.Context, OldNumber: index + 1, NewNumber: index + 1}
@@ -38,7 +39,7 @@ func context(count int) []git.DiffLine {
 }
 
 func TestUnchangedLinesFarFromAChangeAreFolded(test *testing.T) {
-	diff := context(20)
+	diff := unchangedLines(20)
 	diff[10].Kind = git.Insertion
 	rows := DiffRows(diff, 3, nil)
 	// 7 folded, 3 before, the change, 3 after, 6 folded

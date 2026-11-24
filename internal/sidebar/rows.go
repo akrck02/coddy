@@ -140,8 +140,8 @@ func (sidebar *Sidebar) addProjectContent(window Window, index int, project *wor
 		sidebar.Rows = append(sidebar.Rows, Row{Kind: NoteRow, Project: index, Label: "Reading…", Depth: depth, Quiet: true})
 		return
 	}
-	if project.Error != "" {
-		sidebar.Rows = append(sidebar.Rows, Row{Kind: NoteRow, Project: index, Label: project.Error, Depth: depth, Quiet: true})
+	if project.Error != nil {
+		sidebar.Rows = append(sidebar.Rows, Row{Kind: NoteRow, Project: index, Label: project.Error.Error(), Depth: depth, Quiet: true})
 	}
 	sidebar.addFolder(window, index, sidebar.tree(window, index), depth)
 }

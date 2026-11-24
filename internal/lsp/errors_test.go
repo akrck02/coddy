@@ -11,6 +11,7 @@ import (
 func TestEachErrorCarriesItsCode(test *testing.T) {
 	_, badHeader := readMessage(bufio.NewReader(strings.NewReader("Content-Length: x\r\n\r\n")))
 	_, cut := readMessage(bufio.NewReader(strings.NewReader("Content-Length: 9\r\n\r\n{}")))
+	_, tooLarge := readMessage(bufio.NewReader(strings.NewReader("Content-Length: 99999999999\r\n\r\n{}")))
 	client, _ := pair(nil, echo)
 	failed := client.Call(context.Background(), "fail", nil, nil)
 	failedInstall := Install(context.Background(), Server{Name: "none", Install: "no-such-installer-here install it"})
@@ -22,6 +23,7 @@ func TestEachErrorCarriesItsCode(test *testing.T) {
 	}{
 		{"a header that is not a number", badHeader, BadMessage},
 		{"a message cut short", cut, ServerStopped},
+		{"a message larger than any server sends", tooLarge, MessageTooLarge},
 		{"an error reply", failed, RequestFailed},
 		{"a server not installed", notFound, ServerNotFound},
 		{"an installer that is not here", failedInstall, InstallFailed},

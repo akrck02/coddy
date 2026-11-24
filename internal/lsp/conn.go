@@ -87,7 +87,7 @@ func (conn *Conn) Call(ctx context.Context, method string, params, result any) e
 	}
 	select {
 	case <-ctx.Done():
-		_ = conn.Notify("$/cancelRequest", map[string]int64{"id": id})
+		_ = conn.Notify("$/cancelRequest", map[string]int64{"id": id}) // given up either way: a closed connection has none to stop
 		return ctx.Err()
 	case <-conn.done:
 		return failure.Wrap(ServerStopped, method, conn.Err())
@@ -205,7 +205,7 @@ func (conn *Conn) answer(incoming message) {
 		encoded, _ := json.Marshal(result)
 		reply.Result = encoded
 	}
-	_ = conn.write(reply)
+	_ = conn.write(reply) // a reply that cannot go means the connection closed, which the reader finds and tells
 }
 
 // methodNotFound is JSON-RPC's code for a request the other side does not answer.
@@ -246,10 +246,20 @@ func readMessage(reader *bufio.Reader) (message, error) {
 	return readBody(reader, length)
 }
 
+// badMessageShown is how many bytes of a message that cannot be read its error shows.
+const badMessageShown = 80
+
+// largestMessage is the most bytes a message may take. The largest servers send, a workspace's
+// symbols or a big file's tokens, are a few megabytes.
+const largestMessage = 64 << 20
+
 // readBody reads a message's JSON.
 func readBody(reader *bufio.Reader, length int) (message, error) {
 	if length < 0 {
 		return message{}, failure.Wrap(BadMessage, "no Content-Length", nil)
+	}
+	if length > largestMessage {
+		return message{}, failure.Wrap(MessageTooLarge, strconv.Itoa(length)+" bytes", nil)
 	}
 	body := make([]byte, length)
 	if _, err := io.ReadFull(reader, body); err != nil {
@@ -257,7 +267,7 @@ func readBody(reader *bufio.Reader, length int) (message, error) {
 	}
 	var incoming message
 	if err := json.Unmarshal(body, &incoming); err != nil {
-		return message{}, failure.Wrap(BadMessage, string(body[:min(len(body), 80)]), err)
+		return message{}, failure.Wrap(BadMessage, string(body[:min(len(body), badMessageShown)]), err)
 	}
 	return incoming, nil
 }

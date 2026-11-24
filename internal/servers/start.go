@@ -103,7 +103,7 @@ func (fleet *Fleet) optionsOf(projects []string) map[string]workspace.LoadOption
 func takeSnapshots(server string, options map[string]workspace.LoadOptions) map[string]*workspace.Snapshot {
 	snapshots := map[string]*workspace.Snapshot{}
 	for path, asked := range options {
-		snapshot := workspace.TakeSnapshot(workspace.LoadProject(path, asked), server)
+		snapshot := workspace.TakeSnapshot(workspace.LoadProject(context.Background(), path, asked), server)
 		snapshots[path] = &snapshot
 	}
 	return snapshots

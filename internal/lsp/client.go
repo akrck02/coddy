@@ -87,7 +87,7 @@ func Start(ctx context.Context, server Server, root string, folders []string, da
 	}
 	client.conn = NewConn(output, input, client.handle)
 	go func() {
-		_ = command.Wait()
+		_ = command.Wait() // how the server ended is told by its output and exited, not by its status
 		close(client.exited)
 	}()
 	if err := client.initialize(ctx, root, folders); err != nil {
@@ -252,7 +252,7 @@ func (client *Client) handle(method string, params json.RawMessage) (any, error)
 				Section string `json:"section"`
 			} `json:"items"`
 		}
-		_ = json.Unmarshal(params, &asked)
+		_ = json.Unmarshal(params, &asked)       // a question that cannot be read gets no answers: the defaults
 		answers := make([]any, len(asked.Items)) // null: the server's defaults
 		for index, item := range asked.Items {
 			answers[index] = client.Server.setting(item.Section)
@@ -527,7 +527,7 @@ func (client *Client) Stop() {
 	ctx, cancel := context.WithTimeout(context.Background(), stopWait)
 	defer cancel()
 	if client.conn.Call(ctx, "shutdown", nil, nil) == nil {
-		_ = client.conn.Notify("exit", nil)
+		_ = client.conn.Notify("exit", nil) // a server that does not hear it is killed below
 	}
 	select {
 	case <-client.exited:
@@ -546,6 +546,6 @@ const stopWait = 30 * time.Second
 // kill ends the server's process, if it still runs.
 func (client *Client) kill() {
 	if client.command.Process != nil {
-		_ = client.command.Process.Kill()
+		_ = client.command.Process.Kill() // a process that already ended needs no killing
 	}
 }

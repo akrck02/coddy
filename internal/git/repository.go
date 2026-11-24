@@ -1,6 +1,7 @@
 package git
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"sort"
@@ -122,13 +123,13 @@ func CommitsAhead(repository, mergeBase string) int {
 }
 
 // TrackedAndNewFiles lists every file of the working tree git knows about, and the new files it
-// does not ignore, as paths relative to the repository.
-func TrackedAndNewFiles(repository string) ([]string, error) {
-	tracked, err := run(repository, "ls-files", "-z", "--cached")
+// does not ignore, as paths relative to the repository. Git stops once stop is cancelled.
+func TrackedAndNewFiles(stop context.Context, repository string) ([]string, error) {
+	tracked, err := runStoppable(stop, repository, "ls-files", "-z", "--cached")
 	if err != nil {
 		return nil, err
 	}
-	untracked, err := run(repository, "ls-files", "-z", "--others", "--exclude-standard")
+	untracked, err := runStoppable(stop, repository, "ls-files", "-z", "--others", "--exclude-standard")
 	if err != nil {
 		return nil, err
 	}

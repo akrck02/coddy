@@ -12,6 +12,9 @@ var (
 	RequestFailed = failure.Define("lsp.request-failed", "the language server could not answer")
 	// BadMessage is a message that does not follow the protocol: its header or its JSON.
 	BadMessage = failure.Define("lsp.bad-message", "a message from the language server could not be read")
+	// MessageTooLarge is a message whose Content-Length is above largestMessage: it is refused
+	// before its body is read, so a broken server cannot make the reader take all its memory.
+	MessageTooLarge = failure.Define("lsp.message-too-large", "a message from the language server is too large")
 	// InstallFailed is a server whose install command could not run, or ended with an error.
 	InstallFailed = failure.Define("lsp.install-failed", "the language server could not be installed")
 	// BadModel is a model of the projects, exported by the server, that could not be read or kept.

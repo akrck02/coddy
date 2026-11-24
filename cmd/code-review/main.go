@@ -156,13 +156,13 @@ func run(options platform.Options, reader *window.Window) {
 	options.Driver = reader.Driver()
 	options.Hidden = func() {
 		reader.Closed()
-		_ = platform.KeepPreference(onlyChangedPreference, fmt.Sprint(reader.OnlyChanged()))
-		_ = platform.KeepPreference(readOnlyPreference, fmt.Sprint(reader.ReadOnly()))
-		_ = platform.KeepPreference(sidebarPreference, fmt.Sprint(reader.SidebarFolded()))
-		_ = platform.KeepPreference(statusPreference, fmt.Sprint(reader.HidesStatus()))
-		_ = platform.KeepPreference(themePreference, reader.ThemeName())
-		_ = platform.KeepPreference(iconThemePreference, reader.IconThemeName())
-		_ = platform.KeepPreference(foldersPreference, strings.Join(reader.Folders(), "\n"))
+		keepPreference(onlyChangedPreference, fmt.Sprint(reader.OnlyChanged()))
+		keepPreference(readOnlyPreference, fmt.Sprint(reader.ReadOnly()))
+		keepPreference(sidebarPreference, fmt.Sprint(reader.SidebarFolded()))
+		keepPreference(statusPreference, fmt.Sprint(reader.HidesStatus()))
+		keepPreference(themePreference, reader.ThemeName())
+		keepPreference(iconThemePreference, reader.IconThemeName())
+		keepPreference(foldersPreference, strings.Join(reader.Folders(), "\n"))
 	}
 	if err := platform.Run(options, func(context *ui.Context) { reader.Build(context) }); err != nil {
 		log.Fatal(err)
@@ -219,13 +219,21 @@ func rememberedText(name string) string {
 	return remembered
 }
 
+// keepPreference keeps a preference for the next time; one that cannot be kept is logged, as the
+// window works the same without it.
+func keepPreference(name, value string) {
+	if err := platform.KeepPreference(name, value); err != nil {
+		log.Printf("preference %s: %v", name, err)
+	}
+}
+
 // serverData is the folder the servers keep their indexes in: the one -server-data names, kept
 // for the next time, else the one named last time; "" is the reader's own folder.
 func serverData(asked string) string {
 	if asked != "" {
 		absolute, err := filepath.Abs(asked)
 		if err == nil {
-			_ = platform.KeepPreference(serverDataPreference, absolute)
+			keepPreference(serverDataPreference, absolute)
 			return absolute
 		}
 	}

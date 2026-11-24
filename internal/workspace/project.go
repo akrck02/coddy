@@ -4,12 +4,14 @@ package workspace
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"path/filepath"
 	"sort"
 
 	"github.com/akrck02/code-review/internal/git"
+	"github.com/akrck02/go-renderer/failure"
 )
 
 // Project is one repository of the development.
@@ -37,7 +39,8 @@ type Project struct {
 	changeIndex map[string]int
 
 	Loaded bool
-	Error  string
+	// Error is why the project was read only in part, with its code; nil when it was read whole
+	Error error
 }
 
 // Comparison is what this project's changes are measured between.
@@ -63,32 +66,33 @@ type LoadOptions struct {
 }
 
 // LoadProject reads a repository: its branch, its base, what changed and every file. It only reads.
-func LoadProject(path string, options LoadOptions) *Project {
+// Its longest git commands stop once stop is cancelled, and what they gave is then incomplete.
+func LoadProject(stop context.Context, path string, options LoadOptions) *Project {
 	project := &Project{Name: filepath.Base(path), Path: path, Loaded: true}
 	project.Branch = git.CurrentBranch(path)
 	project.Base = options.Base
 	if project.Base == "" || !git.RefExists(path, project.Base) {
 		if options.Base != "" {
-			project.Error = "base " + options.Base + " not found; using the default branch"
+			project.Error = failure.Wrap(BaseNotFound, options.Base, nil)
 		}
 		project.Base = git.DefaultBase(path)
 	}
-	files, err := git.TrackedAndNewFiles(path)
+	files, err := git.TrackedAndNewFiles(stop, path)
 	if err != nil {
-		project.Error = err.Error()
+		project.Error = err
 	}
 	if project.Base == "" {
-		project.Error = "no base branch found (main, master, develop)"
+		project.Error = NoBase
 		project.Files = sortedUnique(files)
 		return project
 	}
 	project.MergeBase, err = git.MergeBase(path, project.Base)
 	if err != nil {
-		project.Error = err.Error()
+		project.Error = err
 		project.Files = sortedUnique(files)
 		return project
 	}
-	changes := project.loadChanges(options.WorkingTree)
+	changes := project.loadChanges(stop, options.WorkingTree)
 	// a file deleted by the development is no longer in the working tree, but it is still worth
 	// finding in the tree to read what was removed
 	for _, change := range changes {
@@ -101,20 +105,20 @@ func LoadProject(path string, options LoadOptions) *Project {
 // loadChanges reads what the development changed against its merge base and keeps it in the
 // project: the commits ahead, the files changed, their counts of lines and their fingerprints. It
 // returns the changes.
-func (project *Project) loadChanges(workingTree bool) []git.Change {
+func (project *Project) loadChanges(stop context.Context, workingTree bool) []git.Change {
 	path := project.Path
 	project.Ahead = git.CommitsAhead(path, project.MergeBase)
-	changes, err := git.Changes(path, project.Comparison(workingTree))
+	changes, err := git.Changes(stop, path, project.Comparison(workingTree))
 	if err != nil {
-		project.Error = err.Error()
+		project.Error = err
 	}
 	project.setChanges(changes)
 	// counts that cannot be read leave the files without their +/− numbers; the changes still show
-	project.Counts, _ = git.CountLines(path, project.Comparison(workingTree))
+	project.Counts, _ = git.CountLines(stop, path, project.Comparison(workingTree))
 	if project.Counts == nil {
 		project.Counts = map[string]git.LineCounts{}
 	}
-	project.Fingerprints = fingerprints(path, project.MergeBase, changes, workingTree, project.Counts)
+	project.Fingerprints = fingerprints(stop, path, project.MergeBase, changes, workingTree, project.Counts)
 	return changes
 }
 
@@ -140,13 +144,13 @@ func (project *Project) TotalCounts() (added, removed int) {
 // commit, or a hash of the file on disk when changes not committed yet count. Each starts with
 // the base, so choosing another base starts the review again. New files git does not know are
 // counted here too, as wholly added.
-func fingerprints(repository, mergeBase string, changes []git.Change, workingTree bool, counts map[string]git.LineCounts) map[string]string {
+func fingerprints(stop context.Context, repository, mergeBase string, changes []git.Change, workingTree bool, counts map[string]git.LineCounts) map[string]string {
 	result := make(map[string]string, len(changes))
 	var blobs map[string]string
 	if !workingTree {
 		// a git that cannot list the content ids leaves the marks following only the base, not each
 		// file's text: still usable, and nothing better can be had from it
-		blobs, _ = git.BlobsAt(repository, "HEAD")
+		blobs, _ = git.BlobsAt(stop, repository, "HEAD")
 	}
 	for _, change := range changes {
 		key := mergeBase + ":"

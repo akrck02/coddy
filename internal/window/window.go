@@ -286,7 +286,7 @@ func (application *Window) reload(index int) {
 		var loaded *workspace.Project
 		var sorting error
 		if !application.work.Read(stop, func() {
-			loaded = workspace.LoadProject(path, options)
+			loaded = workspace.LoadProject(stop, path, options)
 			sorting = written.SortOut(loaded, snapshot, options.WorkingTree)
 		}) {
 			return nil
@@ -459,7 +459,7 @@ func (application *Window) openByLabel(label string) {
 // that could not be read, stays in sight.
 func (application *Window) hidden(project *workspace.Project) bool {
 	// a project where only a server wrote stays, to show its files (badge and list)
-	return application.onlyChanged && project.Loaded && len(project.Changes) == 0 && len(project.ServerFiles) == 0 && project.Error == ""
+	return application.onlyChanged && project.Loaded && len(project.Changes) == 0 && len(project.ServerFiles) == 0 && project.Error == nil
 }
 
 // setOnlyChanged shows only the projects with changes, or every project.

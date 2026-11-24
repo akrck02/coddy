@@ -50,3 +50,20 @@ func TestACancelledSearchStops(test *testing.T) {
 		test.Errorf("a cancelled search gave %v", err)
 	}
 }
+
+// Reading a big project takes these commands longest; a reading replaced by a newer one stops them.
+func TestTheLongestCommandsStopWhenTheirWorkIsCancelled(test *testing.T) {
+	repository := gitRepository(test)
+	stop, cancel := context.WithCancel(context.Background())
+	cancel()
+	comparison := Comparison{MergeBase: "HEAD", WorkingTree: true}
+	_, listing := TrackedAndNewFiles(stop, repository)
+	_, changes := Changes(stop, repository, comparison)
+	_, counting := CountLines(stop, repository, comparison)
+	_, blobs := BlobsAt(stop, repository, "HEAD")
+	for name, err := range map[string]error{"ls-files": listing, "diff": changes, "numstat": counting, "ls-tree": blobs} {
+		if !errors.Is(err, context.Canceled) {
+			test.Errorf("a cancelled %s gave %v", name, err)
+		}
+	}
+}

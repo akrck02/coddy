@@ -138,6 +138,8 @@ type Viewer struct {
 	numbers      map[int]string
 	foldWords    map[foldLabel]string
 	added, gone  pane.Words[int]
+	// problem is the open document's error in words, written once per document
+	problem pane.Words[*workspace.Document]
 
 	// formatted shows a Markdown file as it reads, on from when one opens; formatting is its text
 	// laid out last

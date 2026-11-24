@@ -19,7 +19,7 @@ func wake() {
 	defer func() {
 		// TODO(akrck02): go-renderer's Wake panics once GLFW is terminated; fix it there and drop
 		// this recover. The window closed between the check and the call: there is nothing to wake.
-		_ = recover()
+		_ = recover() // see the TODO above
 	}()
 	platform.Wake()
 }
