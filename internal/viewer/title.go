@@ -85,11 +85,11 @@ func (view *Viewer) buildPath(context *ui.Context, window Window, room float32, 
 	room = view.titleRoom(context, room, name, compact)
 	if !compact {
 		context.Text(view.Project.Name, quiet)
-		context.IconSized("chevron-right", 12, palette.InkQuiet.WithAlpha(0.6))
+		theme.CrumbChevron(context)
 	}
 	for _, crumb := range view.crumbsOf(context, folder, room) {
 		view.buildCrumb(context, window, crumb)
-		context.IconSized("chevron-right", 12, palette.InkQuiet.WithAlpha(0.6))
+		theme.CrumbChevron(context)
 	}
 	nameInk := palette.Ink
 	if document != nil && document.Changed && view.showsStatus(window) {
@@ -104,24 +104,14 @@ func (view *Viewer) buildPath(context *ui.Context, window Window, room float32, 
 // buildCrumb is a folder of the path, a button that shows what the folder holds in the viewer's
 // place.
 func (view *Viewer) buildCrumb(context *ui.Context, window Window, crumb crumb) {
-	palette := context.Theme
-	hovered := ui.Look{Fill: palette.Sunken, Radius: 4}
-	layout := ui.Layout{Padding: ui.PadXY(crumbPadding, 1), AlignY: ui.Center}
-	name := crumb.name
-	if context.Clickable(name, layout, ui.Looks{Hovered: hovered, Pressed: hovered}, func() {
-		context.Text(crumb.label, ui.TextStyle{Color: palette.InkQuiet})
-	}) {
+	if theme.Crumb(context, crumb.label, crumb.name) {
 		window.ShowFolder(view.Reference.Project, crumb.path)
 	}
-	context.Tooltip(name)
 }
-
-// crumbPadding is the room each side of a crumb's text, where its hover shows.
-const crumbPadding = 3
 
 // crumbWidth is what a crumb takes besides its text: its padding, the chevron after it and the gaps
 // around it.
-const crumbWidth = 2*crumbPadding + 12 + 2*6
+const crumbWidth = 2*theme.CrumbPadding + theme.CrumbChevronSize + 2*6
 
 // gathered stands for the folders of a breadcrumb left out for room.
 const gathered = "…"

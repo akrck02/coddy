@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/akrck02/code-review/internal/english"
 	"github.com/akrck02/code-review/internal/servers"
 	"github.com/akrck02/go-renderer/draw2d"
 	ui "github.com/akrck02/go-ui"
@@ -136,7 +137,7 @@ func (application *Window) buildLeftOutCount(context *ui.Context) {
 	}) {
 		application.serversOpen = true
 	}
-	context.Tooltip(plural(count, "project") + " the language servers cannot read: their uses are found by their text")
+	context.Tooltip(english.Count(count, "project") + " the language servers cannot read: their uses are found by their text")
 }
 
 // markSize is the side of the servers' mark: its ring, with the bolt inside.
@@ -198,7 +199,7 @@ func (application *Window) buildServersList(context *ui.Context, views []servers
 		title, explanation := modeTitle(mode)
 		context.Frame(ui.Layout{Direction: ui.Vertical, Width: ui.Grow(), Gap: 2}, clipped, func() {
 			context.Text(title, ui.TextStyle{Weight: draw2d.Bold})
-			context.Text(capitalised(explanation), quiet)
+			context.Text(english.Capitalised(explanation), quiet)
 		})
 		for _, view := range views {
 			application.buildServerLine(context, view, quiet)

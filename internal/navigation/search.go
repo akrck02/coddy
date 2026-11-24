@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/akrck02/code-review/internal/english"
 	"github.com/akrck02/code-review/internal/git"
 	"github.com/akrck02/code-review/internal/lsp"
 	"github.com/akrck02/code-review/internal/servers"
@@ -87,10 +88,10 @@ func (search *Search) note() string {
 	}
 	if search.checked < search.total-search.unchecked {
 		words = append(words, fmt.Sprintf("checking %d of %d places in %s", search.checked, search.total-search.unchecked,
-			counted(len(search.projects), "project")))
+			english.Count(len(search.projects), "project")))
 	}
 	if probable := len(search.probable); probable > 0 {
-		words = append(words, counted(probable, "probable use")+" not confirmed yet, marked ?")
+		words = append(words, english.Count(probable, "probable use")+" not confirmed yet, marked ?")
 	}
 	if search.left > 0 {
 		words = append(words, fmt.Sprintf("%d more places not checked", search.left))
@@ -99,13 +100,4 @@ func (search *Search) note() string {
 		words = append(words, fmt.Sprintf("%d in files no server reads", search.unchecked))
 	}
 	return strings.Join(words, " · ")
-}
-
-// counted is a number of things, the word in the plural unless there is one.
-// TODO(akrck02): one way to count things for every package (proposal 11, T12).
-func counted(count int, thing string) string {
-	if count == 1 {
-		return "1 " + thing
-	}
-	return fmt.Sprintf("%d %ss", count, thing)
 }

@@ -118,16 +118,20 @@ func (sidebar *Sidebar) paintRowBackground(painter painting, index int, rowArea 
 	look := painter.look
 	reference := workspace.FileReference{Project: row.Project, Path: row.Path}
 	isOpen := row.Kind == FileRow && painter.window.IsOpened(reference)
+	state := theme.RowPlain
 	switch {
 	case index == sidebar.Selected && painter.window.SidebarFocused():
-		painter.drawing.Rectangle(rowArea, 5, look.Chosen, look.FocusEdge, 1)
+		state = theme.RowChosen
 	case index == sidebar.Selected, isOpen:
-		// the selection of a pane without the keyboard, quieter than the one with it
-		painter.drawing.Rectangle(rowArea, 5, look.Hover.Mix(look.Chosen, 0.5), draw2d.Color{}, 0)
+		state = theme.RowChosenQuietly // the selection of a pane without the keyboard
 	case index == painter.hovered:
-		painter.drawing.Rectangle(rowArea, 5, look.Hover, draw2d.Color{}, 0)
+		state = theme.RowHovered
 	}
+	theme.PaintRowBackground(painter.drawing, look, rowArea, sidebarRowRadius, state)
 }
+
+// sidebarRowRadius is how round a row's background is, in pixels.
+const sidebarRowRadius = 5
 
 // paintFolderIcons draws a project's or a folder's chevron and icon, and returns where its name
 // starts and how heavy it is.

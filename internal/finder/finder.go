@@ -196,7 +196,7 @@ func (finder *Finder) buildPanel(context *ui.Context, window Window) {
 	submitted := finder.buildQuery(context, window)
 	finder.refresh(window)
 	count := finder.count()
-	finder.selected = min(max(finder.selected, 0), max(count-1, 0))
+	finder.selected = pane.Within(finder.selected, count)
 	finder.list.RowHeight = finder.from.rowHeight()
 	finder.list.Count = count
 	finder.list.Reveal(finder.selected)
@@ -255,7 +255,7 @@ func (finder *Finder) buildFooter(context *ui.Context) {
 		}
 		context.Spacer()
 		for _, hint := range [][2]string{{"↑↓", "choose"}, {"Enter", "open"}, {"Tab", "names or content"}, {"Esc", "close"}} {
-			keyCap(context, hint[0])
+			theme.KeyCaps(context, hint[0])
 			context.Text(hint[1], quiet)
 			context.Box(ui.Layout{Width: ui.Fixed(4)}, nil)
 		}

@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/akrck02/code-review/internal/git"
+	"github.com/akrck02/code-review/internal/pane"
 	"github.com/akrck02/code-review/internal/workspace"
 )
 
@@ -65,7 +66,7 @@ func (sidebar *Sidebar) Rebuild(window Window) {
 			}
 		}
 	}
-	sidebar.Selected = min(max(sidebar.Selected, 0), max(len(sidebar.Rows)-1, 0))
+	sidebar.Selected = pane.Within(sidebar.Selected, len(sidebar.Rows))
 }
 
 // addEnteredProject lists the content of the project entered, with no row for the project itself.

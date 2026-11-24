@@ -1,6 +1,7 @@
 package workspace
 
 import (
+	"path"
 	"sort"
 	"strings"
 )
@@ -48,14 +49,14 @@ func BuildFolders(paths []string, isChanged func(path string) bool) *Folder {
 }
 
 // folderOf finds or makes the folder at a path, and the folders above it.
-func folderOf(byPath map[string]*Folder, path string) *Folder {
-	if folder, known := byPath[path]; known {
+func folderOf(byPath map[string]*Folder, slashed string) *Folder {
+	if folder, known := byPath[slashed]; known {
 		return folder
 	}
-	parent := folderOf(byPath, parentPath(path))
-	folder := &Folder{Name: baseName(path), Path: path}
+	parent := folderOf(byPath, parentPath(slashed))
+	folder := &Folder{Name: path.Base(slashed), Path: slashed}
 	parent.Folders = append(parent.Folders, folder)
-	byPath[path] = folder
+	byPath[slashed] = folder
 	return folder
 }
 
@@ -64,7 +65,7 @@ func sortFolder(folder *Folder) {
 		return strings.ToLower(folder.Folders[first].Name) < strings.ToLower(folder.Folders[second].Name)
 	})
 	sort.Slice(folder.Files, func(first, second int) bool {
-		return strings.ToLower(baseName(folder.Files[first])) < strings.ToLower(baseName(folder.Files[second]))
+		return strings.ToLower(path.Base(folder.Files[first])) < strings.ToLower(path.Base(folder.Files[second]))
 	})
 	for _, child := range folder.Folders {
 		sortFolder(child)
@@ -93,12 +94,8 @@ func parentPath(path string) string {
 	return path[:slash]
 }
 
-func baseName(path string) string {
-	return path[strings.LastIndexByte(path, '/')+1:]
-}
-
 // BaseName is the last part of a path.
-func BaseName(path string) string { return baseName(path) }
+func BaseName(slashed string) string { return path.Base(slashed) }
 
 // FolderRole is what a folder is to a build tool, as IntelliJ marks it in its project tree.
 type FolderRole int

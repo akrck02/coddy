@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/akrck02/code-review/internal/english"
 	"github.com/akrck02/code-review/internal/lsp"
 	"github.com/akrck02/code-review/internal/servers"
 	"github.com/akrck02/go-renderer/draw2d"
@@ -34,7 +35,7 @@ func (application *Window) LeftOut(project int) string {
 	if why == "" {
 		return ""
 	}
-	return capitalised(why) + ". Its uses are found by their text, marked ?."
+	return english.Capitalised(why) + ". Its uses are found by their text, marked ?."
 }
 
 // timeLeft says about how long a working server has left, by how long it took the time before:
@@ -131,12 +132,4 @@ func waitingWords(client *lsp.Client, now time.Time) string {
 		words += " · " + left + " left"
 	}
 	return words
-}
-
-// capitalised is a word with its first letter in capitals.
-func capitalised(word string) string {
-	if word == "" {
-		return word
-	}
-	return strings.ToUpper(word[:1]) + word[1:]
 }

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/akrck02/code-review/internal/english"
 	"github.com/akrck02/code-review/internal/lsp"
 )
 
@@ -134,7 +135,7 @@ func ViewOf(progress lsp.Progress) View {
 		view.State, view.Headline, view.Fraction = Ready, "Ready", 1
 		return view
 	}
-	view.State, view.Headline = Working, capitalised(progress.Phase)
+	view.State, view.Headline = Working, english.Capitalised(progress.Phase)
 	if progress.Phase == "starting" {
 		view.State = Starting
 	}
@@ -165,14 +166,6 @@ func ProjectsDone(progress lsp.Progress) (int, int) {
 		}
 	}
 	return done, len(progress.Projects)
-}
-
-// capitalised is a word with its first letter in capitals.
-func capitalised(word string) string {
-	if word == "" {
-		return word
-	}
-	return strings.ToUpper(word[:1]) + word[1:]
 }
 
 // Elapsed is how long a working server has been at it, "" for one that is not working.

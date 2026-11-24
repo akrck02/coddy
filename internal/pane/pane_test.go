@@ -78,3 +78,12 @@ func TestWordsAreWrittenAgainOnlyWhenTheirValueChanges(test *testing.T) {
 		test.Errorf("after 2 three times and 3 once: %q, written %d times, want 2", got, writes)
 	}
 }
+
+func TestAChosenRowStaysAmongTheRows(test *testing.T) {
+	cases := []struct{ index, count, wanted int }{{-3, 5, 0}, {2, 5, 2}, {9, 5, 4}, {4, 0, 0}}
+	for _, each := range cases {
+		if got := Within(each.index, each.count); got != each.wanted {
+			test.Errorf("row %d of %d is kept as %d, not %d", each.index, each.count, got, each.wanted)
+		}
+	}
+}

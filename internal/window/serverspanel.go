@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"github.com/akrck02/code-review/internal/language"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 
+	"github.com/akrck02/code-review/internal/english"
 	"github.com/akrck02/code-review/internal/lsp"
 	"github.com/akrck02/code-review/internal/servers"
 	"github.com/akrck02/code-review/internal/theme"
@@ -130,7 +130,7 @@ func (application *Window) buildCardHead(context *ui.Context, view servers.View)
 
 // cardFacts are a running server's facts in a line: its projects, what it takes, when it started.
 func (application *Window) cardFacts(view servers.View) string {
-	facts := plural(len(view.Progress.Projects), "project")
+	facts := english.Count(len(view.Progress.Projects), "project")
 	if usage := application.servers.Usage(view.Key); usage != "" {
 		facts += " · " + usage
 	}
@@ -198,14 +198,6 @@ func (application *Window) buildServerLog(context *ui.Context, log []lsp.Message
 	}
 }
 
-// plural writes a count of things: "1 project", "22 projects".
-func plural(count int, thing string) string {
-	if count == 1 {
-		return "1 " + thing
-	}
-	return strconv.Itoa(count) + " " + thing + "s"
-}
-
 // buildGradleLine says what a server that imports Gradle builds does with Gradle: its daemons
 // running, or those the reader stopped once it was done importing.
 func (application *Window) buildGradleLine(context *ui.Context, view servers.View) {
@@ -220,12 +212,12 @@ func (application *Window) buildGradleLine(context *ui.Context, view servers.Vie
 	case running > 0:
 		context.Box(ui.Layout{Gap: 6, AlignY: ui.Center}, func() {
 			context.IconSized("cog", 12, palette.InkSoft)
-			context.Text(fmt.Sprintf("Gradle: %s of its own running, stopped once it is done; yours are left alone", plural(running, "daemon")), quiet)
+			context.Text(fmt.Sprintf("Gradle: %s of its own running, stopped once it is done; yours are left alone", english.Count(running, "daemon")), quiet)
 		})
 	case released > 0:
 		context.Box(ui.Layout{Gap: 6, AlignY: ui.Center}, func() {
 			context.IconSized("check", 12, palette.Positive)
-			context.Text(fmt.Sprintf("Gradle stopped once done: %s released at %s", plural(released, "daemon"), at.Format("15:04")), quiet)
+			context.Text(fmt.Sprintf("Gradle stopped once done: %s released at %s", english.Count(released, "daemon"), at.Format("15:04")), quiet)
 		})
 	}
 }
@@ -256,16 +248,16 @@ func buildModelsLine(context *ui.Context, view servers.View) {
 func modelWords(fromModel, imported int, keptAt time.Time, why string) (string, bool) {
 	var parts []string
 	if fromModel > 0 {
-		parts = append(parts, plural(fromModel, "project")+" from their models, no Gradle")
+		parts = append(parts, english.Count(fromModel, "project")+" from their models, no Gradle")
 	}
 	switch {
 	case imported == 0:
 	case why != "":
-		parts = append(parts, plural(imported, "project")+" imported with Gradle; their models could not be kept: "+why)
+		parts = append(parts, english.Count(imported, "project")+" imported with Gradle; their models could not be kept: "+why)
 	case keptAt.IsZero():
-		parts = append(parts, plural(imported, "project")+" imported with Gradle; their models are kept once it is done")
+		parts = append(parts, english.Count(imported, "project")+" imported with Gradle; their models are kept once it is done")
 	default:
-		parts = append(parts, plural(imported, "project")+" imported with Gradle, models kept at "+keptAt.Format("15:04"))
+		parts = append(parts, english.Count(imported, "project")+" imported with Gradle, models kept at "+keptAt.Format("15:04"))
 	}
 	return strings.Join(parts, " · "), why != ""
 }
@@ -288,7 +280,7 @@ func buildLeftOut(context *ui.Context, left []servers.LeftOutProject) {
 		context.Box(ui.Layout{Width: ui.Grow(), Gap: 12}, func() {
 			context.Box(ui.Layout{Width: ui.Fixed(200)}, func() { context.Text(project.Name, ui.TextStyle{Size: palette.SmallTextSize}) })
 			context.Box(ui.Layout{Direction: ui.Vertical, Width: ui.Grow()}, func() {
-				for _, line := range wrapLines([]string{capitalised(project.Why) + "."}, serversPanelWidth-290, measure) {
+				for _, line := range wrapLines([]string{english.Capitalised(project.Why) + "."}, serversPanelWidth-290, measure) {
 					context.Text(line, small)
 				}
 			})

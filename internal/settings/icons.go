@@ -42,10 +42,7 @@ func buildIconThemeCard(context *ui.Context, window Window, name string, icons *
 	if icons != nil {
 		look.Pictures = window.IconPictures(icons)
 	}
-	samples := []theme.Icon{{Name: "folder", Ink: look.Theme.InkQuiet, Opacity: 1}}
-	if icons != nil {
-		samples[0].Picture = icons.FolderPicture("src", false)
-	}
+	samples := []theme.Icon{theme.FolderIcon("src", false, look)}
 	for _, file := range iconSamples {
 		samples = append(samples, theme.FileIcon(file, look))
 	}

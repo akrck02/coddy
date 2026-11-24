@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/akrck02/code-review/internal/english"
 	"github.com/akrck02/code-review/internal/pane"
 	"github.com/akrck02/code-review/internal/session"
 	"github.com/akrck02/code-review/internal/viewer"
@@ -330,7 +331,7 @@ type branchState struct {
 }
 
 func readingWords(count int) string        { return fmt.Sprintf("reading %d…", count) }
-func changedFilesWords(count int) string   { return plural(count, "file") + " changed" }
+func changedFilesWords(count int) string   { return english.Count(count, "file") + " changed" }
 func fraction(parts [2]int) string         { return fmt.Sprintf("%d/%d", parts[0], parts[1]) }
 func branchWords(state branchState) string { return state.branch + " ← " + state.base }
 
@@ -339,7 +340,7 @@ func projectsWords(parts [2]int) string {
 }
 
 func aheadWords(state branchState) string {
-	return fmt.Sprintf("%s is %s ahead of %s", state.branch, plural(state.ahead, "commit"), state.base)
+	return fmt.Sprintf("%s is %s ahead of %s", state.branch, english.Count(state.ahead, "commit"), state.base)
 }
 
 func (application *Window) openBaseDialog() {

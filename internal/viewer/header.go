@@ -2,6 +2,7 @@ package viewer
 
 import (
 	"fmt"
+	"path"
 	"strings"
 
 	"github.com/akrck02/code-review/internal/git"
@@ -113,12 +114,9 @@ func (view *Viewer) buildViewSwitch(context *ui.Context) {
 }
 
 // splitPath cuts a path into its folder and its name.
-func splitPath(path string) (folder, name string) {
-	slash := strings.LastIndexByte(path, '/')
-	if slash < 0 {
-		return "", path
-	}
-	return path[:slash], path[slash+1:]
+func splitPath(slashed string) (folder, name string) {
+	folder, name = path.Split(slashed)
+	return strings.TrimSuffix(folder, "/"), name
 }
 
 func statusName(status git.Status) string {

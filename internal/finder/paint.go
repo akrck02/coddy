@@ -12,14 +12,8 @@ import (
 	ui "github.com/akrck02/go-ui"
 )
 
-// keyCap draws a key as a small rounded cap.
-func keyCap(context *ui.Context, key string) {
-	palette := context.Theme
-	context.Frame(ui.Layout{Height: ui.Fixed(20), Padding: ui.PadXY(7, 0), AlignY: ui.Center},
-		ui.Look{Fill: palette.Chosen.WithAlpha(0.6), Radius: 6}, func() {
-			context.Text(key, ui.TextStyle{Size: palette.SmallTextSize - 1, Color: palette.InkSoft, Weight: draw2d.Medium})
-		})
-}
+// finderRowRadius is how round a result's background is, in pixels.
+const finderRowRadius = 8
 
 func (finder *Finder) paint(context *ui.Context, window Window, drawing *draw2d.List) {
 	palette := context.Theme
@@ -35,12 +29,14 @@ func (finder *Finder) paint(context *ui.Context, window Window, drawing *draw2d.
 	for index := first; index < last; index++ {
 		top := finder.list.RowTop(index)
 		rowArea := draw2d.Rectangle{X: area.X, Y: top + 1, Width: area.Width - pane.ScrollBarWidth - 2, Height: finder.from.rowHeight() - 2}
+		state := theme.RowPlain
 		switch index {
 		case finder.selected:
-			drawing.Rectangle(rowArea, 8, window.Look().Chosen, draw2d.Color{}, 0)
+			state = theme.RowChosen
 		case hovered:
-			drawing.Rectangle(rowArea, 8, window.Look().Hover, draw2d.Color{}, 0)
+			state = theme.RowHovered
 		}
+		theme.PaintRowBackground(drawing, window.Look(), rowArea, finderRowRadius, state)
 		finder.from.paintRow(finder, context, window, drawing, index, rowArea)
 	}
 	finder.list.PaintBar(drawing, window.Look().ScrollThumb)

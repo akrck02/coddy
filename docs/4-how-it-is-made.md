@@ -13,6 +13,7 @@
 | `internal/builds` | What a project's builds publish and depend on, read as text: one reader per build system (Gradle, Maven) |
 | `internal/java` | The IntelliJ-style tree and the kinds of class |
 | `internal/theme` | Zed's One colours, file icons and the reader's own controls |
+| `internal/english` | A count of things in the singular or the plural, a sentence's first capital |
 | `internal/pane` | What every pane shares: the keys and a scrolling list |
 | `internal/viewer`, `internal/sidebar`, `internal/finder`, `internal/explorer` | The panes |
 | `internal/work` | Background jobs, and what they give back to the frame |

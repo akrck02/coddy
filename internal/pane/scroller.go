@@ -195,3 +195,9 @@ func (list *Scroller) PaintBar(drawing *draw2d.List, colour draw2d.Color) {
 		drawing.Rectangle(thumb, thumb.Width/2, colour, draw2d.Color{}, 0)
 	}
 }
+
+// Within keeps the index of a chosen row among count rows: the first when it is before them or
+// there are none, the last when it is past them. A list steps by adding to its index, then this.
+func Within(index, count int) int {
+	return min(max(index, 0), max(count-1, 0))
+}

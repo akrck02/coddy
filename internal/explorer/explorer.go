@@ -3,6 +3,7 @@
 package explorer
 
 import (
+	"path"
 	"slices"
 	"strings"
 
@@ -92,13 +93,13 @@ func (explorer *Explorer) Build(context *ui.Context, window Window) {
 		}
 		context.Box(ui.Layout{Width: ui.Grow(), Wrap: true, Gap: 8}, func() {
 			for _, name := range listing.Folders {
-				if explorer.buildTile(context, window, name, folderIcon(window.Look(), name)) {
-					explorer.Show(window, explorer.Project, joined(explorer.Path, name))
+				if explorer.buildTile(context, window, name, theme.FolderIcon(name, false, window.Look())) {
+					explorer.Show(window, explorer.Project, path.Join(explorer.Path, name))
 				}
 			}
 			for _, name := range listing.Files {
 				if explorer.buildTile(context, window, name, theme.FileIcon(name, window.Look())) {
-					window.OpenFile(workspace.FileReference{Project: explorer.Project, Path: joined(explorer.Path, name)})
+					window.OpenFile(workspace.FileReference{Project: explorer.Project, Path: path.Join(explorer.Path, name)})
 				}
 			}
 		})
@@ -122,27 +123,9 @@ func (explorer *Explorer) buildTile(context *ui.Context, window Window, name str
 	return chosen
 }
 
-// folderIcon is a closed folder's icon: the icon theme's for its name, else Lucide's.
-func folderIcon(look theme.Look, name string) theme.Icon {
-	icon := theme.Icon{Name: "folder", Ink: look.Theme.InkQuiet, Opacity: 1}
-	if look.Icons != nil {
-		icon.Picture = look.Icons.FolderPicture(name, false)
-	}
-	return icon
-}
-
-// joined is the path of an entry of a folder.
-func joined(folder, name string) string {
-	if folder == "" {
-		return name
-	}
-	return folder + "/" + name
-}
-
 // BuildTitle names the folder as a breadcrumb: its project, then each folder down to it, every one
 // but the last a button that shows it. A path too long for the bar is cut at its end.
 func (explorer *Explorer) BuildTitle(context *ui.Context, window Window) {
-	palette := context.Theme
 	paths := []string{""}
 	if explorer.Path != "" {
 		parts := strings.Split(explorer.Path, "/")
@@ -152,41 +135,28 @@ func (explorer *Explorer) BuildTitle(context *ui.Context, window Window) {
 	}
 	project := window.Projects()[explorer.Project]
 	context.Frame(ui.Layout{Width: ui.Grow(), Gap: 6, AlignY: ui.Center}, ui.Look{Clip: true}, func() {
-		for index, path := range paths {
+		for index, folder := range paths {
 			label := project.Name
-			if path != "" {
-				_, label, _ = cutLast(path)
+			if folder != "" {
+				label = path.Base(folder)
 			}
 			if index == len(paths)-1 {
 				context.Text(label, ui.TextStyle{Weight: draw2d.Medium})
 				return
 			}
-			explorer.buildCrumb(context, window, label, path)
-			context.IconSized("chevron-right", 12, palette.InkQuiet.WithAlpha(0.6))
+			explorer.buildCrumb(context, window, label, folder)
+			theme.CrumbChevron(context)
 		}
 	})
 }
 
 // buildCrumb is a folder of the breadcrumb, a button that shows it.
 func (explorer *Explorer) buildCrumb(context *ui.Context, window Window, label, path string) {
-	hovered := ui.Look{Fill: context.Theme.Sunken, Radius: 4}
 	name := "Show the folder " + path
 	if path == "" {
 		name = "Show the top of " + label
 	}
-	if context.Clickable(name, ui.Layout{Padding: ui.PadXY(3, 1), AlignY: ui.Center}, ui.Looks{Hovered: hovered, Pressed: hovered}, func() {
-		context.Text(label, ui.TextStyle{Color: context.Theme.InkQuiet})
-	}) {
+	if theme.Crumb(context, label, name) {
 		explorer.Show(window, explorer.Project, path)
 	}
-	context.Tooltip(name)
-}
-
-// cutLast splits a path at its last "/": the folder before it and the name after it.
-func cutLast(path string) (folder, name string, found bool) {
-	at := strings.LastIndexByte(path, '/')
-	if at < 0 {
-		return "", path, false
-	}
-	return path[:at], path[at+1:], true
 }

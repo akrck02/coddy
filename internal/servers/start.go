@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/akrck02/code-review/internal/english"
 	"github.com/akrck02/code-review/internal/lsp"
 	"github.com/akrck02/code-review/internal/workspace"
 )
@@ -53,7 +54,7 @@ func (fleet *Fleet) Start(server lsp.Server, root, key, project string) {
 		client, err := lsp.Start(ctx, server, root, folders, data)
 		return func() {
 			if len(removed) > 0 {
-				fleet.host.Toast(server.Name + ": removed " + plural(len(removed), "old index") + " of projects no longer open")
+				fleet.host.Toast(server.Name + ": removed " + english.Count(len(removed), "old index") + " of projects no longer open")
 			}
 			if fleet.started(server, key, client, err) {
 				fleet.keepSnapshots(snapshots) // a server that never ran wrote nothing
@@ -87,15 +88,6 @@ func bytesOf(size int64) string {
 	default:
 		return strconv.Itoa(int(size>>10)) + " KB"
 	}
-}
-
-// plural writes a count of things: "1 project", "22 projects".
-// TODO(akrck02): one with the window's own, once the shared pieces have a home (proposal 11, T12).
-func plural(count int, thing string) string {
-	if count == 1 {
-		return "1 " + thing
-	}
-	return strconv.Itoa(count) + " " + thing + "s"
 }
 
 // optionsOf are how each of some projects is read, worked out on the interface's goroutine for a job.

@@ -101,3 +101,16 @@ func kindOf(name string) (fileKind, bool) {
 	kind, found := otherKinds[path.Ext(lower)]
 	return kind, found
 }
+
+// FolderIcon is the icon a folder is drawn with, open or closed, the twin of FileIcon: the icon
+// theme's picture for its name, when the look has one, and Lucide's folder.
+func FolderIcon(name string, open bool, look Look) Icon {
+	icon := Icon{Name: "folder", Ink: look.Theme.InkQuiet, Opacity: 1}
+	if open {
+		icon.Name = "folder-open"
+	}
+	if look.Icons != nil {
+		icon.Picture = look.Icons.FolderPicture(name, open)
+	}
+	return icon
+}
