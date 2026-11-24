@@ -1,4 +1,4 @@
-package theme
+package icons
 
 import (
 	"os"
@@ -9,14 +9,14 @@ import (
 )
 
 // harbourIcons is the made-up icon theme of testdata, read as a Zed extension's.
-func harbourIcons(test *testing.T) IconTheme {
+func harbourIcons(test *testing.T) Theme {
 	test.Helper()
 	folder := filepath.Join("testdata", "harbour-icons")
 	content, err := os.ReadFile(filepath.Join(folder, "icon_themes", "harbour.json"))
 	if err != nil {
 		test.Fatal(err)
 	}
-	themes, err := ReadIconThemes(content, folder)
+	themes, err := ReadThemes(content, folder)
 	if err != nil || len(themes) != 1 {
 		test.Fatalf("the made-up set reads into %d icon themes: %v", len(themes), err)
 	}
@@ -69,8 +69,8 @@ func TestAFileTakesTheIconOfItsNameThenOfItsLongestExtension(test *testing.T) {
 }
 
 func TestABrokenIconThemeFileIsToldByItsCode(test *testing.T) {
-	for content, code := range map[string]*failure.Code{"{": NotAnIconThemeFile, `{"themes": []}`: NoIconThemes} {
-		if _, err := ReadIconThemes([]byte(content), "anywhere"); !failure.Is(err, code) {
+	for content, code := range map[string]*failure.Code{"{": NotAThemeFile, `{"themes": []}`: NoThemes} {
+		if _, err := ReadThemes([]byte(content), "anywhere"); !failure.Is(err, code) {
 			test.Errorf("%q gives %v, not %s", content, err, code.Name())
 		}
 	}

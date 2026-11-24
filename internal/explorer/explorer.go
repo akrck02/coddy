@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/akrck02/code-review/internal/icons"
 	"github.com/akrck02/code-review/internal/theme"
 	"github.com/akrck02/code-review/internal/workspace"
 	"github.com/akrck02/go-renderer/draw2d"
@@ -107,7 +108,7 @@ func (explorer *Explorer) Build(context *ui.Context, window Window) {
 }
 
 // buildTile is an entry of the folder, its icon over its name, and tells whether it was chosen.
-func (explorer *Explorer) buildTile(context *ui.Context, window Window, name string, icon theme.Icon) bool {
+func (explorer *Explorer) buildTile(context *ui.Context, window Window, name string, icon icons.Icon) bool {
 	palette := context.Theme
 	hovered := ui.Look{Fill: palette.Sunken, Radius: 6}
 	layout := ui.Layout{Direction: ui.Vertical, Width: ui.Fixed(tileWidth), Padding: ui.Pad(8), Gap: 6, AlignX: ui.Center}

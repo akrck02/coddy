@@ -18,6 +18,7 @@ navigation · servers · session                         what the window does be
 mode                                                   what a mode is, and what it may do
 viewer · sidebar · finder · explorer · settings        the panes
 theme · pane                                           what every pane shares
+icons                                                  what files and folders are drawn as
 workspace · java · lsp · gradle · builds · text · highlight · markdown     the domain
 git · language · work · english                        the base
 ```

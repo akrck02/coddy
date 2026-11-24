@@ -1,4 +1,4 @@
-package theme
+package icons
 
 import (
 	"os"
@@ -9,9 +9,9 @@ import (
 	"github.com/akrck02/go-renderer/failure"
 )
 
-// IconThemesFolder is where a person's own icon themes are read from: icon-themes/ in the
+// ThemesFolder is where a person's own icon themes are read from: icon-themes/ in the
 // reader's own folder, beside themes/, each in a folder of its own as Zed's extensions are.
-func IconThemesFolder() string {
+func ThemesFolder() string {
 	folder, err := os.UserConfigDir()
 	if err != nil {
 		return ""
@@ -41,19 +41,19 @@ func zedExtensionsFolder(system, home, dataHome string) string {
 	return filepath.Join(dataHome, "zed", "extensions", "installed")
 }
 
-// LoadIconThemes are the icon themes of the extensions in some folders: every folder in them
+// LoadThemes are the icon themes of the extensions in some folders: every folder in them
 // with icon_themes/*.json, its pictures' paths starting at that folder. A file that cannot be
 // read is told in problems and left out; a folder that is not there has none.
-func LoadIconThemes(roots ...string) (themes []IconTheme, problems []error) {
+func LoadThemes(roots ...string) (themes []Theme, problems []error) {
 	for _, root := range roots {
 		if root == "" {
 			continue
 		}
 		files, _ := filepath.Glob(filepath.Join(root, "*", "icon_themes", "*.json")) // only a malformed pattern errs
 		for _, path := range files {
-			read, err := readIconThemeFile(path)
+			read, err := readThemeFile(path)
 			if err != nil {
-				problems = append(problems, failure.Wrap(NotAnIconThemeFile, path, err))
+				problems = append(problems, failure.Wrap(NotAThemeFile, path, err))
 			}
 			themes = append(themes, read...)
 		}
@@ -62,12 +62,12 @@ func LoadIconThemes(roots ...string) (themes []IconTheme, problems []error) {
 	return themes, problems
 }
 
-// readIconThemeFile reads a file of icon themes, its pictures' paths starting at its extension's
+// readThemeFile reads a file of icon themes, its pictures' paths starting at its extension's
 // folder: the one above icon_themes/.
-func readIconThemeFile(path string) ([]IconTheme, error) {
+func readThemeFile(path string) ([]Theme, error) {
 	content, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
-	return ReadIconThemes(content, filepath.Dir(filepath.Dir(path)))
+	return ReadThemes(content, filepath.Dir(filepath.Dir(path)))
 }

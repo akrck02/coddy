@@ -1,19 +1,38 @@
 package theme
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
+	"github.com/akrck02/code-review/internal/icons"
 	"github.com/akrck02/go-renderer/draw2d"
 	"github.com/akrck02/go-renderer/failure"
 )
 
+// harbourFolder is the made-up icon theme of the icons package's tests.
+var harbourFolder = filepath.Join("..", "icons", "testdata", "harbour-icons")
+
 // withHarbourIcons is the reader's dark look with the made-up icon theme, its problems kept.
 func withHarbourIcons(test *testing.T) (Look, *[]error) {
+	test.Helper()
+	content, err := os.ReadFile(filepath.Join(harbourFolder, "icon_themes", "harbour.json"))
+	if err != nil {
+		test.Fatal(err)
+	}
+	themes, err := icons.ReadThemes(content, harbourFolder)
+	if err != nil || len(themes) != 1 {
+		test.Fatalf("the made-up set reads into %d icon themes: %v", len(themes), err)
+	}
 	told := &[]error{}
 	look := Find(BuiltIn(), DefaultDark, true).Look
-	icons := harbourIcons(test)
-	look.Icons, look.Pictures = &icons, NewIconPictures(func(problem error) { *told = append(*told, problem) })
+	look.Icons, look.Pictures = &themes[0], icons.NewPictures(func(problem error) { *told = append(*told, problem) })
 	return look, told
+}
+
+// picture is a path of the made-up set, as its icon theme gives it.
+func picture(name string) string {
+	return filepath.Join(harbourFolder, "icons", name+".svg")
 }
 
 func TestWithoutAnIconThemeTheFilesKeepTodaysIcons(test *testing.T) {
@@ -54,7 +73,7 @@ func TestAnIconThemesPictureIsDrawnSharpAndKept(test *testing.T) {
 func TestAMissingOrBrokenIconFallsBackAndIsToldByItsCode(test *testing.T) {
 	look, told := withHarbourIcons(test)
 	for _, path := range []string{picture("broken"), picture("not-there")} {
-		icon := Icon{Name: "file", Ink: look.Theme.InkQuiet, Picture: path, Opacity: 1}
+		icon := icons.Icon{Name: "file", Ink: look.Theme.InkQuiet, Picture: path, Opacity: 1}
 		var list draw2d.List
 		for range 2 { // told once, however often it is drawn
 			list.Reset()
@@ -64,7 +83,7 @@ func TestAMissingOrBrokenIconFallsBackAndIsToldByItsCode(test *testing.T) {
 			test.Errorf("%s is drawn as %+v, want Lucide's icon instead", path, list.Commands)
 		}
 	}
-	if len(*told) != 2 || !failure.Is((*told)[0], IconNotDrawn) || !failure.Is((*told)[1], IconNotDrawn) {
+	if len(*told) != 2 || !failure.Is((*told)[0], icons.NotDrawn) || !failure.Is((*told)[1], icons.NotDrawn) {
 		test.Errorf("the two pictures not drawn are told as %v, want each once with its code", *told)
 	}
 }

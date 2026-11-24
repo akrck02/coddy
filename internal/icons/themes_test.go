@@ -1,4 +1,4 @@
-package theme
+package icons
 
 import (
 	"os"
@@ -25,7 +25,7 @@ func TestTheIconThemesOfTheFolderAndOfZedsExtensionsAreListed(test *testing.T) {
 	extension(test, own, "tides", `{"themes": [{"name": "Tides", "appearance": "light"}]}`)
 	extension(test, zeds, "lanterns", `{"themes": [{"name": "Lanterns Dark"}, {"name": "Lanterns Light", "appearance": "light"}]}`)
 	extension(test, zeds, "broken", `{`)
-	themes, problems := LoadIconThemes(own, zeds, filepath.Join(own, "not-there"))
+	themes, problems := LoadThemes(own, zeds, filepath.Join(own, "not-there"))
 	var names []string
 	for _, each := range themes {
 		names = append(names, each.Name)
@@ -36,7 +36,7 @@ func TestTheIconThemesOfTheFolderAndOfZedsExtensionsAreListed(test *testing.T) {
 	if len(themes) > 0 && themes[0].Folder != filepath.Join(zeds, "lanterns") {
 		test.Errorf("an icon theme's pictures start at %q, not at its extension's folder", themes[0].Folder)
 	}
-	if len(problems) != 1 || !failure.Is(problems[0], NotAnIconThemeFile) {
+	if len(problems) != 1 || !failure.Is(problems[0], NotAThemeFile) {
 		test.Errorf("the broken file is told as %v, want one problem with its code", problems)
 	}
 }

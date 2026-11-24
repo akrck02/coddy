@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/akrck02/code-review/internal/icons"
 	"github.com/akrck02/code-review/internal/settings"
 	"github.com/akrck02/code-review/internal/theme"
 	"github.com/akrck02/go-renderer/draw2d"
@@ -87,9 +88,9 @@ func TestChoosingAModeLeavesTheSettings(test *testing.T) {
 }
 
 // harbourIconThemes are the made-up icon themes of the theme package's tests.
-func harbourIconThemes(test *testing.T) []theme.IconTheme {
+func harbourIconThemes(test *testing.T) []icons.Theme {
 	test.Helper()
-	themes, problems := theme.LoadIconThemes(filepath.Join("..", "theme", "testdata"))
+	themes, problems := icons.LoadThemes(filepath.Join("..", "icons", "testdata"))
 	if len(themes) != 1 || len(problems) != 0 {
 		test.Fatalf("the made-up icon themes read into %d themes, %v", len(themes), problems)
 	}

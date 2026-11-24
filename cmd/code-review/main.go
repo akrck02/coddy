@@ -18,6 +18,7 @@ import (
 	"strings"
 
 	"github.com/akrck02/code-review/internal/files"
+	"github.com/akrck02/code-review/internal/icons"
 	"github.com/akrck02/code-review/internal/lsp"
 	"github.com/akrck02/code-review/internal/review"
 	"github.com/akrck02/code-review/internal/theme"
@@ -112,7 +113,7 @@ func settingsOf(asked commandLine, options platform.Options) window.Settings {
 		ThemesFolder:     theme.Folder(),
 		IconTheme:        rememberedText(iconThemePreference),
 		IconThemes:       iconThemes(),
-		IconThemesFolder: theme.IconThemesFolder(),
+		IconThemesFolder: icons.ThemesFolder(),
 		// an icon that cannot be drawn is told once, and drawn as Lucide's
 		Tell:        func(problem error) { log.Printf("icon theme %v", problem) },
 		OnlyChanged: onlyChanged(*asked.allProjects),
@@ -205,8 +206,8 @@ func themes() []theme.Theme {
 
 // iconThemes are the person's icon themes: those in the reader's icon themes folder and those
 // installed in Zed; a file that cannot be read is told, and left out.
-func iconThemes() []theme.IconTheme {
-	found, problems := theme.LoadIconThemes(theme.IconThemesFolder(), theme.ZedExtensionsFolder())
+func iconThemes() []icons.Theme {
+	found, problems := icons.LoadThemes(icons.ThemesFolder(), icons.ZedExtensionsFolder())
 	for _, problem := range problems {
 		log.Printf("icon theme %v", problem)
 	}

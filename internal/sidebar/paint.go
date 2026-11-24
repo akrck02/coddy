@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/akrck02/code-review/internal/git"
+	"github.com/akrck02/code-review/internal/icons"
 	"github.com/akrck02/code-review/internal/java"
 	"github.com/akrck02/code-review/internal/pane"
 	"github.com/akrck02/code-review/internal/theme"
@@ -136,23 +137,23 @@ const sidebarRowRadius = 5
 // paintFolderIcons draws a project's or a folder's chevron and icon, and returns where its name
 // starts and how heavy it is.
 func paintFolderIcons(painter painting, row Row, text rowText, iconTop float32) rowText {
-	palette, icons := painter.context.Theme, painter.look.Icons
-	chevron := theme.Icon{Name: "chevron-right", Ink: palette.InkQuiet, Opacity: 1}
+	palette, iconTheme := painter.context.Theme, painter.look.Icons
+	chevron := icons.Icon{Name: "chevron-right", Ink: palette.InkQuiet, Opacity: 1}
 	if row.Expanded {
 		chevron.Name = "chevron-down"
 	}
-	if icons != nil {
-		chevron.Picture = icons.ChevronPicture(row.Expanded)
+	if iconTheme != nil {
+		chevron.Picture = iconTheme.ChevronPicture(row.Expanded)
 	}
 	theme.DrawIcon(painter.drawing, painter.look, chevron, text.x, iconTop, treeIconSize)
 	text.x += treeIconSize + 4
 	name, ink := folderIcon(row, painter.look)
-	folder := theme.Icon{Name: name, Ink: ink, Opacity: 1}
+	folder := icons.Icon{Name: name, Ink: ink, Opacity: 1}
 	switch {
 	case row.Kind == ProjectRow:
-		folder, text.weight = theme.Icon{Name: "git-branch", Ink: palette.InkQuiet, Opacity: 1}, draw2d.Medium
-	case icons != nil: // an icon theme draws folders by their name, as Zed does: roles are Lucide's
-		folder.Picture = icons.FolderPicture(row.Label, row.Expanded)
+		folder, text.weight = icons.Icon{Name: "git-branch", Ink: palette.InkQuiet, Opacity: 1}, draw2d.Medium
+	case iconTheme != nil: // an icon theme draws folders by their name, as Zed does: roles are Lucide's
+		folder.Picture = iconTheme.FolderPicture(row.Label, row.Expanded)
 	}
 	if row.Role == workspace.ModuleFolder {
 		text.weight = draw2d.Medium

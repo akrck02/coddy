@@ -1,4 +1,4 @@
-package theme
+package icons
 
 import (
 	"os"
@@ -8,9 +8,9 @@ import (
 	"github.com/akrck02/go-renderer/svg"
 )
 
-// IconPictures are an icon theme's pictures: each SVG read the first time it is drawn, and drawn
+// Pictures are an icon theme's pictures: each SVG read the first time it is drawn, and drawn
 // once for each size, so that later frames only look them up.
-type IconPictures struct {
+type Pictures struct {
 	drawings map[string]*svg.Drawing // nil for an SVG that cannot be read
 	pictures map[pictureSize]*draw2d.Image
 	tell     func(error)
@@ -22,14 +22,14 @@ type pictureSize struct {
 	pixels int
 }
 
-// NewIconPictures keeps the pictures of an icon theme. tell hears, once each, of the SVGs that
+// NewPictures keeps the pictures of an icon theme. tell hears, once each, of the SVGs that
 // cannot be read: their files are drawn with Lucide's icons instead.
-func NewIconPictures(tell func(error)) *IconPictures {
-	return &IconPictures{drawings: map[string]*svg.Drawing{}, pictures: map[pictureSize]*draw2d.Image{}, tell: tell}
+func NewPictures(tell func(error)) *Pictures {
+	return &Pictures{drawings: map[string]*svg.Drawing{}, pictures: map[pictureSize]*draw2d.Image{}, tell: tell}
 }
 
 // Picture is an SVG drawn at a size in pixels, or nil when it cannot be read.
-func (kept *IconPictures) Picture(path string, pixels int) *draw2d.Image {
+func (kept *Pictures) Picture(path string, pixels int) *draw2d.Image {
 	key := pictureSize{path, pixels}
 	if picture, found := kept.pictures[key]; found {
 		return picture
@@ -44,7 +44,7 @@ func (kept *IconPictures) Picture(path string, pixels int) *draw2d.Image {
 }
 
 // drawing is an SVG read, once; nil when it cannot be, which is told the first time.
-func (kept *IconPictures) drawing(path string) *svg.Drawing {
+func (kept *Pictures) drawing(path string) *svg.Drawing {
 	if drawing, found := kept.drawings[path]; found {
 		return drawing
 	}
@@ -54,7 +54,7 @@ func (kept *IconPictures) drawing(path string) *svg.Drawing {
 		drawing, err = svg.Read(content)
 	}
 	if drawing == nil && err != nil {
-		kept.tell(failure.Wrap(IconNotDrawn, path, err))
+		kept.tell(failure.Wrap(NotDrawn, path, err))
 	}
 	kept.drawings[path] = drawing
 	return drawing

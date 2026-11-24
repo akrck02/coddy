@@ -1,12 +1,14 @@
-// Package theme is how the reader looks: its themes, read from files in Zed's format (Zed's One
-// and IntelliJ's come with it), the icon of each kind of file, and the few controls of its own it
-// draws (tool buttons, icon switches, fitted text).
+// Package theme is how the reader looks: its colour themes, read from files in Zed's format (Zed's
+// One and IntelliJ's come with it), each file's icon in those colours, and the few controls of its
+// own it draws (tool buttons, icon switches, fitted text). What each kind of file is drawn as, and
+// Zed's icon themes, are the icons package's.
 package theme
 
 import (
 	"github.com/akrck02/bubble"
 	"github.com/akrck02/bubble/goui"
 	"github.com/akrck02/code-review/internal/highlight"
+	"github.com/akrck02/code-review/internal/icons"
 	"github.com/akrck02/go-renderer/draw2d"
 	ui "github.com/akrck02/go-ui"
 )
@@ -42,8 +44,8 @@ type Look struct {
 
 	// Icons is the icon theme files and folders are drawn with, and Pictures its pictures, drawn
 	// once; nil for Lucide's icons, tinted by the code's colours.
-	Icons    *IconTheme
-	Pictures *IconPictures
+	Icons    *icons.Theme
+	Pictures *icons.Pictures
 }
 
 // deepenInks takes every ink of a light theme a step deeper. Dark letters on a light ground are

@@ -7,6 +7,7 @@ import (
 
 	"github.com/akrck02/code-review/internal/explorer"
 	"github.com/akrck02/code-review/internal/finder"
+	"github.com/akrck02/code-review/internal/icons"
 	"github.com/akrck02/code-review/internal/java"
 	"github.com/akrck02/code-review/internal/lsp"
 	"github.com/akrck02/code-review/internal/mode"
@@ -41,7 +42,7 @@ type Settings struct {
 	// one not there draws Lucide's icons, tinted by the theme.
 	IconTheme string
 	// IconThemes are the icon themes the settings offer, besides Lucide's.
-	IconThemes []theme.IconTheme
+	IconThemes []icons.Theme
 	// IconThemesFolder is the folder the settings say a person's own icon themes are read from.
 	IconThemesFolder string
 	// Tell hears of problems a person may want to know about while the window runs, such as an
@@ -117,9 +118,9 @@ type Window struct {
 	theme  theme.Theme
 	// iconThemes are the icon themes the settings offer, and iconTheme the one drawing files and
 	// folders, nil for Lucide's; iconPictures keep each one's pictures, by its name
-	iconThemes   []theme.IconTheme
-	iconTheme    *theme.IconTheme
-	iconPictures map[string]*theme.IconPictures
+	iconThemes   []icons.Theme
+	iconTheme    *icons.Theme
+	iconPictures map[string]*icons.Pictures
 	tell         func(problem error)
 	// settingsScreen shows the settings in place of the sidebar and the viewer, when open
 	settingsScreen settings.Screen
@@ -220,7 +221,7 @@ func (application *Window) startThemes(settings Settings) {
 	}
 	application.theme = theme.Find(application.themes, settings.Theme, settings.Dark)
 	application.iconThemes, application.tell = settings.IconThemes, settings.Tell
-	application.iconPictures = map[string]*theme.IconPictures{}
+	application.iconPictures = map[string]*icons.Pictures{}
 	application.iconTheme = findIconTheme(application.iconThemes, settings.IconTheme)
 	application.setLook()
 }

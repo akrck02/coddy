@@ -1,4 +1,4 @@
-package theme
+package icons
 
 import (
 	"encoding/json"
@@ -8,9 +8,9 @@ import (
 	"github.com/akrck02/go-renderer/failure"
 )
 
-// IconTheme is one of Zed's icon themes: the picture (an SVG file) each file and folder is drawn
+// Theme is one of Zed's icon themes: the picture (an SVG file) each file and folder is drawn
 // with. Its format is https://zed.dev/docs/extensions/icon-themes.
-type IconTheme struct {
+type Theme struct {
 	Name string
 	// Dark tells whether it is drawn for a dark theme.
 	Dark bool
@@ -46,16 +46,16 @@ type iconThemeFile struct {
 	} `json:"themes"`
 }
 
-// ReadIconThemes reads a file of icon themes, its pictures' paths starting at folder.
-func ReadIconThemes(content []byte, folder string) ([]IconTheme, error) {
+// ReadThemes reads a file of icon themes, its pictures' paths starting at folder.
+func ReadThemes(content []byte, folder string) ([]Theme, error) {
 	var file iconThemeFile
 	if err := json.Unmarshal(content, &file); err != nil {
-		return nil, failure.Wrap(NotAnIconThemeFile, "", err)
+		return nil, failure.Wrap(NotAThemeFile, "", err)
 	}
 	if len(file.Themes) == 0 {
-		return nil, NoIconThemes
+		return nil, NoThemes
 	}
-	themes := make([]IconTheme, 0, len(file.Themes))
+	themes := make([]Theme, 0, len(file.Themes))
 	for _, each := range file.Themes {
 		pictures := make(map[string]string, len(each.Pictures))
 		for kind, picture := range each.Pictures {
@@ -65,7 +65,7 @@ func ReadIconThemes(content []byte, folder string) ([]IconTheme, error) {
 		for name, named := range each.NamedFolders {
 			namedFolders[name] = named.from(folder)
 		}
-		themes = append(themes, IconTheme{
+		themes = append(themes, Theme{
 			Name: each.Name, Dark: each.Appearance != "light", Folder: folder,
 			stems: each.Stems, suffixes: each.Suffixes, pictures: pictures,
 			folders: each.Folders.from(folder), namedFolders: namedFolders, chevrons: each.Chevrons.from(folder),
@@ -92,9 +92,9 @@ func fromFolder(folder, path string) string {
 // by each end of it after a dot, the longest first ("tide.spec.ts": "spec.ts", then "ts"); then
 // by what comes before its first dot ("Dockerfile.prod": "Dockerfile"); then the default. Names
 // are matched as they are written. It is "" when the theme has no picture for the file.
-func (icons IconTheme) FilePicture(name string) string {
-	if kind, found := icons.kindOf(name); found {
-		return icons.pictures[kind]
+func (set Theme) FilePicture(name string) string {
+	if kind, found := set.kindOf(name); found {
+		return set.pictures[kind]
 	}
 	rest, firstPart, cut := name, "", false
 	for {
@@ -105,40 +105,40 @@ func (icons IconTheme) FilePicture(name string) string {
 		if !cut {
 			firstPart, cut = before, true
 		}
-		if kind, found := icons.kindOf(after); found {
-			return icons.pictures[kind]
+		if kind, found := set.kindOf(after); found {
+			return set.pictures[kind]
 		}
 		rest = after
 	}
-	if kind, found := icons.kindOf(firstPart); cut && found {
-		return icons.pictures[kind]
+	if kind, found := set.kindOf(firstPart); cut && found {
+		return set.pictures[kind]
 	}
-	return icons.pictures["default"]
+	return set.pictures["default"]
 }
 
 // kindOf is the kind of file a name, or an end of one, stands for.
-func (icons IconTheme) kindOf(part string) (string, bool) {
-	if kind, found := icons.stems[part]; found {
+func (set Theme) kindOf(part string) (string, bool) {
+	if kind, found := set.stems[part]; found {
 		return kind, true
 	}
-	kind, found := icons.suffixes[part]
+	kind, found := set.suffixes[part]
 	return kind, found
 }
 
 // FolderPicture is the picture a folder is drawn with, open or closed: its own by its name, or
 // every folder's; "" when the theme has none.
-func (icons IconTheme) FolderPicture(name string, open bool) string {
-	if named, found := icons.namedFolders[strings.TrimSpace(name)]; found {
+func (set Theme) FolderPicture(name string, open bool) string {
+	if named, found := set.namedFolders[strings.TrimSpace(name)]; found {
 		if picture := named.of(open); picture != "" {
 			return picture
 		}
 	}
-	return icons.folders.of(open)
+	return set.folders.of(open)
 }
 
 // ChevronPicture is the picture of a folder's chevron, open or closed; "" when the theme has none.
-func (icons IconTheme) ChevronPicture(open bool) string {
-	return icons.chevrons.of(open)
+func (set Theme) ChevronPicture(open bool) string {
+	return set.chevrons.of(open)
 }
 
 // of is the open picture or the closed one.

@@ -166,7 +166,9 @@ go in before the code that moves it (the viewer and sidebar have few: about 190 
 1. Approve this proposal, or change its order or scope.
 2. File watching (a dependency) or the stamp check alone.
 3. The theme package split in two (`theme` for colours, `icons`): it moves about 10 files and
-   every import. It is optional.
+   every import. It is optional. Answered "yes, split" (2026-11-24): `icons` holds Lucide's kinds, Zed's
+   icon themes and their pictures; `theme` keeps the colours and joins them to the icons in
+   `FileIcon`, `FolderIcon` and `DrawIcon`, as only it knows the look.
 4. The budget of the document cache, in megabytes. Built with 64 MB as the default
    (`session.documentCacheBytes`); say if another.
 

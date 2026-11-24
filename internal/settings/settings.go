@@ -4,6 +4,7 @@
 package settings
 
 import (
+	"github.com/akrck02/code-review/internal/icons"
 	"github.com/akrck02/code-review/internal/pane"
 	"github.com/akrck02/code-review/internal/theme"
 	"github.com/akrck02/go-renderer/draw2d"
@@ -41,10 +42,10 @@ type Window interface {
 	ThemesFolder() string
 	// IconThemes are the icon themes to choose from, IconTheme the one drawing the files (nil for
 	// Lucide's), and IconPictures an icon theme's pictures, kept across frames
-	IconThemes() []theme.IconTheme
-	IconTheme() *theme.IconTheme
-	ChooseIconTheme(context *ui.Context, icons *theme.IconTheme)
-	IconPictures(icons *theme.IconTheme) *theme.IconPictures
+	IconThemes() []icons.Theme
+	IconTheme() *icons.Theme
+	ChooseIconTheme(context *ui.Context, icons *icons.Theme)
+	IconPictures(icons *icons.Theme) *icons.Pictures
 	IconThemesFolder() string
 	// KeyGroups are the commands' keys, a group for each place they work in
 	KeyGroups() []KeyGroup

@@ -1,6 +1,7 @@
 package settings
 
 import (
+	"github.com/akrck02/code-review/internal/icons"
 	"github.com/akrck02/code-review/internal/theme"
 	"github.com/akrck02/go-renderer/draw2d"
 	ui "github.com/akrck02/go-ui"
@@ -25,9 +26,9 @@ func buildIconThemes(context *ui.Context, window Window) {
 		}
 		themes := window.IconThemes()
 		for index := range themes {
-			icons := &themes[index]
-			if buildIconThemeCard(context, window, icons.Name, icons) {
-				window.ChooseIconTheme(context, icons)
+			iconTheme := &themes[index]
+			if buildIconThemeCard(context, window, iconTheme.Name, iconTheme) {
+				window.ChooseIconTheme(context, iconTheme)
 			}
 		}
 	})
@@ -36,17 +37,17 @@ func buildIconThemes(context *ui.Context, window Window) {
 
 // buildIconThemeCard is an icon theme's card: a folder and some files drawn with it on the
 // editor's colour, and its name. It tells whether the card was clicked.
-func buildIconThemeCard(context *ui.Context, window Window, name string, icons *theme.IconTheme) bool {
+func buildIconThemeCard(context *ui.Context, window Window, name string, iconTheme *icons.Theme) bool {
 	look := window.Look()
-	look.Icons, look.Pictures = icons, nil
-	if icons != nil {
-		look.Pictures = window.IconPictures(icons)
+	look.Icons, look.Pictures = iconTheme, nil
+	if iconTheme != nil {
+		look.Pictures = window.IconPictures(iconTheme)
 	}
-	samples := []theme.Icon{theme.FolderIcon("src", false, look)}
+	samples := []icons.Icon{theme.FolderIcon("src", false, look)}
 	for _, file := range iconSamples {
 		samples = append(samples, theme.FileIcon(file, look))
 	}
-	chosen := sameIconTheme(window.IconTheme(), icons)
+	chosen := sameIconTheme(window.IconTheme(), iconTheme)
 	layout := ui.Layout{Direction: ui.Vertical, Width: ui.Fixed(themeCardWidth), Padding: ui.Pad(8), Gap: 8}
 	label := "File icons: " + name
 	clicked := context.Clickable(label, layout, cardLooks(context.Theme, chosen), func() {
@@ -69,7 +70,7 @@ func buildIconThemeCard(context *ui.Context, window Window, name string, icons *
 
 // buildIconSample draws an icon in a card: its picture, or Lucide's icon when it has none or the
 // picture cannot be drawn.
-func buildIconSample(context *ui.Context, icon theme.Icon, pictures *theme.IconPictures) {
+func buildIconSample(context *ui.Context, icon icons.Icon, pictures *icons.Pictures) {
 	if icon.Picture != "" && pictures != nil {
 		if picture := pictures.Picture(icon.Picture, iconSampleSize*2); picture != nil {
 			context.Image(picture, ui.Layout{Width: ui.Fixed(iconSampleSize), Height: ui.Fixed(iconSampleSize)}, 0)
@@ -80,7 +81,7 @@ func buildIconSample(context *ui.Context, icon theme.Icon, pictures *theme.IconP
 }
 
 // sameIconTheme tells whether two icon themes are the one theme, nil being Lucide's.
-func sameIconTheme(one, other *theme.IconTheme) bool {
+func sameIconTheme(one, other *icons.Theme) bool {
 	if one == nil || other == nil {
 		return one == other
 	}

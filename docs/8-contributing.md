@@ -43,7 +43,8 @@ internal/navigation   following names: declarations, the trail back, uses across
 internal/session      what is open: folders, projects, their bases, the documents read
 internal/english      a count of things and a first capital, in English
 internal/pane         what every pane shares: the keys, key presses, a scrolling list
-internal/theme        Zed's One colours, file icons, the reader's own controls
+internal/theme        colour themes in Zed's format, each file's icon in their colours, the reader's own controls
+internal/icons        what files and folders are drawn as: Lucide's kinds, Zed's icon themes, their pictures
 internal/java         the IntelliJ-style tree and the kinds of class
 internal/workspace    projects, changes, a file's two sides and its diff, the tree
 internal/text         a file being edited: lines, caret, selection, undo
