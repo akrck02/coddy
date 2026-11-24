@@ -99,7 +99,7 @@ func TestServersStopWithTheWindow(test *testing.T) {
 	log := filepath.Join(test.TempDir(), "log")
 	application := readerWithServers(test, "lighthouse/src/lamp.go", fakeGo(test, log))
 	newWindow(test, application)
-	client := application.servers.Running("fakels " + application.projects[0].Path)
+	client := application.servers.Running("fakels " + application.session.Projects[0].Path)
 	if client == nil {
 		test.Fatalf("no server runs for lamp.go: %s", application.servers.Status())
 	}
@@ -124,7 +124,7 @@ func TestAMissingServerIsNamed(test *testing.T) {
 	if shown := strings.Join(window.Texts(), " "); !strings.Contains(shown, "nols is not installed: brew install nols") {
 		test.Errorf("the window shows %q", shown)
 	}
-	if application.servers.Snapshot(application.projects[0].Path) != nil {
+	if application.servers.Snapshot(application.session.Projects[0].Path) != nil {
 		test.Error("a server that never ran left a snapshot, which would take later changes for its own")
 	}
 	if application.servers.Status() != "nols not installed" {
@@ -154,7 +154,7 @@ func TestFilesWrittenByAServerAreNotChanges(test *testing.T) {
 	}
 	application.reloadAll()
 	window.Frames(2)
-	project := application.projects[0]
+	project := application.session.Projects[0]
 	if _, changed := project.ChangeOf(".classpath"); changed || len(project.ServerFiles) != 1 || project.ServerFiles[0].Server != "fakels" {
 		test.Fatalf("the server's .classpath is a change (%t); its files are %+v", changed, project.ServerFiles)
 	}
@@ -163,7 +163,7 @@ func TestFilesWrittenByAServerAreNotChanges(test *testing.T) {
 	}
 	again := newReader(Settings{Folders: []string{folder}, WorkingTree: true, Synchronous: true, ServersWrote: record})
 	newWindow(test, again)
-	if _, changed := again.projects[0].ChangeOf(".classpath"); changed {
+	if _, changed := again.session.Projects[0].ChangeOf(".classpath"); changed {
 		test.Error("after a restart, the server's .classpath counts as a change")
 	}
 }
@@ -206,8 +206,8 @@ func TestACommitWhileAServerRunsStaysAChange(test *testing.T) {
 	}
 	application.reloadAll()
 	window.Frames(2)
-	if _, changed := application.projects[0].ChangeOf("src/keeper.go"); !changed {
-		test.Errorf("a commit made while the server ran left the review; the server's files are %+v", application.projects[0].ServerFiles)
+	if _, changed := application.session.Projects[0].ChangeOf("src/keeper.go"); !changed {
+		test.Errorf("a commit made while the server ran left the review; the server's files are %+v", application.session.Projects[0].ServerFiles)
 	}
 }
 
@@ -215,7 +215,7 @@ func TestAServerThatStopsIsStartedAgain(test *testing.T) {
 	log := filepath.Join(test.TempDir(), "log")
 	application := readerWithServers(test, "lighthouse/src/lamp.go", fakeGo(test, log))
 	window := newWindow(test, application)
-	key := "fakels " + application.projects[0].Path
+	key := "fakels " + application.session.Projects[0].Path
 	first := application.servers.Running(key)
 	first.Stop() // as if it had crashed
 	for attempt := 0; attempt < 100 && application.servers.Running(key) == first; attempt++ {
@@ -264,7 +264,7 @@ func TestAServerWaitsForAnotherToHaveImportedTheProjects(test *testing.T) {
 	application := readerWithServers(test, "lighthouse/src/lamp.go", []lsp.Server{first, second})
 	window := newWindow(test, application)
 	window.Frames(1)
-	project := application.projects[0].Path
+	project := application.session.Projects[0].Path
 	application.servers.Start(second, "", "second", project)
 	if application.servers.Starting("second") || !strings.Contains(application.servers.Status(), "second waits for fakels") {
 		test.Fatalf("second started while fakels imported; the status says %q", application.servers.Status())

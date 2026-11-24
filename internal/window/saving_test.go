@@ -22,7 +22,7 @@ func editingKeeper(test *testing.T) (*Window, *uitest.Window, string) {
 	if !application.editing() {
 		test.Fatal("keeper.go is not being edited")
 	}
-	return application, window, filepath.Join(application.projects[0].Path, "src", "keeper.go")
+	return application, window, filepath.Join(application.session.Projects[0].Path, "src", "keeper.go")
 }
 
 func TestASavedFileShowsAsChanged(test *testing.T) {
@@ -36,7 +36,7 @@ func TestASavedFileShowsAsChanged(test *testing.T) {
 	if application.viewer.Unsaved() {
 		test.Error("the file still has edits not saved")
 	}
-	if _, changed := application.projects[0].ChangeOf("src/keeper.go"); !changed {
+	if _, changed := application.session.Projects[0].ChangeOf("src/keeper.go"); !changed {
 		test.Error("the project does not count the file saved as changed")
 	}
 	if application.viewer.Edit == nil || application.viewer.Edit.Caret().Column != 3 {
@@ -145,7 +145,7 @@ func TestCountingOnlyCommitsAsksBeforeLosingEdits(test *testing.T) {
 	application, window, _ := editingKeeper(test)
 	typeText(window, "x")
 	press(window, input.KeyW, input.KeySuper, input.KeyShift)
-	if !application.questions.unsavedOpen || !application.settings.WorkingTree {
+	if !application.questions.unsavedOpen || !application.session.WorkingTree {
 		test.Fatal("⌘⇧W read the files again without asking about the edits")
 	}
 	answer(test, window, "Cancel")

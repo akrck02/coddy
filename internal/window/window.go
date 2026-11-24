@@ -4,19 +4,17 @@ package window
 
 import (
 	"context"
-	"sort"
-	"strings"
 	"time"
 
 	"github.com/akrck02/code-review/internal/explorer"
 	"github.com/akrck02/code-review/internal/finder"
-	"github.com/akrck02/code-review/internal/git"
 	"github.com/akrck02/code-review/internal/java"
 	"github.com/akrck02/code-review/internal/lsp"
 	"github.com/akrck02/code-review/internal/mode"
 	"github.com/akrck02/code-review/internal/navigation"
 	"github.com/akrck02/code-review/internal/pane"
 	"github.com/akrck02/code-review/internal/servers"
+	"github.com/akrck02/code-review/internal/session"
 	"github.com/akrck02/code-review/internal/settings"
 	"github.com/akrck02/code-review/internal/sidebar"
 	"github.com/akrck02/code-review/internal/theme"
@@ -91,15 +89,12 @@ const (
 // back to that goroutine.
 type Window struct {
 	settings Settings
-	folders  []string
-
-	projects      []*workspace.Project
-	projectBases  map[string]string // a base chosen for one project, by its path
-	loading       int
-	candidates    []finder.Candidate
-	changedOrder  []workspace.FileReference
-	work          *work.Queue
-	documentCache map[workspace.FileReference]*workspace.Document
+	// session is what is open: the folders, their projects and bases, the documents read
+	session      session.Session
+	loading      int
+	candidates   []finder.Candidate
+	changedOrder []workspace.FileReference
+	work         *work.Queue
 
 	sidebar sidebar.Sidebar
 	viewer  viewer.Viewer
@@ -177,9 +172,8 @@ func New(settings Settings, modes ...mode.Mode) (*Window, error) {
 	}
 	application := &Window{
 		settings:      settings,
-		projectBases:  map[string]string{},
+		session:       session.New(settings.Base, settings.WorkingTree),
 		work:          work.New(settings.Synchronous, wake),
-		documentCache: map[workspace.FileReference]*workspace.Document{},
 		tap:           &inputTap{},
 		onlyChanged:   settings.OnlyChanged,
 		focus:         sidebarPane,
@@ -213,7 +207,7 @@ func New(settings Settings, modes ...mode.Mode) (*Window, error) {
 func (application *Window) Driver() uidrive.Driver { return application.tap }
 
 // Folders are the folders opened, to remember them for the next time.
-func (application *Window) Folders() []string { return application.folders }
+func (application *Window) Folders() []string { return application.session.Folders }
 
 // startThemes chooses the theme and the icon theme the window starts in, among those offered.
 func (application *Window) startThemes(settings Settings) {
@@ -253,25 +247,7 @@ func (application *Window) openFolders(folders []string) {
 		application.keepingEdits(func() { application.openFolders(folders) })
 		return
 	}
-	known := map[string]bool{}
-	for _, project := range application.projects {
-		known[project.Path] = true
-	}
-	for _, folder := range folders {
-		if !contains(application.folders, folder) {
-			application.folders = append(application.folders, folder)
-		}
-	}
-	for _, path := range git.Discover(folders) {
-		if known[path] {
-			continue
-		}
-		application.projects = append(application.projects, &workspace.Project{Name: baseName(path), Path: path})
-	}
-	sort.SliceStable(application.projects, func(first, second int) bool {
-		return strings.ToLower(application.projects[first].Name) < strings.ToLower(application.projects[second].Name)
-	})
-	application.documentCache = map[workspace.FileReference]*workspace.Document{}
+	application.session.AddFolders(folders)
 	application.viewer.Close()
 	application.reloadAll()
 }
@@ -282,16 +258,14 @@ func (application *Window) closeAll() {
 		application.keepingEdits(application.closeAll)
 		return
 	}
-	application.projects = nil
-	application.folders = nil
-	application.documentCache = map[workspace.FileReference]*workspace.Document{}
+	application.session.Clear()
 	application.viewer.Close()
 	application.projectsChanged()
 }
 
 // reloadAll reads every project again: after a change of base, or to see new commits.
 func (application *Window) reloadAll() {
-	for index := range application.projects {
+	for index := range application.session.Projects {
 		application.reload(index)
 	}
 	application.projectsChanged()
@@ -299,10 +273,8 @@ func (application *Window) reloadAll() {
 
 // reload reads one project again, on another goroutine.
 func (application *Window) reload(index int) {
-	project := application.projects[index]
-	path := project.Path
+	path := application.session.Unread(index)
 	options := application.LoadOptions(path)
-	application.projects[index] = &workspace.Project{Name: project.Name, Path: path}
 	application.loading++
 	settle := func() { application.loading-- } // also when a newer reading replaced this one
 	snapshot, written := application.servers.Snapshot(path), application.servers.Written()
@@ -320,16 +292,7 @@ func (application *Window) reload(index int) {
 				application.toast = sorting.Error()
 			}
 			application.forgetClassKinds(path)
-			for position, current := range application.projects {
-				if current.Path == path {
-					application.projects[position] = loaded
-				}
-			}
-			for reference := range application.documentCache {
-				if reference.Project < len(application.projects) && application.projects[reference.Project].Path == path {
-					delete(application.documentCache, reference)
-				}
-			}
+			application.session.Loaded(loaded)
 			application.projectsChanged()
 			application.viewer.Reopen(path, application.openFile)
 		}
@@ -338,15 +301,7 @@ func (application *Window) reload(index int) {
 
 // LoadOptions are how a project is read: against its base, with the changes not committed yet or not.
 func (application *Window) LoadOptions(path string) workspace.LoadOptions {
-	return workspace.LoadOptions{Base: application.baseFor(path), WorkingTree: application.settings.WorkingTree}
-}
-
-// baseFor is the base a project is compared against: its own, the one for all, or its default.
-func (application *Window) baseFor(path string) string {
-	if base, chosen := application.projectBases[path]; chosen {
-		return base
-	}
-	return application.settings.Base
+	return application.session.LoadOptions(path)
 }
 
 // projectsChanged rebuilds what is made from the projects: the finder's files, the order of the
@@ -355,7 +310,7 @@ func (application *Window) projectsChanged() {
 	application.servers.ProjectsChanged()
 	application.candidates = application.candidates[:0]
 	application.changedOrder = application.changedOrder[:0]
-	for index, project := range application.projects {
+	for index, project := range application.session.Projects {
 		if application.hidden(project) {
 			continue
 		}
@@ -388,32 +343,29 @@ func walkFiles(folder *workspace.Folder, visit func(path string)) {
 // openFile opens a file of a project in the viewer, reading it on another goroutine. Another
 // file asks first about the edits not saved of the one open.
 func (application *Window) openFile(reference workspace.FileReference) {
-	if reference.Project < 0 || reference.Project >= len(application.projects) {
+	if reference.Project < 0 || reference.Project >= len(application.session.Projects) {
 		return
 	}
 	if application.viewer.Unsaved() && reference != application.viewer.Reference {
 		application.keepingEdits(func() { application.openFile(reference) })
 		return
 	}
-	project := application.projects[reference.Project]
+	project := application.session.Projects[reference.Project]
 	application.explorer.Close()
 	application.viewer.Start(reference, project)
 	application.viewer.Uses = application.usesOfFile(reference)
-	if document, cached := application.documentCache[reference]; cached {
+	if document, cached := application.session.Document(reference); cached {
 		application.viewer.Show(document, application.mode.ShowsChanges())
 		return
 	}
-	workingTree := application.settings.WorkingTree
+	workingTree := application.session.WorkingTree
 	request := application.viewer.Request
 	application.work.Run("", func(context.Context) func() {
-		document := workspace.OpenDocument(project, reference.Path, workingTree)
+		read := session.ReadDocument(project, reference, workingTree)
 		return func() {
-			if len(application.documentCache) > 64 {
-				application.documentCache = map[workspace.FileReference]*workspace.Document{}
-			}
-			application.documentCache[reference] = document
+			application.session.Keep(read)
 			if application.viewer.Request == request {
-				application.viewer.Show(document, application.mode.ShowsChanges())
+				application.viewer.Show(read.Document, application.mode.ShowsChanges())
 			}
 		}
 	})
@@ -433,7 +385,7 @@ func (application *Window) openFileAt(reference workspace.FileReference, line in
 func (application *Window) stepChangedFile(step int) {
 	var order []workspace.FileReference
 	for _, reference := range application.changedOrder {
-		if application.inScope(reference) && !application.sidebar.LeavesOut(application.projects[reference.Project], reference.Path) {
+		if application.inScope(reference) && !application.sidebar.LeavesOut(application.session.Projects[reference.Project], reference.Path) {
 			order = append(order, reference)
 		}
 	}
@@ -456,23 +408,9 @@ func (application *Window) stepChangedFile(step int) {
 	application.sidebar.RevealFile(application, order[next])
 }
 
-func contains(list []string, wanted string) bool {
-	for _, item := range list {
-		if item == wanted {
-			return true
-		}
-	}
-	return false
-}
-
-func baseName(path string) string {
-	path = strings.TrimRight(path, "/")
-	return path[strings.LastIndexByte(path, '/')+1:]
-}
-
 // projectIndex is where a project is in the list, by its path; -1 when it is not open.
 func (application *Window) projectIndex(path string) int {
-	for index, project := range application.projects {
+	for index, project := range application.session.Projects {
 		if project.Path == path {
 			return index
 		}
@@ -484,23 +422,18 @@ func (application *Window) projectIndex(path string) int {
 // those of the project the sidebar is in.
 func (application *Window) inScope(reference workspace.FileReference) bool {
 	entered := application.sidebar.Entered
-	return entered == "" || application.projects[reference.Project].Path == entered
+	return entered == "" || application.session.Projects[reference.Project].Path == entered
 }
 
 // projectsWithChanges counts the projects the development changed.
 func (application *Window) projectsWithChanges() int {
 	count := 0
-	for _, project := range application.projects {
+	for _, project := range application.session.Projects {
 		if len(project.Changes) > 0 {
 			count++
 		}
 	}
 	return count
-}
-
-// clearDocuments forgets the files read, so they are read again.
-func (application *Window) clearDocuments() {
-	application.documentCache = map[workspace.FileReference]*workspace.Document{}
 }
 
 // openByLabel opens a file named as "project/path/in/it", once the projects have been read.

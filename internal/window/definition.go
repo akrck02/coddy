@@ -75,7 +75,7 @@ func (application *Window) GoToDefinition(place viewer.Place) {
 			case navigation.Declares(locations[0], asked.Path, at):
 				application.searchUses(question)
 			default:
-				location, _ := navigation.FromJar(application.projects, locations[0], question.Name)
+				location, _ := navigation.FromJar(application.session.Projects, locations[0], question.Name)
 				application.goToLocation(from, location)
 			}
 		}
@@ -104,7 +104,7 @@ func (application *Window) definitionAsked() {
 // the person left on the trail.
 func (application *Window) goToLocation(from navigation.Spot, location lsp.Location) {
 	path := lsp.PathOf(location.URI)
-	reference, found := navigation.ReferenceOf(application.projects, path)
+	reference, found := navigation.ReferenceOf(application.session.Projects, path)
 	if !found {
 		application.toast = "Outside the projects open: " + navigation.OutsideName(location.URI, path)
 		return
@@ -138,7 +138,7 @@ func (application *Window) stepTrail(step int) {
 	if !found {
 		return
 	}
-	reference, open := navigation.ReferenceOf(application.projects, target.Path)
+	reference, open := navigation.ReferenceOf(application.session.Projects, target.Path)
 	if !open {
 		application.trail.Drop(step) // its project was closed
 		application.toast = "No longer open: " + target.Path

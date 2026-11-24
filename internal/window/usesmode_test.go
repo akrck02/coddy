@@ -140,7 +140,7 @@ func TestTheUsersOfTheDeclarationAUseIsInAreFound(test *testing.T) {
 func lastUseIn(application *Window, base string) (mode.Use, bool) {
 	holder, _ := application.usesHolder()
 	last, found := mode.Use{}, false
-	for index, project := range application.projects {
+	for index, project := range application.session.Projects {
 		for _, path := range project.Files {
 			reference := workspace.FileReference{Project: index, Path: path}
 			for line, spans := range holder.UsesIn(reference) {

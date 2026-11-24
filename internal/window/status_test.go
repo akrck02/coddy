@@ -14,7 +14,7 @@ func TestAQuestionSaysWhatItWaitsFor(test *testing.T) {
 	log := filepath.Join(test.TempDir(), "log")
 	application := readerWithServers(test, "lighthouse/src/lamp.go", fakeGo(test, log, "FAKE_LSP_BUSY=3000"))
 	window := newWindow(test, application)
-	client := application.servers.Running("fakels " + application.projects[0].Path)
+	client := application.servers.Running("fakels " + application.session.Projects[0].Path)
 	for deadline := time.Now().Add(2 * time.Second); client != nil && !client.Busy() && time.Now().Before(deadline); time.Sleep(10 * time.Millisecond) {
 	}
 	if client == nil || client.Ready() {
@@ -38,7 +38,7 @@ func TestAClickOnAServerOpensWhatItDoesProjectByProject(test *testing.T) {
 		test.Fatal(err)
 	}
 	window.Frames(2)
-	client := application.servers.Running("fakels " + application.projects[0].Path)
+	client := application.servers.Running("fakels " + application.session.Projects[0].Path)
 	for deadline := time.Now().Add(2 * time.Second); client != nil && !client.Busy() && time.Now().Before(deadline); time.Sleep(10 * time.Millisecond) {
 	}
 	window.Frames(1)

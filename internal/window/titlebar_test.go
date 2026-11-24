@@ -67,7 +67,7 @@ func TestTheMenuReadsTheProjectsAgain(test *testing.T) {
 		test.Fatal(err)
 	}
 	window.Frames(2)
-	if len(application.projects[0].Changes) != 4 {
+	if len(application.session.Projects[0].Changes) != 4 {
 		test.Error("after the menu's item the file added since the start is not among the changes")
 	}
 }

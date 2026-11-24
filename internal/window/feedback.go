@@ -17,7 +17,7 @@ import (
 // leftOutCount is how many projects of the window some server leaves out.
 func (application *Window) leftOutCount() int {
 	count := 0
-	for _, project := range application.projects {
+	for _, project := range application.session.Projects {
 		if application.servers.CannotImport(project.Path) != "" {
 			count++
 		}
@@ -27,10 +27,10 @@ func (application *Window) leftOutCount() int {
 
 // LeftOut says why the servers leave a project out, for the sidebar's mark; "" when none does.
 func (application *Window) LeftOut(project int) string {
-	if project < 0 || project >= len(application.projects) {
+	if project < 0 || project >= len(application.session.Projects) {
 		return ""
 	}
-	why := application.servers.CannotImport(application.projects[project].Path)
+	why := application.servers.CannotImport(application.session.Projects[project].Path)
 	if why == "" {
 		return ""
 	}

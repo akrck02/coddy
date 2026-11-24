@@ -15,7 +15,7 @@ func TestAServerNotAskedForAWhileRestsAndAQuestionWakesIt(test *testing.T) {
 	application := readerWithServers(test, "lighthouse/src/lamp.go", fakeGo(test, log))
 	application.servers.Rest = 300 * time.Millisecond
 	window := newWindow(test, application)
-	key := "fakels " + application.projects[0].Path
+	key := "fakels " + application.session.Projects[0].Path
 	first := application.servers.Running(key)
 	if first == nil {
 		test.Fatal("no server runs for lamp.go")
@@ -51,7 +51,7 @@ func TestTheServersPanelShowsWhatAServerTakesAndStopsIt(test *testing.T) {
 	log := filepath.Join(test.TempDir(), "log")
 	application := readerWithServers(test, "lighthouse/src/lamp.go", fakeGo(test, log))
 	window := newWindow(test, application)
-	key := "fakels " + application.projects[0].Path
+	key := "fakels " + application.session.Projects[0].Path
 	client := application.servers.Running(key)
 	application.serversOpen = true
 	for attempt := 0; attempt < 200 && application.servers.Usage(key) == ""; attempt++ {
@@ -80,7 +80,7 @@ func TestAServerWokenWhileTheOneBeforeSavesStartsOnceItHasEnded(test *testing.T)
 	servers[0].Environment = append(servers[0].Environment, "FAKE_LSP_SLOW_EXIT=800")
 	application := readerWithServers(test, "lighthouse/src/lamp.go", servers)
 	window := newWindow(test, application)
-	key := "fakels " + application.projects[0].Path
+	key := "fakels " + application.session.Projects[0].Path
 	first := application.servers.Running(key)
 	application.servers.Pause(key, first)
 	application.GoToDefinition(viewer.Place{Line: 2, Column: 5})
@@ -102,7 +102,7 @@ func TestAServerStillImportingNeverRests(test *testing.T) {
 	application := readerWithServers(test, "lighthouse/src/lamp.go", servers)
 	application.servers.Rest = 100 * time.Millisecond
 	window := newWindow(test, application)
-	key := "fakels " + application.projects[0].Path
+	key := "fakels " + application.session.Projects[0].Path
 	importing := application.servers.Running(key)
 	if importing == nil {
 		test.Fatal("no server runs for lamp.go")

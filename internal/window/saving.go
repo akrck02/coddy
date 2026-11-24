@@ -3,6 +3,7 @@ package window
 import (
 	"errors"
 
+	"github.com/akrck02/code-review/internal/session"
 	"github.com/akrck02/code-review/internal/workspace"
 	ui "github.com/akrck02/go-ui"
 	platform "github.com/akrck02/go-ui/window"
@@ -35,10 +36,9 @@ func (application *Window) keepingEdits(then func()) {
 // toggleWorkingTree counts the changes not committed yet, or the commits only; the files are read
 // again, from disk or from the last commit.
 func (application *Window) toggleWorkingTree() {
-	application.settings.WorkingTree = !application.settings.WorkingTree
-	application.clearDocuments()
+	counted := application.session.ToggleWorkingTree()
 	application.reloadAll()
-	application.toast = workingTreeNote(application.settings.WorkingTree)
+	application.toast = workingTreeNote(counted)
 }
 
 // quit closes the window, asking first about edits not saved.
@@ -88,7 +88,7 @@ func (application *Window) keepMine() {
 func (application *Window) takeTheirs() {
 	view := &application.viewer
 	view.Edit = nil
-	delete(application.documentCache, view.Reference)
+	application.session.Forget(view.Reference)
 	view.Document = nil
 	application.openFile(view.Reference)
 	application.doWhatWasAsked()
@@ -106,7 +106,7 @@ func (application *Window) doWhatWasAsked() {
 // buildQuestions shows the dialog about edits that is open, if one is.
 func (application *Window) buildQuestions(context *ui.Context) {
 	asked := &application.questions
-	name := baseName(application.viewer.Reference.Path)
+	name := session.BaseName(application.viewer.Reference.Path)
 	if asked.unsavedOpen {
 		application.ask(context, "Save the changes to "+name+"?", "Your changes are lost if you don't save them.",
 			[2]string{"Save", "Don't save"}, &asked.unsavedOpen, application.answerUnsaved)

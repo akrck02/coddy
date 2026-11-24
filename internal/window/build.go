@@ -8,6 +8,7 @@ import (
 
 	"github.com/akrck02/code-review/internal/mode"
 	"github.com/akrck02/code-review/internal/pane"
+	"github.com/akrck02/code-review/internal/session"
 	"github.com/akrck02/code-review/internal/viewer"
 	"github.com/akrck02/go-renderer/draw2d"
 	ui "github.com/akrck02/go-ui"
@@ -221,13 +222,13 @@ func (application *Window) buildMenu(context *ui.Context) {
 }
 
 func (application *Window) title() string {
-	switch len(application.folders) {
+	switch len(application.session.Folders) {
 	case 0:
 		return "Code review"
 	case 1:
-		return baseName(application.folders[0])
+		return session.BaseName(application.session.Folders[0])
 	}
-	return fmt.Sprintf("%s and %d more", baseName(application.folders[0]), len(application.folders)-1)
+	return fmt.Sprintf("%s and %d more", session.BaseName(application.session.Folders[0]), len(application.session.Folders)-1)
 }
 
 // buildStatusBar says where the development stands: its projects and changed files, how far a
@@ -244,7 +245,7 @@ func (application *Window) buildStatusBar(context *ui.Context) {
 		if application.viewer.IsOpen() {
 			application.buildBranch(context, small)
 		}
-		if !application.settings.WorkingTree {
+		if !application.session.WorkingTree {
 			context.Text("commits only", ui.TextStyle{Size: palette.SmallTextSize, Color: palette.Warning})
 		}
 		application.buildServersButton(context)
@@ -270,7 +271,7 @@ func (application *Window) buildCounts(context *ui.Context, small ui.TextStyle) 
 		context.Tooltip(words)
 	}
 	status := &application.status
-	files, changed, projects := len(application.changedOrder), application.projectsWithChanges(), len(application.projects)
+	files, changed, projects := len(application.changedOrder), application.projectsWithChanges(), len(application.session.Projects)
 	counted("file-diff", status.files.Of(files, strconv.Itoa), status.filesWords.Of(files, changedFilesWords), nil)
 	counted("folder-git-2", status.projects.Of([2]int{changed, projects}, fraction),
 		status.projectsWords.Of([2]int{changed, projects}, projectsWords), nil)
@@ -299,7 +300,7 @@ func (application *Window) buildProgress(context *ui.Context, viewed, total int)
 // buildBranch says where the open file's branch stands against its base, as the project is now.
 func (application *Window) buildBranch(context *ui.Context, small ui.TextStyle) {
 	project := application.viewer.Project
-	for _, current := range application.projects {
+	for _, current := range application.session.Projects {
 		if current.Path == project.Path {
 			project = current
 		}
@@ -350,11 +351,11 @@ func (application *Window) openBaseDialog() {
 	if application.viewer.IsOpen() {
 		dialog.forProject = application.viewer.Project.Path
 	} else if row, ok := application.sidebar.SelectedRow(); ok && row.Project >= 0 {
-		dialog.forProject = application.projects[row.Project].Path
+		dialog.forProject = application.session.Projects[row.Project].Path
 	}
-	dialog.ref = application.settings.Base
+	dialog.ref = application.session.Base
 	if dialog.forProject != "" {
-		if base, chosen := application.projectBases[dialog.forProject]; chosen {
+		if base, chosen := application.session.BaseOf(dialog.forProject); chosen {
 			dialog.ref = base
 		}
 	}
@@ -395,7 +396,7 @@ func (application *Window) buildBaseSheet(context *ui.Context) bool {
 		apply = true
 	}
 	if dialog.forProject != "" {
-		context.Tabs("base scope", &dialog.forAll, baseName(dialog.forProject), "Every project")
+		context.Tabs("base scope", &dialog.forAll, session.BaseName(dialog.forProject), "Every project")
 	}
 	context.Row(func() {
 		context.Spacer()
@@ -414,14 +415,12 @@ func (application *Window) applyBase() {
 	dialog := &application.base
 	ref := strings.TrimSpace(dialog.ref)
 	if dialog.forAll == 1 || dialog.forProject == "" {
-		application.settings.Base = ref
-		application.projectBases = map[string]string{}
-		application.clearDocuments()
+		application.session.SetBaseForAll(ref)
 		application.reloadAll()
 		return
 	}
-	application.projectBases[dialog.forProject] = ref
-	for index, project := range application.projects {
+	application.session.SetBase(dialog.forProject, ref)
+	for index, project := range application.session.Projects {
 		if project.Path == dialog.forProject {
 			application.reload(index)
 		}
@@ -434,8 +433,8 @@ func (application *Window) buildPicker(context *ui.Context) {
 		return
 	}
 	start := ""
-	if len(application.folders) > 0 {
-		start = application.folders[len(application.folders)-1]
+	if len(application.session.Folders) > 0 {
+		start = application.session.Folders[len(application.session.Folders)-1]
 	}
 	path, closed := context.FilePicker(ui.FilePickerOptions{Title: "Open a repository or a folder of repositories", Folder: true, Start: start})
 	if path != "" {

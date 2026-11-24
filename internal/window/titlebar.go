@@ -78,7 +78,7 @@ func (application *Window) showsFolder() bool {
 // buildWorkspaceTitle names the workspace, and what it is compared against when that was chosen.
 func (application *Window) buildWorkspaceTitle(context *ui.Context) {
 	context.Text(application.title(), ui.TextStyle{Weight: draw2d.Medium})
-	if base := application.settings.Base; base != "" {
+	if base := application.session.Base; base != "" {
 		context.Text("against "+base, ui.TextStyle{Size: context.Theme.SmallTextSize, Color: context.Theme.InkQuiet})
 	}
 }
@@ -87,7 +87,7 @@ func (application *Window) buildWorkspaceTitle(context *ui.Context) {
 // the base; in the others, whether files are edited. The settings themselves are in every mode.
 func (application *Window) buildModeButtons(context *ui.Context) {
 	if application.mode.ShowsChanges() {
-		if theme.ToolButton(context, "Count the changes not committed yet (w)", "file-pen-line", application.settings.WorkingTree) {
+		if theme.ToolButton(context, "Count the changes not committed yet (w)", "file-pen-line", application.session.WorkingTree) {
 			application.keepingEdits(application.toggleWorkingTree)
 		}
 		if theme.ToolButton(context, "Compare against another branch, tag or commit (b)", "git-branch", false) {

@@ -24,7 +24,7 @@ func (application *Window) Look() theme.Look { return application.look }
 func (application *Window) Keys() pane.Keys { return application.keys }
 
 // HasProjects tells whether any repository is open.
-func (application *Window) HasProjects() bool { return len(application.projects) > 0 }
+func (application *Window) HasProjects() bool { return len(application.session.Projects) > 0 }
 
 // OpenFolder asks for a folder of repositories to open.
 func (application *Window) OpenFolder() { application.pickerOpen = true }
@@ -38,19 +38,19 @@ func (application *Window) BuildInsteadOfAFile(context *ui.Context) bool {
 }
 
 // Projects are the repositories open, in the order the sidebar lists them.
-func (application *Window) Projects() []*workspace.Project { return application.projects }
+func (application *Window) Projects() []*workspace.Project { return application.session.Projects }
 
 // Candidates are every file the finder can find by name.
 func (application *Window) Candidates() []finder.Candidate { return application.candidates }
 
 // Searchable tells whether the finder's content search looks in a project.
 func (application *Window) Searchable(index int) bool {
-	project := application.projects[index]
+	project := application.session.Projects[index]
 	return project.Loaded && !application.hidden(project) && application.inScope(workspace.FileReference{Project: index})
 }
 
 // WorkingTree tells whether the changes not committed yet count.
-func (application *Window) WorkingTree() bool { return application.settings.WorkingTree }
+func (application *Window) WorkingTree() bool { return application.session.WorkingTree }
 
 // Synchronous tells whether work runs at once, for a capture or a test.
 func (application *Window) Synchronous() bool { return application.settings.Synchronous }

@@ -70,10 +70,10 @@ func newWindow(test *testing.T, application *Window) *uitest.Window {
 func TestAWorkspaceListsTheChangedFilesOfItsRepositories(test *testing.T) {
 	application := newReader(Settings{Folders: []string{makeRepository(test)}, WorkingTree: true, Synchronous: true, Mode: "Review"})
 	newWindow(test, application)
-	if len(application.projects) != 1 {
-		test.Fatalf("found %d projects, want 1", len(application.projects))
+	if len(application.session.Projects) != 1 {
+		test.Fatalf("found %d projects, want 1", len(application.session.Projects))
 	}
-	project := application.projects[0]
+	project := application.session.Projects[0]
 	if project.Base != "main" || len(project.Changes) != 3 {
 		test.Fatalf("base %q with %d changes, want main with 3 (%s)", project.Base, len(project.Changes), project.Error)
 	}
@@ -218,8 +218,8 @@ func TestOnlyTheProjectsWithChangesAreShownInBothModesAndTheFinder(test *testing
 	addUntouchedRepository(test, folder)
 	application := newReader(Settings{Folders: []string{folder}, WorkingTree: true, Synchronous: true, OnlyChanged: true})
 	window := newWindow(test, application)
-	if len(application.projects) != 2 {
-		test.Fatalf("found %d projects, want 2", len(application.projects))
+	if len(application.session.Projects) != 2 {
+		test.Fatalf("found %d projects, want 2", len(application.session.Projects))
 	}
 	for _, each := range application.modes {
 		application.setMode(each)
@@ -301,7 +301,7 @@ func TestEnteringAProjectListsOnlyItsTree(test *testing.T) {
 		test.Fatal("Enter on a project did not enter it")
 	}
 	inside := application.projectIndex(tree.Entered)
-	if application.projects[inside].Name != "lighthouse" {
+	if application.session.Projects[inside].Name != "lighthouse" {
 		test.Fatalf("entered %s, want lighthouse", tree.Entered)
 	}
 	for _, row := range tree.Rows {

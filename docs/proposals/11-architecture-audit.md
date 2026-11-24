@@ -151,7 +151,7 @@ go in before the code that moves it (the viewer and sidebar have few: about 190 
 - [x] T3 — `work` out of `window`; overlays as a list; the command table kept · `internal/work`, `window` · R3
 - [x] T4 — `servers` out of `window`, behind `Host`; `told` holds the open file only and closes the last one · `internal/servers` · R3, R8
 - [x] T5 — `navigation` out of `window` · `internal/navigation` · R3
-- [ ] T6 — `session` out of `window`; the document cache by bytes with a stamp check · `internal/session` · R3, R8
+- [x] T6 — `session` out of `window`; the document cache by bytes with a stamp check · `internal/session` · R3, R8
 - [ ] T7 — `language`, the table; every list of extensions and names replaced · `internal/language` · R7
 - [ ] T8 — `Mode`'s capabilities; `sidebar.Window` and `viewer.Window` trimmed; capabilities resolved once · `mode`, `files`, `review`, `uses`, `sidebar`, `viewer` · R5
 - [ ] T9 — viewer: tests of each presentation, then `presentation`; `viewer.go` split into layout, navigation, paint · `viewer` · R4, R6
@@ -167,7 +167,8 @@ go in before the code that moves it (the viewer and sidebar have few: about 190 
 2. File watching (a dependency) or the stamp check alone.
 3. The theme package split in two (`theme` for colours, `icons`): it moves about 10 files and
    every import. It is optional.
-4. The budget of the document cache, in megabytes.
+4. The budget of the document cache, in megabytes. Built with 64 MB as the default
+   (`session.documentCacheBytes`); say if another.
 
 ## Result
 

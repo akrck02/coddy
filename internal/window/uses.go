@@ -58,7 +58,7 @@ func (application *Window) searchUses(question navigation.Question) {
 // inSightPaths are the folders of the projects in sight that are read.
 func (application *Window) inSightPaths() []string {
 	var paths []string
-	for index, project := range application.projects {
+	for index, project := range application.session.Projects {
 		if application.Searchable(index) {
 			paths = append(paths, project.Path)
 		}
@@ -68,7 +68,7 @@ func (application *Window) inSightPaths() []string {
 
 // wordSearch searches for a name as a whole word in the files a server of the table reads.
 func (application *Window) wordSearch() git.GrepOptions {
-	options := git.GrepOptions{WorkingTree: application.settings.WorkingTree, Word: true}
+	options := git.GrepOptions{WorkingTree: application.session.WorkingTree, Word: true}
 	for extension, language := range lsp.LanguageIDs() {
 		if application.servers.Reads(language) {
 			options.Files = append(options.Files, "*"+extension)
@@ -160,11 +160,11 @@ func limitLines(lines []string) []string {
 // ShowServerFiles lists the files language servers wrote in a project in the finder's panel, to
 // open any of them.
 func (application *Window) ShowServerFiles(project int) {
-	if project < 0 || project >= len(application.projects) {
+	if project < 0 || project >= len(application.session.Projects) {
 		return
 	}
 	var files []finder.Use
-	for _, file := range application.projects[project].ServerFiles {
+	for _, file := range application.session.Projects[project].ServerFiles {
 		// the reader cannot tell who wrote a file outside it: it says what it saw
 		note := "new while " + file.Server + " ran: by it, or by you outside the reader"
 		if file.Existed {
