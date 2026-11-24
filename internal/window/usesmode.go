@@ -3,6 +3,7 @@ package window
 import (
 	"github.com/akrck02/code-review/internal/lsp"
 	"github.com/akrck02/code-review/internal/mode"
+	"github.com/akrck02/code-review/internal/navigation"
 	"github.com/akrck02/code-review/internal/viewer"
 	"github.com/akrck02/code-review/internal/workspace"
 )
@@ -18,89 +19,42 @@ func (application *Window) usesHolder() (mode.UsesHolder, bool) {
 	return nil, false
 }
 
-// showUses shows the uses found so far: in the uses mode, turning it on when the search starts
+// The window is the Host of navigation's searches of uses: what follows is what they ask of it.
+
+// ClientFor is the running server of a file of a project, by its key; reads tells whether any
+// server reads the file, client is nil while it starts.
+func (application *Window) ClientFor(project, path string) (*lsp.Client, string, bool) {
+	return application.servers.ClientFor(project, path)
+}
+
+// ShowUses shows the uses found so far: in the uses mode, turning it on when the search starts
 // (opening), or in the finder.
-func (application *Window) showUses(search *usesSearch, opening bool) {
-	note := application.usesNote(search)
-	search.noted, search.shownUses = note, usesShown(search)
+func (application *Window) ShowUses(search *navigation.Search, note string, opening bool) {
 	holder, held := application.usesHolder()
 	if !held {
+		listed := navigation.Listed(application, search)
 		if opening {
-			application.finder.ShowUsesFrom(application, "uses of "+search.name, search.home, application.usesListed(search))
+			application.finder.ShowUsesFrom(application, "uses of "+search.Name, search.Home, listed)
 		} else {
-			application.finder.UpdateUses(application, application.usesListed(search))
+			application.finder.UpdateUses(application, listed)
 		}
 		application.finder.Note = note
 		return
 	}
-	holder.SetUses(search.name, search.home, application.modeUses(search), note)
+	holder.SetUses(search.Name, search.Home, navigation.ModeUses(application, search), note)
 	if opening {
 		application.setMode(holder)
 	}
 	application.markUses()
 }
 
-// noteUses says again how the search goes, when that changed.
-// Only a change of the uses lays them out again: the note alone changes with each word of a
-// server's progress, and laying out hundreds of uses, the sidebar and the marks for it each frame
-// made the uses mode crawl while kotlin-lsp imported.
-func (application *Window) noteUses(search *usesSearch) {
-	if usesShown(search) != search.shownUses {
-		application.showUses(search, false)
-		return
-	}
-	note := application.usesNote(search)
-	if note == search.noted {
-		return
-	}
-	search.noted = note
+// NoteUses says again how the search of uses goes, its uses unchanged.
+func (application *Window) NoteUses(note string) {
 	if holder, held := application.usesHolder(); held {
 		holder.SetUsesNote(note)
 		return
 	}
 	application.finder.Note = note
-}
-
-// usesShown tells which uses a search has: how many found, probable and checked.
-func usesShown(search *usesSearch) [3]int {
-	return [3]int{len(search.found), len(search.probable), search.checked}
-}
-
-// modeUses are the uses found, as the uses mode keeps them, and the probable ones not checked yet.
-func (application *Window) modeUses(search *usesSearch) []mode.Use {
-	var found []mode.Use
-	for _, location := range search.found {
-		if use, known := application.modeUseOf(location); known {
-			found = append(found, use)
-		}
-	}
-	for key, location := range search.probable {
-		if _, confirmed := search.found[key]; confirmed {
-			continue
-		}
-		if use, known := application.modeUseOf(location); known {
-			use.Probable = true
-			found = append(found, use)
-		}
-	}
-	return found
-}
-
-// modeUseOf is a place a server gave as a use, when it is in a project open.
-func (application *Window) modeUseOf(location lsp.Location) (mode.Use, bool) {
-	path := lsp.PathOf(location.URI)
-	reference, found := application.referenceOf(path)
-	if !found {
-		return mode.Use{}, false
-	}
-	start, end := location.Range.Start, location.Range.End
-	text := lineOf(path, start.Line, application)
-	column := lsp.CharacterColumn(text, start.Character)
-	last := column
-	if end.Line == start.Line {
-		last = lsp.CharacterColumn(text, end.Character)
-	}
-	return mode.Use{File: reference, Line: start.Line + 1, Start: column, End: last}, true
 }
 
 // markUses gives the viewer the uses of the file open, when the uses mode is on.
@@ -135,10 +89,10 @@ func (application *Window) Relist() { application.sidebar.Invalidate() }
 
 // SearchUsesAgain makes the last search of uses again, from the start.
 func (application *Window) SearchUsesAgain() {
-	last := application.uses
+	last := application.uses.Last()
 	if last == nil {
 		application.toast = "No search to make again: press ⌥F7 on a name"
 		return
 	}
-	application.searchUses(last.asked, last.at, last.name, last.home)
+	application.searchUses(last.Question)
 }

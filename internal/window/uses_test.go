@@ -36,7 +36,7 @@ func TestHoverShowsTheServersText(test *testing.T) {
 	window.MoveTo(application.viewer.PointOf(keeperUse))
 	window.Frames(3)
 	if shown := strings.Join(window.Texts(), " "); !strings.Contains(shown, "Keeper from the fake server") {
-		test.Fatalf("resting on Keeper shows no card: %q", application.hover.text)
+		test.Fatalf("resting on Keeper shows no card: %q", application.hover.Text)
 	}
 	window.MoveTo(application.viewer.PointOf(viewer.Place{Line: 0, Column: 2}))
 	window.Frames(3)

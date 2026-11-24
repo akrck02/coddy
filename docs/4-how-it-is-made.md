@@ -14,6 +14,7 @@
 | `internal/viewer`, `internal/sidebar`, `internal/finder`, `internal/explorer` | The panes |
 | `internal/work` | Background jobs, and what they give back to the frame |
 | `internal/servers` | The language servers a window runs: started for the file open, told its edits, rested when unasked, installed |
+| `internal/navigation` | Following names: where one is declared, the trail back, what a server says of it, its uses across projects |
 | `internal/window` | The window: layout, commands and dialogs |
 | `internal/mode` | What a mode is, and what it asks of the window |
 | `internal/files`, `internal/review` | The two modes: read any file; review the changes, marking each viewed |

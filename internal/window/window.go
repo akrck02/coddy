@@ -14,6 +14,7 @@ import (
 	"github.com/akrck02/code-review/internal/java"
 	"github.com/akrck02/code-review/internal/lsp"
 	"github.com/akrck02/code-review/internal/mode"
+	"github.com/akrck02/code-review/internal/navigation"
 	"github.com/akrck02/code-review/internal/pane"
 	"github.com/akrck02/code-review/internal/servers"
 	"github.com/akrck02/code-review/internal/settings"
@@ -157,13 +158,13 @@ type Window struct {
 	// waiting is the server a question asked waits for, still reading the projects, to say so
 	// until the answer comes
 	waiting *lsp.Client
-	// uses is the list of uses being made, checked place by place across projects
-	uses      *usesSearch
+	// uses makes the lists of uses, checked place by place across projects
+	uses      navigation.Uses
 	themeSet  bool
 	questions questions
 	servers   *servers.Fleet
-	trail     trail
-	hover     hoverCard
+	trail     navigation.Trail
+	hover     navigation.HoverCard
 	// pointer is where the pointer was in the last frame, for a card shown under it
 	pointerX, pointerY float32
 }
@@ -188,6 +189,7 @@ func New(settings Settings, modes ...mode.Mode) (*Window, error) {
 	application.servers = servers.New(servers.Settings{Table: settings.Servers, Wrote: settings.ServersWrote, Data: settings.ServerData},
 		application, application.work, wake)
 	application.overlays = overlaysOf(application)
+	application.uses = navigation.NewUses(application, application.work)
 	application.sidebar = newSidebar(settings)
 	application.startThemes(settings)
 	application.startModes(modes, settings.Mode)

@@ -150,7 +150,7 @@ go in before the code that moves it (the viewer and sidebar have few: about 190 
 - [x] T2 — the idle-frame allocation test, and everything it finds: commands, progress, decorations, badges, Markdown, the uses graph, crumbs, counts, metrics · `window`, `review`, `sidebar`, `viewer`, `uses`, `finder` · R1 · test: `an idle frame allocates no more than the interface itself`, in each mode
 - [x] T3 — `work` out of `window`; overlays as a list; the command table kept · `internal/work`, `window` · R3
 - [x] T4 — `servers` out of `window`, behind `Host`; `told` holds the open file only and closes the last one · `internal/servers` · R3, R8
-- [ ] T5 — `navigation` out of `window` · `internal/navigation` · R3
+- [x] T5 — `navigation` out of `window` · `internal/navigation` · R3
 - [ ] T6 — `session` out of `window`; the document cache by bytes with a stamp check · `internal/session` · R3, R8
 - [ ] T7 — `language`, the table; every list of extensions and names replaced · `internal/language` · R7
 - [ ] T8 — `Mode`'s capabilities; `sidebar.Window` and `viewer.Window` trimmed; capabilities resolved once · `mode`, `files`, `review`, `uses`, `sidebar`, `viewer` · R5

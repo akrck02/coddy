@@ -35,7 +35,7 @@ func (application *Window) Build(context *ui.Context) {
 	application.typeInTheFile(context, application.handleKeys(context))
 	application.unfoldForTheKeyboard()
 	application.servers.Serve(application.servedFile())
-	application.advanceUses()
+	application.uses.Advance()
 
 	context.Frame(ui.Layout{Direction: ui.Vertical, Width: ui.Grow(), Height: ui.Grow()}, ui.Look{Fill: context.Theme.Background}, func() {
 		context.Box(ui.Layout{Width: ui.Grow(), Height: ui.Grow()}, func() {

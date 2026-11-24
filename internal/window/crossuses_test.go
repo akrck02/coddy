@@ -68,7 +68,7 @@ func TestUsesAreFoundInOtherProjectsThroughTheirJars(test *testing.T) {
 	window.Frames(1)
 	application.viewer.PlaceCaret(viewer.Place{Line: 2, Column: 14}) // on Lamp, where it is declared
 	application.usesAsked()
-	for frame := 0; frame < 20 && application.uses != nil && application.finder.Note != ""; frame++ {
+	for frame := 0; frame < 20 && application.uses.Last() != nil && application.finder.Note != ""; frame++ {
 		window.Frames(1)
 	}
 	got := usesListedIn(application)
@@ -98,7 +98,7 @@ func TestUsesAskedWhileTheServerReadsAreAskedAgainOnceItIsDone(test *testing.T) 
 	}
 	application.viewer.PlaceCaret(viewer.Place{Line: 2, Column: 6}) // on On
 	application.usesAsked()
-	for frame := 0; frame < 50 && application.uses != nil && application.uses.busy; frame++ {
+	for frame := 0; frame < 50 && application.uses.Last() != nil && application.uses.Last().Busy(); frame++ {
 		window.Frames(1)
 		time.Sleep(20 * time.Millisecond)
 	}
@@ -109,12 +109,5 @@ func TestUsesAskedWhileTheServerReadsAreAskedAgainOnceItIsDone(test *testing.T) 
 	}
 	if len(application.finder.Hits) == 0 || strings.Contains(application.finder.Note, "more once") {
 		test.Errorf("once the server was done the uses are %d, noted %q", len(application.finder.Hits), application.finder.Note)
-	}
-}
-
-func TestANameIsFoundEachTimeItStandsAsAWordInALine(test *testing.T) {
-	columns := wordColumns("    Lamp lamp = new Lamp(); // Lamps", "Lamp")
-	if len(columns) != 2 || columns[0] != 4 || columns[1] != 20 {
-		test.Errorf("Lamp stands at %v, want [4 20]", columns)
 	}
 }

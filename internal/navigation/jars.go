@@ -1,4 +1,4 @@
-package window
+package navigation
 
 import (
 	"os"
@@ -11,16 +11,16 @@ import (
 	"github.com/akrck02/code-review/internal/workspace"
 )
 
-// fromJar turns a location in a jar (jdtls's jdt://, kotlin-lsp's jar:) into the class's source, when a project open
-// holds it: in the big workspace every repository is a dependency of the others as a jar, and its source is
-// what the person reads. The line is where the name is declared in the source, as the jar's lines
-// need not be the source's.
-func (application *Window) fromJar(location lsp.Location, name string) (lsp.Location, bool) {
+// FromJar turns a location in a jar (jdtls's jdt://, kotlin-lsp's jar:) into the class's source,
+// when a project open holds it, and tells whether it did: in the big workspace every repository
+// is a dependency of the others as a jar, and its source is what the person reads. The line is
+// where the name is declared in the source, as the jar's lines need not be the source's.
+func FromJar(projects []*workspace.Project, location lsp.Location, name string) (lsp.Location, bool) {
 	pkg, class, isJar := lsp.ClassInJar(location.URI)
 	if !isJar {
 		return location, false
 	}
-	source, found := application.sourceOfClass(strings.ReplaceAll(pkg, ".", "/"), class)
+	source, found := sourceOfClass(projects, strings.ReplaceAll(pkg, ".", "/"), class)
 	if !found {
 		return location, false
 	}
@@ -37,18 +37,18 @@ func (application *Window) fromJar(location lsp.Location, name string) (lsp.Loca
 // sourceOfClass is the source of a class in a folder of packages: Class.java, Class.kt, Name.kt
 // for the class NameKt Kotlin makes of a file's functions, or else a Kotlin file of the folder that
 // declares the class, as one Kotlin file may hold several.
-func (application *Window) sourceOfClass(folder, class string) (string, bool) {
+func sourceOfClass(projects []*workspace.Project, folder, class string) (string, bool) {
 	names := []string{class + ".java", class + ".kt"}
 	if facade, isFacade := strings.CutSuffix(class, "Kt"); isFacade && facade != "" {
 		names = append(names, facade+".kt")
 	}
 	for _, name := range names {
-		if source, found := application.sourceOf(folder + "/" + name); found {
+		if source, found := sourceOf(projects, folder+"/"+name); found {
 			return source, true
 		}
 	}
 	declared := typeDeclaration(class)
-	for _, project := range application.projects {
+	for _, project := range projects {
 		for _, file := range project.Files {
 			if !strings.HasSuffix(file, ".kt") || !inFolder(file, folder) {
 				continue
@@ -80,9 +80,9 @@ func memberDeclaration(name string) *regexp.Regexp {
 
 // sourceOf is the file on disk of a project open whose path ends with a class's path: the main
 // sources first, then any other.
-func (application *Window) sourceOf(classPath string) (string, bool) {
+func sourceOf(projects []*workspace.Project, classPath string) (string, bool) {
 	var other string
-	for _, project := range application.projects {
+	for _, project := range projects {
 		for _, file := range project.Files {
 			if file != classPath && !strings.HasSuffix(file, "/"+classPath) {
 				continue

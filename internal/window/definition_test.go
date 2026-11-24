@@ -81,8 +81,8 @@ func TestBackReturnsToThePlaceBefore(test *testing.T) {
 	if !isAt(application, "lighthouse", "src/keeper.go", 4) {
 		test.Errorf("⌘] went to %s at line %d, want src/keeper.go again", application.viewer.Reference.Path, application.viewer.MarkedLine)
 	}
-	if len(application.trail.back) != 1 {
-		test.Errorf("the trail keeps %d places back, want 1", len(application.trail.back))
+	if application.trail.Behind() != 1 {
+		test.Errorf("the trail keeps %d places back, want 1", application.trail.Behind())
 	}
 }
 
@@ -92,8 +92,8 @@ func TestACancelledJumpLeavesNoTrail(test *testing.T) {
 	typeText(window, "x") // an edit not saved, in the comment: going to another file asks first
 	application.GoToDefinition(keeperUse)
 	window.Frames(1)
-	if !application.questions.unsavedOpen || len(application.trail.back) != 0 || application.viewer.GoToColumn != 0 {
+	if !application.questions.unsavedOpen || application.trail.Behind() != 0 || application.viewer.GoToColumn != 0 {
 		test.Errorf("while asking, the trail has %d places back and the column %d is set (asking %t)",
-			len(application.trail.back), application.viewer.GoToColumn, application.questions.unsavedOpen)
+			application.trail.Behind(), application.viewer.GoToColumn, application.questions.unsavedOpen)
 	}
 }

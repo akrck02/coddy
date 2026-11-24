@@ -2,12 +2,12 @@ package window
 
 import (
 	"context"
-	"regexp"
-	"strings"
-	"unicode"
+	"sort"
 
 	"github.com/akrck02/code-review/internal/finder"
+	"github.com/akrck02/code-review/internal/git"
 	"github.com/akrck02/code-review/internal/lsp"
+	"github.com/akrck02/code-review/internal/navigation"
 	"github.com/akrck02/code-review/internal/viewer"
 	"github.com/akrck02/go-renderer/draw2d"
 	ui "github.com/akrck02/go-ui"
@@ -25,76 +25,57 @@ func (application *Window) usesAsked() {
 	if !ready {
 		return
 	}
-	name := wordAt(application.viewer.LineText(place.Line), place.Column)
-	application.searchUses(asked, application.positionOf(place), name, application.viewer.Reference.Project)
+	name := navigation.WordAt(application.viewer.LineText(place.Line), place.Column)
+	application.searchUses(navigation.Question{Name: name, Home: application.viewer.Reference.Project,
+		Asked: asked, At: application.positionOf(place)})
 }
 
 // searchUses searches the uses of a name at a place of a file its server reads.
-func (application *Window) searchUses(asked asking, at lsp.Position, name string, home int) {
-	search := &usesSearch{name: name, home: home, asked: asked, at: at}
+func (application *Window) searchUses(question navigation.Question) {
+	asked, at := question.Asked, question.At
 	projects, options := application.inSightPaths(), application.wordSearch()
-	application.waitFor(asked.client)
+	application.waitFor(asked.Client)
 	application.work.Run("references", func(stop context.Context) func() {
-		ctx, cancel := context.WithTimeout(stop, requestWait)
+		ctx, cancel := context.WithTimeout(stop, navigation.RequestWait)
 		defer cancel()
-		asked.tellFirst()
-		busy := !asked.client.Ready()
-		locations, err := asked.client.References(ctx, asked.path, at)
-		declared, _ := asked.client.Definition(ctx, asked.path, at)
-		hits := application.grepAll(stop, projects, name, options)
+		asked.TellFirst()
+		answer := navigation.Answer{Busy: !asked.Client.Ready()}
+		locations, err := asked.Client.References(ctx, asked.Path, at)
+		answer.Locations = locations
+		answer.Declared, _ = asked.Client.Definition(ctx, asked.Path, at) // no declaration: only the server's uses are listed
+		answer.Hits = navigation.Grep(stop, application.work, projects, question.Name, options)
 		return func() {
 			application.waiting = nil
 			if err != nil {
 				application.toast = "The uses could not be found: " + err.Error()
 				return
 			}
-			search.busy = busy
-			application.startUses(search, locations, declared, hits)
+			application.uses.Begin(question, answer)
 		}
 	})
 }
 
-// useOf is a place a server gave as a use listed in the finder, when it is in a project open.
-func (application *Window) useOf(location lsp.Location) (finder.Use, bool) {
-	path := lsp.PathOf(location.URI)
-	reference, found := application.referenceOf(path)
-	if !found {
-		return finder.Use{}, false
+// inSightPaths are the folders of the projects in sight that are read.
+func (application *Window) inSightPaths() []string {
+	var paths []string
+	for index, project := range application.projects {
+		if application.Searchable(index) {
+			paths = append(paths, project.Path)
+		}
 	}
-	start, end := location.Range.Start, location.Range.End
-	text := lineOf(path, start.Line, application)
-	column := lsp.CharacterColumn(text, start.Character)
-	length := 0
-	if end.Line == start.Line {
-		length = lsp.CharacterColumn(text, end.Character) - column
-	}
-	byteColumn := len(string([]rune(text)[:min(column, len([]rune(text)))]))
-	return finder.Use{Project: reference.Project, Path: reference.Path, Line: start.Line + 1,
-		Column: byteColumn, Length: length, Text: text}, true
+	return paths
 }
 
-// wordAt is the name a character of a line is in: letters, digits and _.
-func wordAt(line string, column int) string {
-	characters := []rune(line)
-	start, end := min(max(column, 0), len(characters)), min(max(column, 0), len(characters))
-	isName := func(character rune) bool {
-		return character == '_' || unicode.IsLetter(character) || unicode.IsDigit(character)
+// wordSearch searches for a name as a whole word in the files a server of the table reads.
+func (application *Window) wordSearch() git.GrepOptions {
+	options := git.GrepOptions{WorkingTree: application.settings.WorkingTree, Word: true}
+	for extension, language := range lsp.LanguageIDs() {
+		if application.servers.Reads(language) {
+			options.Files = append(options.Files, "*"+extension)
+		}
 	}
-	for start > 0 && isName(characters[start-1]) {
-		start--
-	}
-	for end < len(characters) && isName(characters[end]) {
-		end++
-	}
-	return string(characters[start:end])
-}
-
-// hoverCard is what a server said of the name the pointer rests on.
-type hoverCard struct {
-	place   viewer.Place
-	resting bool
-	text    string
-	x, y    float32
+	sort.Strings(options.Files)
+	return options
 }
 
 // Hover asks the server of the file open about the name the pointer rests on, and drops the card
@@ -102,7 +83,7 @@ type hoverCard struct {
 func (application *Window) Hover(place viewer.Place, resting bool) {
 	if !resting {
 		application.work.Cancel("hover")
-		application.hover = hoverCard{}
+		application.hover = navigation.HoverCard{}
 		return
 	}
 	asked, why := application.runningServer(false)
@@ -110,40 +91,18 @@ func (application *Window) Hover(place viewer.Place, resting bool) {
 		return
 	}
 	at := application.positionOf(place)
-	application.hover = hoverCard{place: place, resting: true, x: application.pointerX, y: application.pointerY}
+	application.hover = navigation.HoverCard{Place: place, Resting: true, X: application.pointerX, Y: application.pointerY}
 	application.work.Run("hover", func(stop context.Context) func() {
-		ctx, cancel := context.WithTimeout(stop, requestWait)
+		ctx, cancel := context.WithTimeout(stop, navigation.RequestWait)
 		defer cancel()
-		asked.tellFirst()
-		text, err := asked.client.Hover(ctx, asked.path, at)
+		asked.TellFirst()
+		text, err := asked.Client.Hover(ctx, asked.Path, at)
 		return func() {
-			if err == nil && application.hover.resting && application.hover.place == place {
-				application.hover.text = text
+			if err == nil && application.hover.Resting && application.hover.Place == place {
+				application.hover.Text = text
 			}
 		}
 	})
-}
-
-// markdownLink is a Markdown link, of which the card keeps the words.
-var markdownLink = regexp.MustCompile(`\[([^\]]*)\]\([^)]*\)`)
-
-// hoverLines are the lines of a hover's Markdown worth showing in a small card: no code fences,
-// rules or emphasis marks, links as their words, and no more than a few.
-
-func hoverLines(markdown string) []string {
-	var lines []string
-	for _, line := range strings.Split(markdown, "\n") {
-		if trimmed := strings.TrimSpace(line); strings.HasPrefix(trimmed, "```") || trimmed == "---" {
-			continue // fences and rules: the card shows the words alone
-		}
-		line = markdownLink.ReplaceAllString(line, "$1")
-		line = strings.ReplaceAll(strings.ReplaceAll(line, "**", ""), "`", "")
-		if line == "" && (len(lines) == 0 || lines[len(lines)-1] == "") {
-			continue
-		}
-		lines = append(lines, line)
-	}
-	return lines
 }
 
 const (
@@ -161,7 +120,7 @@ const (
 // wrapped to its width.
 func (application *Window) buildHover(context *ui.Context) {
 	card := application.hover
-	if !card.resting || application.ModalOpen() {
+	if !card.Resting || application.ModalOpen() {
 		return
 	}
 	width, height := context.Size()
@@ -169,15 +128,15 @@ func (application *Window) buildHover(context *ui.Context) {
 	palette := context.Theme
 	size := palette.SmallTextSize + 1
 	measure := func(text string) float32 { return context.Measurer().MeasureText(text, size, draw2d.Regular, 1).Width }
-	lines := limitLines(wrapLines(hoverLines(card.text), cardWidth-2*hoverPaddingX, measure))
+	lines := limitLines(wrapLines(navigation.HoverLines(card.Text), cardWidth-2*hoverPaddingX, measure))
 	if len(lines) == 0 {
 		return
 	}
 	tall := float32(len(lines))*hoverLineHeight + 2*hoverPaddingY
-	left := max(min(card.x+8, width-cardWidth-8), 8)
-	top := card.y + 20
+	left := max(min(card.X+8, width-cardWidth-8), 8)
+	top := card.Y + 20
 	if top+tall > height-8 {
-		top = max(card.y-tall-8, 8)
+		top = max(card.Y-tall-8, 8)
 	}
 	options := ui.LayerOptions{AlignX: ui.Start, AlignY: ui.Start, Padding: ui.Padding{Left: left, Top: top}, Width: ui.Fixed(cardWidth)}
 	look := ui.Look{Fill: palette.Surface, Border: application.look.Chosen, BorderWidth: 1, Radius: 8, Shadow: true}

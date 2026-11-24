@@ -1,4 +1,4 @@
-package window
+package navigation
 
 import (
 	"os"
@@ -41,7 +41,7 @@ func namesDeclaration(text, declaredIn, name string) bool {
 
 // markProbable keeps, of the places to check, those whose file names the declaration for sure,
 // reading each file once.
-func markProbable(search *usesSearch) {
+func markProbable(search *Search) {
 	search.probable = map[string]lsp.Location{}
 	declared, err := os.ReadFile(lsp.PathOf(search.declaration.URI))
 	if err != nil {
@@ -51,11 +51,11 @@ func markProbable(search *usesSearch) {
 	names := map[string]bool{}
 	for _, place := range search.pending {
 		if _, read := names[place.path]; !read {
-			text, _ := os.ReadFile(place.path)
-			names[place.path] = isJavaOrKotlin(place.path) && namesDeclaration(string(text), declaredIn, search.name)
+			text, _ := os.ReadFile(place.path) // a file gone names nothing: its place is checked by its server
+			names[place.path] = isJavaOrKotlin(place.path) && namesDeclaration(string(text), declaredIn, search.Name)
 		}
 		if names[place.path] {
-			location := placeLocation(place, search.name)
+			location := placeLocation(place, search.Name)
 			search.probable[placeKey(location)] = location
 		}
 	}

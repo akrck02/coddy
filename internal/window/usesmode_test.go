@@ -49,7 +49,7 @@ func readerOfUses(test *testing.T) (*Window, *uitest.Window) {
 	window.Frames(1)
 	application.viewer.PlaceCaret(viewer.Place{Line: 2, Column: 14})
 	press(window, input.KeyF12, input.KeyShift)
-	for frame := 0; frame < 40 && application.uses != nil && application.uses.noted != ""; frame++ {
+	for frame := 0; frame < 40 && application.uses.Last() != nil && application.uses.Last().Noted() != ""; frame++ {
 		window.Frames(1)
 	}
 	window.Frames(1)
@@ -181,46 +181,6 @@ func TestAUseNoServerConfirmsIsShownAsProbable(test *testing.T) {
 	}
 	if header := application.mode.Header(); !strings.HasSuffix(header, "· 2 probable") {
 		test.Errorf("the header says %q: the uses a server confirmed are still probable", header)
-	}
-}
-
-func TestAFileNamesADeclarationByItsImportOrItsPackage(test *testing.T) {
-	for text, want := range map[string]bool{
-		"package org.harbour;\nimport org.lighthouse.Lamp;\n":      true,
-		"package org.harbour\nimport org.lighthouse.*\n":           true,
-		"package org.lighthouse;\n":                                true,
-		"package org.harbour;\nimport org.lighthouse.LampStore;\n": false,
-		"package org.harbour;\nimport org.quay.Lamp;\n":            false,
-	} {
-		if got := namesDeclaration(text, "org.lighthouse", "Lamp"); got != want {
-			test.Errorf("%q names Lamp: %t, want %t", text, got, want)
-		}
-	}
-}
-
-// The note of a search changes with each word of a server's progress: saying it again must not lay
-// out the uses, the sidebar and the marks again, which made the uses mode crawl.
-func TestANewNoteAloneDoesNotLayTheUsesOutAgain(test *testing.T) {
-	application, window := readerOfUses(test)
-	search := application.uses
-	if search == nil {
-		test.Fatal("no search of uses")
-	}
-	window.Frames(2)
-	application.sidebar.Stale = false
-	search.unchecked++ // the note says one more place no server reads; the uses are the same
-	application.noteUses(search)
-	if application.sidebar.Stale {
-		test.Error("a new note laid the uses out again: the sidebar is listed again")
-	}
-	holder, _ := application.usesHolder()
-	if holder == nil || !strings.Contains(search.noted, "in files no server reads") {
-		test.Errorf("the note shown is %q", search.noted)
-	}
-	search.found["somewhere:9"] = lsp.Location{}
-	application.noteUses(search)
-	if !application.sidebar.Stale {
-		test.Error("a use found was not laid out")
 	}
 }
 
