@@ -120,8 +120,9 @@ apart from your changes. The window is [Go UI](https://github.com/akrck02/go-ui)
 | [What it does](docs/1-features.md) | The modes, the diff, editing, language servers, the uses mode, the design, what is not done yet. |
 | [Get started](docs/2-get-started.md) | Building, running and every flag. |
 | [Keys](docs/3-keys.md) | Every key, in each mode and while editing. |
-| [How it is made](docs/4-how-it-is-made.md) | The packages and how the window is drawn. |
-| [Contributing](docs/8-contributing.md) | The one rule, where things are, adding a mode, building and testing, proposing a change. |
+| [How it is made](docs/4-how-it-is-made.md) | The packages in floors, how a frame is built, the threads, what is kept between frames. |
+| [Guides](docs/5-guides/) | Adding a language, a language server, a theme or a mode. |
+| [Contributing](docs/8-contributing.md) | The one rule, where things are, building and testing, proposing a change. |
 | [Proposals](docs/proposals) | Each change as it was proposed, approved and tried. |
 
 ## Licence

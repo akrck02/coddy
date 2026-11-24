@@ -23,19 +23,19 @@ Code Review writes a file of a repository only when someone saves it, and git on
 
 ## Where things are
 
-Packages are named by what they are about. The arrows point one way: a package only imports those
-below it.
+Packages are named by what they are about, one line each:
 
 ```
 cmd/code-review       the program: flags, the modes it registers, the window
 internal/files        the files mode: read any file
 internal/review       the review mode: the changes, each marked as viewed
+internal/uses         the uses mode: every use of a name across the projects in sight
 internal/window       the window: layout, mode rail, commands, dialogs
 internal/mode         what a mode is, and what it asks of the window
-internal/viewer       the panes: a file's view, the tree, the finder, the settings
-internal/sidebar
-internal/finder
-internal/settings
+internal/viewer       a file's view: whole, as its changes, or as the uses of a name
+internal/sidebar      the projects' tree, its filter and the rows' decorations
+internal/finder       finding files by name, lines by content, and the uses of a name
+internal/settings     the settings screen
 internal/explorer     a folder's files, shown like a file manager
 internal/work         background jobs, and what they give back to the frame
 internal/servers      the language servers a window runs: start, tell, rest, install
@@ -51,17 +51,24 @@ internal/lsp          language servers: JSON-RPC over their input and output, th
 internal/gradle       what servers that import Gradle builds need: their own Gradle home, its daemons, kept models
 internal/builds       what a project's builds publish and depend on, one reader per build system
 internal/highlight    Chroma's tokens, cut into lines of coloured pieces
+internal/markdown     a Markdown file read into blocks, for the viewer to lay out
 internal/language     what Coddy knows of each language: names, extensions, server, icon, fences
 internal/git          the read-only git commands
 ```
 
-Three tests in `cmd/code-review/rules_test.go` keep the arrows pointing down:
+How these lean on each other, floor by floor, is in [how it is made](4-how-it-is-made.md).
+`cmd/code-review/rules_test.go` keeps the arrows pointing down, and this list true:
 
 | Test | It checks |
 |---|---|
-| `TestTheDomainImportsNoInterface` | `workspace`, `text` and `lsp` import no go-ui, pane, window or mode |
-| `TestNoPaneImportsTheWindow` | `theme`, `pane`, `viewer`, `sidebar` and `finder` don't import `window` |
+| `TestTheDomainImportsNoInterface` | `workspace`, `text` and `lsp` import no Go UI, pane, window or mode |
+| `TestNoPaneImportsTheWindow` | no pane, nor `work`, `session`, `navigation` or `servers`, imports `window` |
 | `TestTheWindowImportsNoMode` | `window` imports neither `files` nor `review` |
+| `TestTheLanguageTableImportsNothingOfTheReader` | `language` is data, and imports nothing of Coddy |
+| `TestGradleKnowsNothingOfTheLanguageServers` | `gradle` does not import `lsp` |
+| `TestTheContributingGuideListsEveryPackage` | the list above names every package of `internal/`, and only those |
+| `TestNoFunctionIsLongerThanFortyLines` | a function fits on a screen |
+| `TestNoErrorIsDroppedWithoutAReasonOnItsLine` | every `_ =` says why on its line |
 
 ## How a pane talks to the window
 
@@ -75,27 +82,11 @@ classes (`sidebar.ClassReader`), is an interface of its own beside `Window`. The
 and does without it when it is missing, so a test's window only has to answer what every window
 answers. `panes.go` checks at build time that the reader's window has every such power.
 
-## Adding a mode
+## Adding a language, a server, a theme or a mode
 
-A mode is one package and one line in `main`.
-
-1. Make a package, say `internal/usages`, with a type that implements `mode.Mode`. The
-   files mode, `internal/files/files.go`, is the smallest example.
-2. Answer what every mode answers (`mode.Mode`). `ChangesOnly` and `ShowsChanges` decide what is
-   listed and how a file opens. `Decorate(row)` says what a row shows beside its name.
-3. Add only the powers your mode has, each an interface of `mode` or `sidebar`: `WithCommands`
-   declares its keys, with `pane.Key`; `WithFileButton` puts a button in the viewer's header;
-   `WithProgress` counts its work in the status bar; `WithPage` shows a page while no file is
-   open; `Cover` draws over the viewer; `UsesHolder` shows the uses of a name; `sidebar.Headed`
-   puts words beside the sidebar's title. The window looks for each once, when the mode is turned
-   on. A method that does nothing to fill a contract is refused by
-   `TestNoModeHasAMethodThatDoesNothing`.
-4. Reach the window through the `mode.Window` it is given in `Start`, never by importing `window`.
-5. Register it in `cmd/code-review/main.go`, after the others: `window.New(settings, files.New(),
-   review.New(path), usages.New())`. It takes the next place on the rail and the next number key.
-
-`TestNoTwoCommandsShareAKeyInOneMode` fails if a new key clashes with one already taken.
-`TestTheHelpListsEveryCommand` checks the help shows it.
+Each has its guide: [a language](5-guides/1-adding-a-language.md),
+[a language server](5-guides/2-adding-a-language-server.md),
+[a theme](5-guides/3-adding-a-theme.md) and [a mode](5-guides/4-adding-a-mode.md).
 
 ## Errors
 

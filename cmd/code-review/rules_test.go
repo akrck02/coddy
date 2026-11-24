@@ -281,3 +281,54 @@ func isZero(expression ast.Expr) bool {
 	}
 	return false
 }
+
+// contributingGuide is the page that lists the packages, seen from this package's folder.
+const contributingGuide = moduleRoot + "/docs/8-contributing.md"
+
+// listedPackages are the packages named in the contributing guide's map of the code: the first
+// word of each line of its code blocks that starts with "internal/".
+func listedPackages(test *testing.T) map[string]bool {
+	test.Helper()
+	content, err := os.ReadFile(contributingGuide)
+	if err != nil {
+		test.Fatal(err)
+	}
+	listed := map[string]bool{}
+	inCode := false
+	for _, line := range strings.Split(string(content), "\n") {
+		if strings.HasPrefix(line, "```") {
+			inCode = !inCode
+			continue
+		}
+		if inCode && strings.HasPrefix(line, "internal/") {
+			listed[strings.Fields(line)[0]] = true
+		}
+	}
+	return listed
+}
+
+// The contributing guide is where a newcomer finds each package, so it names every one of them
+// and none that is gone.
+func TestTheContributingGuideListsEveryPackage(test *testing.T) {
+	listed := listedPackages(test)
+	entries, err := os.ReadDir(moduleRoot + "/internal")
+	if err != nil {
+		test.Fatal(err)
+	}
+	present := map[string]bool{}
+	for _, entry := range entries {
+		if entry.IsDir() && !strings.HasPrefix(entry.Name(), ".") {
+			present["internal/"+entry.Name()] = true
+		}
+	}
+	for name := range present {
+		if !listed[name] {
+			test.Errorf("%s is not in %s", name, contributingGuide)
+		}
+	}
+	for name := range listed {
+		if !present[name] {
+			test.Errorf("%s names %s, which is not a package", contributingGuide, name)
+		}
+	}
+}

@@ -1,6 +1,6 @@
 # 11. An architecture for the long run
 
-> Status: being built · Author's approval: proposal ☑ ("dale", 2026-11-24) plan ☑ ("dale, implementa todo", 2026-11-24)
+> Status: built, pending review · Author's approval: proposal ☑ ("dale", 2026-11-24) plan ☑ ("dale, implementa todo", 2026-11-24)
 
 ## Why
 
@@ -159,7 +159,7 @@ go in before the code that moves it (the viewer and sidebar have few: about 190 
 - [x] T11 — `finder.source`; `workspace.Layout`; `builds.Reader`; `gradle` out of `lsp` · R6
 - [x] T12 — shared pieces: breadcrumb, folder icon, key cap, row background, `path` · R4
 - [x] T13 — errors and context: codes kept to the interface, git and servers cancelled, named limits · R9
-- [ ] T14 — docs: how a frame is built, threads, caches, the package diagram, how to add a language, server, theme, mode; the rules of `rules_test` · `docs/4-how-it-is-made.md`, `docs/8-contributing.md` · R10
+- [x] T14 — docs: how a frame is built, threads, caches, the package diagram, how to add a language, server, theme, mode; the rules of `rules_test` · `docs/4-how-it-is-made.md`, `docs/8-contributing.md` · R10
 
 ## Decisions for the author
 
@@ -172,4 +172,46 @@ go in before the code that moves it (the viewer and sidebar have few: about 190 
 
 ## Result
 
-Not built yet.
+Built on 24 November 2026, one commit per task, pending the author's review. `gofmt`, `go vet`,
+`go test ./...` and `go test -race ./internal/...` pass.
+
+| Task | Commit | What it gave |
+|---|---|---|
+| T1 | `6613ef9` | The five bugs fixed, each with its test |
+| T2 | `b81256d` | The idle-frame test; an idle frame went from about 80 and 126 allocations to 34 and 52 (files, review) |
+| T3 | `df308fa` | `internal/work`; the overlays are one list, which `ModalOpen` walks |
+| T4 | `86b1ecc` | `internal/servers`, a `Fleet` behind `Host` (`Loading`, `Projects`, `InSight`, `LoadOptions`, `Toast`) |
+| T5 | `67e0688` | `internal/navigation`: definitions, the trail, the hover card's lines, uses across projects |
+| T6 | `896ac2f` | `internal/session`; documents kept by bytes, least recently opened first, read again when their file's time or size changed |
+| T7 | `bfd0ed4` | `internal/language`, one table read by the icons, the highlighting, the servers and Markdown |
+| T8 | `0feda62` | `mode.Mode` down to what every mode does; its other powers are interfaces found once |
+| T9 | `ba8cfa8` | The viewer's three presentations; `viewer.go` from 1,012 lines to 330 |
+| T10 | `3784cff` | `sidebar.go` from 971 lines to 158; trees kept for the last 4 filters |
+| T11 | `b39a9dd`, `e267044` | `finder.source`, `workspace.Layout`, `builds.Reader`; `internal/gradle` out of `lsp`, which keeps the protocol |
+| T12 | `3621436` | One breadcrumb, folder icon, key cap, row background and list step; `internal/english` |
+| T13 | `d7b764f` | Codes up to the interface, no `_ =` without its reason, long git commands cancelled, `lsp.message-too-large` |
+| T14 | this one | `docs/4-how-it-is-made.md` rewritten, `docs/5-guides/` (a language, a server, a theme, a mode), the package list checked by a test |
+
+`window` has 25 files besides its tests, down from 32. The requirements' checks:
+
+- R1, R8: the idle-frame and cache tests pass; R2: `-race` and the link test pass; R3, R5, R6, R7,
+  R9, R10: each has its rule or test in `cmd/code-review/rules_test.go` or beside its package.
+- R4 is not quite met: three files are still above 400 lines, `window/build.go` (469),
+  `window/window.go` (493) and `lsp/client.go` (551).
+
+**What a person still has to review:**
+
+- The budget of the document cache, 64 MB (decision 4), and that a document's size is an estimate
+  from its text, not a measure.
+- T5 moved "a new note alone does not lay the uses out again" to a fake host: it no longer checks
+  that the sidebar itself goes stale, only how many times the uses are shown.
+- Seen on screen: T12 gives the finder the settings' raised key caps and the sidebar's focus edge
+  on its chosen row; T13 shows an error's code in front of its message in the sidebar
+  (`workspace.no-base: …`). The finder and the sidebar were captured in light and dark; the codes
+  in the sidebar were not.
+- Small behaviour changes: TypeScript, JavaScript, Python and Rust now have a server language, so a
+  server configured for them gets their files; `.markdown`, `.mdown` and `.mkd` are Markdown; a
+  file that stopped changing maps its rows to lines in the changes view; a newer reading of the
+  projects stops the git of the one it replaces.
+- Not done: the uses mode still checks its `uses.Host` at each call; two readings of projects (a
+  server's snapshot, `notCommitted`) cannot be stopped yet.
