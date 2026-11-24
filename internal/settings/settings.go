@@ -67,6 +67,9 @@ type Screen struct {
 	useWords    pane.Words[documentUse]
 	budgetName  pane.Words[int]
 	budgetFiles pane.Words[int]
+	// slidTo is the budget, in megabytes, the slider is being moved to and not let go of yet; 0
+	// while it is not moved
+	slidTo int
 }
 
 const (

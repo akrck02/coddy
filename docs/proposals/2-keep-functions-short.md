@@ -87,3 +87,8 @@ What changed from the plan:
 What was left as it is: the sidebar's `paintEnterButton` and `paintRight` still take the row's
 `top` along with its area, since working it out again from the area could round differently and
 move a pixel.
+
+**Later (24 November 2026).** `TestNoFunctionIsLongerThanFortyLines` was taken out with the other
+tests of how the code is written: the author chose that tests check what the program does, and
+that the length of a function is a rule of review (proposal 11's Result). Functions still keep to
+about 40 lines; a reviewer checks it.

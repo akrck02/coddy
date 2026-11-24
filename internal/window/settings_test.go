@@ -211,3 +211,28 @@ func TestChoosingABudgetInTheSettingsChangesTheCacheAndIsRemembered(test *testin
 		test.Errorf("the reader started with the budget kept starts with %d MB, want %d", reopened.DocumentMegabytes(), session.DocumentMegabytesMost)
 	}
 }
+
+// Dragging the slider down and up again on the way must forget no file: the budget is only chosen
+// once the pointer lets the slider go.
+func TestTheMemoryForFilesIsChosenWhenTheSliderIsLetGo(test *testing.T) {
+	application := newReader(Settings{Folders: []string{makeRepository(test)}, Synchronous: true, Open: "lighthouse/src/lamp.go"})
+	window := newWindow(test, application)
+	application.settingsScreen.Toggle(settings.Memory)
+	window.Frames(2)
+	slider, err := window.Element("Memory for the files kept")
+	if err != nil {
+		test.Fatal(err)
+	}
+	middle := slider.Rect.Y + slider.Rect.Height/2
+	window.MoveTo(slider.Rect.X+slider.Rect.Width-1, middle)
+	window.Press()
+	window.Frames(2)
+	if application.DocumentMegabytes() != session.DefaultDocumentMegabytes {
+		test.Fatalf("while the slider is held the files may keep %d MB, want the %d in use", application.DocumentMegabytes(), session.DefaultDocumentMegabytes)
+	}
+	window.Release()
+	window.Frames(2)
+	if application.DocumentMegabytes() != session.DocumentMegabytesMost {
+		test.Errorf("once the slider is let go the files may keep %d MB, want %d", application.DocumentMegabytes(), session.DocumentMegabytesMost)
+	}
+}

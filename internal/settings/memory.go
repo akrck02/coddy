@@ -75,7 +75,7 @@ func (screen *Screen) buildMemory(context *ui.Context, window Window) {
 	context.Text("Files kept in memory", ui.TextStyle{Weight: draw2d.Bold})
 	buildNote(context, "Each file you open is kept with its two versions, its changes and its colours, so going back to it is instant. "+
 		"When the memory chosen is full, the file opened longest ago is forgotten, and read again if you open it.")
-	chosen := window.DocumentMegabytes()
+	chosen := screen.slideBudget(window)
 	context.Box(ui.Layout{Direction: ui.Vertical, Width: ui.Fixed(memorySliderWidth), Gap: 8}, func() {
 		context.Box(ui.Layout{Width: ui.Grow(), Gap: 10, AlignY: ui.Center}, func() {
 			context.Text(screen.budgetName.Of(chosen, budgetName), ui.TextStyle{Size: palette.HeadingSize, Weight: draw2d.Bold})
@@ -83,7 +83,7 @@ func (screen *Screen) buildMemory(context *ui.Context, window Window) {
 		})
 		value := float32(chosen)
 		if context.SliderStep(memorySliderLabel, &value, session.DocumentMegabytesLeast, session.DocumentMegabytesMost, session.DocumentMegabytesStep) {
-			window.ChooseDocumentMegabytes(int(value))
+			screen.slidTo = int(value)
 		}
 		context.Box(ui.Layout{Width: ui.Grow()}, func() {
 			context.Text(leastBudgetName, soft)
@@ -93,4 +93,19 @@ func (screen *Screen) buildMemory(context *ui.Context, window Window) {
 	})
 	documents, bytes := window.DocumentUse()
 	context.Text(screen.useWords.Of(documentUse{documents, bytes}, documentUseWords), soft)
+}
+
+// slideBudget is the budget the memory section shows: the one the slider is being moved to, or the
+// one in use. The budget moved to is only chosen once the pointer lets the slider go, so dragging
+// down and up again on the way forgets no file; a key or a screen reader's step lets go at once.
+func (screen *Screen) slideBudget(window Window) int {
+	if screen.slidTo == 0 {
+		return window.DocumentMegabytes()
+	}
+	if window.Keys().Holding() {
+		return screen.slidTo
+	}
+	window.ChooseDocumentMegabytes(screen.slidTo)
+	screen.slidTo = 0
+	return window.DocumentMegabytes()
 }
