@@ -12,8 +12,13 @@ import (
 // 100 to 350 KB once read with its two versions, its diff and its colours.
 const DefaultDocumentMegabytes = 64
 
-// DocumentMegabyteChoices are the budgets of the documents kept a person may choose, in megabytes.
-var DocumentMegabyteChoices = []int{32, 64, 128, 256}
+// The budgets of the documents kept a person may choose, in megabytes: from the least to the
+// most, in whole steps.
+const (
+	DocumentMegabytesLeast = 32
+	DocumentMegabytesMost  = 512
+	DocumentMegabytesStep  = 32
+)
 
 // bytesPerMegabyte is how many bytes a megabyte holds.
 const bytesPerMegabyte = 1 << 20

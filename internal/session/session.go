@@ -60,13 +60,20 @@ func (session *Session) DocumentMegabytes() int {
 }
 
 // SetDocumentMegabytes changes how much memory, in megabytes, the documents kept may take, and
-// forgets the least recently opened at once until they fit. A budget that is not one of
-// DocumentMegabyteChoices (a preference written by hand, or none) is taken as the default.
+// forgets the least recently opened at once until they fit. A budget is kept between
+// DocumentMegabytesLeast and DocumentMegabytesMost, in whole steps; none (0, no preference) is
+// the default.
 func (session *Session) SetDocumentMegabytes(megabytes int) {
-	if !slices.Contains(DocumentMegabyteChoices, megabytes) {
-		megabytes = DefaultDocumentMegabytes
+	session.documents.setBudget(budgetOf(megabytes) * bytesPerMegabyte)
+}
+
+// budgetOf is a budget asked, in megabytes, as one a person may choose.
+func budgetOf(megabytes int) int {
+	if megabytes <= 0 {
+		return DefaultDocumentMegabytes
 	}
-	session.documents.setBudget(megabytes * bytesPerMegabyte)
+	stepped := (megabytes + DocumentMegabytesStep/2) / DocumentMegabytesStep * DocumentMegabytesStep
+	return min(max(stepped, DocumentMegabytesLeast), DocumentMegabytesMost)
 }
 
 // DocumentUse is how many documents are kept, and about how many bytes they take.

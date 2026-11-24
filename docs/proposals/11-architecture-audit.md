@@ -170,7 +170,7 @@ go in before the code that moves it (the viewer and sidebar have few: about 190 
    icon themes and their pictures; `theme` keeps the colours and joins them to the icons in
    `FileIcon`, `FolderIcon` and `DrawIcon`, as only it knows the look.
 4. The budget of the document cache, in megabytes. Answered (2026-11-24): a setting,
-   *Settings › Memory* (32, 64, 128 or 256 MB), 64 MB by default and remembered.
+   *Settings › Memory* (a slider from 32 to 512 MB, in steps of 32), 64 MB by default and remembered.
 
 ## Result
 

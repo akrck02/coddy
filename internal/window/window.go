@@ -76,8 +76,8 @@ type Settings struct {
 	// ServerData is the folder the servers keep their indexes in, one folder each; "" is the
 	// reader's own folder. kotlin-lsp's take gigabytes: another disk may be better.
 	ServerData string
-	// DocumentMegabytes is how much memory the files read may keep, one of
-	// session.DocumentMegabyteChoices; any other value (0 included) keeps the default.
+	// DocumentMegabytes is how much memory the files read may keep, kept within the session's
+	// least and most in whole steps; 0 keeps the default.
 	DocumentMegabytes int
 }
 

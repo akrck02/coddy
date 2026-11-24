@@ -72,9 +72,16 @@ func TestASmallerBudgetForgetsTheLeastRecentlyUsedDocumentsAtOnce(test *testing.
 	if _, kept := opened.documents.take(references[0], diskStamp{}); kept {
 		test.Error("the document opened longest ago is kept")
 	}
-	opened.SetDocumentMegabytes(1000)
-	if opened.DocumentMegabytes() != DefaultDocumentMegabytes {
-		test.Errorf("a budget that is not a choice gives %d MB, want the default %d", opened.DocumentMegabytes(), DefaultDocumentMegabytes)
+}
+
+func TestABudgetIsKeptWithinItsEndsInWholeSteps(test *testing.T) {
+	cases := map[int]int{0: DefaultDocumentMegabytes, 100: 96, 8: DocumentMegabytesLeast, 4000: DocumentMegabytesMost, 128: 128}
+	for asked, want := range cases {
+		opened := New("", true)
+		opened.SetDocumentMegabytes(asked)
+		if opened.DocumentMegabytes() != want {
+			test.Errorf("asking %d MB keeps %d MB, want %d", asked, opened.DocumentMegabytes(), want)
+		}
 	}
 }
 

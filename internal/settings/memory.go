@@ -2,6 +2,7 @@ package settings
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/akrck02/code-review/internal/english"
 	"github.com/akrck02/code-review/internal/session"
@@ -10,37 +11,47 @@ import (
 )
 
 const (
-	// memoryCardWidth is the width of a budget's card
-	memoryCardWidth = 150
+	// memorySliderWidth is the widest the budget's slider grows, so a step stays a short move
+	memorySliderWidth = 480
 	// fileKilobytesLeast and fileKilobytesMost are about how much a usual file of code takes once
-	// read with its two versions, its diff and its colours: what a budget's card counts files by
+	// read with its two versions, its diff and its colours: what the files a budget holds are
+	// counted by
 	fileKilobytesLeast = 100
 	fileKilobytesMost  = 350
 	// kilobytesPerMegabyte is how many kilobytes a megabyte holds
 	kilobytesPerMegabyte = 1024
+	// fileCountStep is what the counts of files are rounded to: they are a guide, so a precise
+	// number would promise more than it knows
+	fileCountStep = 100
+	// memorySliderLabel is what a screen reader, and a test, call the budget's slider
+	memorySliderLabel = "Memory for the files kept"
 )
 
-// memoryChoice is a budget the memory section offers: its megabytes, its name, how many files of a
-// usual size it holds, and its card's label.
-type memoryChoice struct {
-	megabytes   int
-	name, files string
-	label       string // what a screen reader says of its card
+// budgetName is a budget's name, in megabytes: "64 MB".
+func budgetName(megabytes int) string { return fmt.Sprintf("%d MB", megabytes) }
+
+// budgetFiles is about how many files of a usual size a budget holds: "about 200 to 600 files".
+func budgetFiles(megabytes int) string {
+	kilobytes := megabytes * kilobytesPerMegabyte
+	return "about " + roughly(kilobytes/fileKilobytesMost) + " to " + roughly(kilobytes/fileKilobytesLeast) + " files"
 }
 
-// memoryChoices are the budgets offered, written once.
-var memoryChoices = memoryChoicesOf(session.DocumentMegabyteChoices)
+// The names of the slider's two ends, written once.
+var (
+	leastBudgetName = budgetName(session.DocumentMegabytesLeast)
+	mostBudgetName  = budgetName(session.DocumentMegabytesMost)
+)
 
-// memoryChoicesOf writes a card's words for each budget, in megabytes.
-func memoryChoicesOf(budgets []int) []memoryChoice {
-	choices := make([]memoryChoice, 0, len(budgets))
-	for _, megabytes := range budgets {
-		kilobytes := megabytes * kilobytesPerMegabyte
-		files := fmt.Sprintf("about %d to %d files", kilobytes/fileKilobytesMost, kilobytes/fileKilobytesLeast)
-		name := fmt.Sprintf("%d MB", megabytes)
-		choices = append(choices, memoryChoice{megabytes: megabytes, name: name, files: files, label: "Keep " + name + " of files"})
+// roughly is a count rounded to the nearest hundred, never below one hundred, with a comma
+// between its thousands: 1310 is "1,300".
+func roughly(count int) string {
+	rounded := max(fileCountStep, (count+fileCountStep/2)/fileCountStep*fileCountStep)
+	const thousand = 1000
+	thousands, rest := rounded/thousand, rounded%thousand
+	if thousands == 0 {
+		return strconv.Itoa(rest)
 	}
-	return choices
+	return fmt.Sprintf("%d,%03d", thousands, rest)
 }
 
 // documentUse is what the files kept take: how many, and about how many bytes.
@@ -56,34 +67,30 @@ func documentUseWords(use documentUse) string {
 	return fmt.Sprintf("Kept now: %s, %.1f MB.", files, float64(kilobytes)/kilobytesPerMegabyte)
 }
 
-// buildMemory is the memory section: what the files read keep, the budgets to choose from, the one
-// in use marked, and what is kept now.
+// buildMemory is the memory section: what the files read keep, a slider for the budget with the
+// files it holds, and what is kept now.
 func (screen *Screen) buildMemory(context *ui.Context, window Window) {
+	palette := context.Theme
+	soft := ui.TextStyle{Size: palette.SmallTextSize, Color: palette.InkSoft}
 	context.Text("Files kept in memory", ui.TextStyle{Weight: draw2d.Bold})
 	buildNote(context, "Each file you open is kept with its two versions, its changes and its colours, so going back to it is instant. "+
 		"When the memory chosen is full, the file opened longest ago is forgotten, and read again if you open it.")
-	context.Box(ui.Layout{Width: ui.Grow(), Gap: 16, Wrap: true}, func() {
-		for _, choice := range memoryChoices {
-			if buildMemoryCard(context, choice, choice.megabytes == window.DocumentMegabytes()) {
-				window.ChooseDocumentMegabytes(choice.megabytes)
-			}
+	chosen := window.DocumentMegabytes()
+	context.Box(ui.Layout{Direction: ui.Vertical, Width: ui.Fixed(memorySliderWidth), Gap: 8}, func() {
+		context.Box(ui.Layout{Width: ui.Grow(), Gap: 10, AlignY: ui.Center}, func() {
+			context.Text(screen.budgetName.Of(chosen, budgetName), ui.TextStyle{Size: palette.HeadingSize, Weight: draw2d.Bold})
+			context.Text(screen.budgetFiles.Of(chosen, budgetFiles), ui.TextStyle{Color: palette.InkSoft})
+		})
+		value := float32(chosen)
+		if context.SliderStep(memorySliderLabel, &value, session.DocumentMegabytesLeast, session.DocumentMegabytesMost, session.DocumentMegabytesStep) {
+			window.ChooseDocumentMegabytes(int(value))
 		}
-	})
-	documents, bytes := window.DocumentUse()
-	words := screen.useWords.Of(documentUse{documents, bytes}, documentUseWords)
-	context.Text(words, ui.TextStyle{Size: context.Theme.SmallTextSize, Color: context.Theme.InkSoft})
-}
-
-// buildMemoryCard is a budget's card: its megabytes and how many files they hold, ringed in the
-// accent while it is the one in use. It tells whether the card was clicked.
-func buildMemoryCard(context *ui.Context, choice memoryChoice, chosen bool) bool {
-	layout := ui.Layout{Direction: ui.Vertical, Width: ui.Fixed(memoryCardWidth), Padding: ui.Pad(12), Gap: 6}
-	clicked := context.Clickable(choice.name, layout, cardLooks(context.Theme, chosen), func() {
-		buildCardName(context, choice.name, chosen)
-		context.Box(ui.Layout{Padding: ui.PadXY(4, 0)}, func() {
-			context.Text(choice.files, ui.TextStyle{Size: context.Theme.SmallTextSize, Color: context.Theme.InkSoft})
+		context.Box(ui.Layout{Width: ui.Grow()}, func() {
+			context.Text(leastBudgetName, soft)
+			context.Box(ui.Layout{Width: ui.Grow()}, nil)
+			context.Text(mostBudgetName, soft)
 		})
 	})
-	context.Describe(ui.Description{Role: ui.ButtonRole, Label: choice.label, Selected: chosen})
-	return clicked
+	documents, bytes := window.DocumentUse()
+	context.Text(screen.useWords.Of(documentUse{documents, bytes}, documentUseWords), soft)
 }

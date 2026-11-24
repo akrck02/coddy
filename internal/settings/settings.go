@@ -62,8 +62,11 @@ type Window interface {
 type Screen struct {
 	Open    bool
 	Section Section
-	// useWords are the memory section's words on what the files kept take, made when it changes
-	useWords pane.Words[documentUse]
+	// useWords are the memory section's words on what the files kept take, budgetName and
+	// budgetFiles on the budget chosen, each made when what it tells changes
+	useWords    pane.Words[documentUse]
+	budgetName  pane.Words[int]
+	budgetFiles pane.Words[int]
 }
 
 const (

@@ -194,18 +194,20 @@ func TestChoosingABudgetInTheSettingsChangesTheCacheAndIsRemembered(test *testin
 		test.Fatal(err)
 	}
 	window.Frames(2)
-	if err := window.Click("Keep 128 MB of files"); err != nil {
+	slider, err := window.Element("Memory for the files kept")
+	if err != nil {
 		test.Fatal(err)
 	}
+	window.ClickAt(slider.Rect.X+slider.Rect.Width-1, slider.Rect.Y+slider.Rect.Height/2) // the far end: the most
 	window.Frames(2)
-	if application.DocumentMegabytes() != 128 {
-		test.Fatalf("after choosing 128 MB the files may keep %d MB", application.DocumentMegabytes())
+	if application.DocumentMegabytes() != session.DocumentMegabytesMost {
+		test.Fatalf("after sliding to the end the files may keep %d MB, want %d", application.DocumentMegabytes(), session.DocumentMegabytesMost)
 	}
 	if documents, _ := application.DocumentUse(); documents == 0 {
 		test.Error("the file open is not kept")
 	}
 	reopened := newReader(Settings{Synchronous: true, DocumentMegabytes: application.DocumentMegabytes()})
-	if reopened.DocumentMegabytes() != 128 {
-		test.Errorf("the reader started with the budget kept starts with %d MB, want 128", reopened.DocumentMegabytes())
+	if reopened.DocumentMegabytes() != session.DocumentMegabytesMost {
+		test.Errorf("the reader started with the budget kept starts with %d MB, want %d", reopened.DocumentMegabytes(), session.DocumentMegabytesMost)
 	}
 }
