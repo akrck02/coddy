@@ -3,6 +3,8 @@ package uses
 import (
 	"context"
 	"fmt"
+	"github.com/akrck02/code-review/internal/workspace"
+	"slices"
 	"sort"
 	"strings"
 
@@ -20,19 +22,18 @@ const (
 // projects read.
 func (uses *Mode) readBuilds() {
 	projects := uses.window.Projects()
-	var key strings.Builder
+	if uses.graphs.reading || slices.Equal(uses.graphs.readFor, projects) {
+		return // a project read again is a new one, so the same pointers are the same projects
+	}
 	type reading struct {
 		path  string
 		files []string
 	}
 	var asked []reading
 	for _, project := range projects {
-		fmt.Fprintf(&key, "%s %t %d|", project.Path, project.Loaded, len(project.Files))
 		asked = append(asked, reading{project.Path, project.Files})
 	}
-	if uses.graphs.reading || uses.graphs.readFor == key.String() {
-		return
-	}
+	readFor := append([]*workspace.Project(nil), projects...)
 	uses.graphs.reading = true
 	uses.window.Run("read builds", func(stop context.Context) func() {
 		read := make([]builds.Build, len(asked))
@@ -41,7 +42,8 @@ func (uses *Mode) readBuilds() {
 		}
 		return func() {
 			uses.graphs.builds, uses.graphs.links = read, builds.Links(read)
-			uses.graphs.readFor, uses.graphs.reading = key.String(), false
+			uses.graphs.readFor, uses.graphs.reading = readFor, false
+			uses.graphs.projectsKept = nil
 			uses.graphs.projects.fitted = false
 		}
 	})
@@ -82,6 +84,22 @@ func (uses *Mode) layers(inSight []int) [][]int {
 		layers[layer[project]] = append(layers[layer[project]], project)
 	}
 	return layers
+}
+
+// keptProjectsScene is the projects graph, laid out again only when the builds were read again,
+// or the projects shown changed.
+func (uses *Mode) keptProjectsScene() scene {
+	shown := uses.graphs.projectsShown[:0]
+	for _, project := range uses.window.Projects() {
+		shown = append(shown, !uses.window.Hidden(project))
+	}
+	uses.graphs.projectsShown = shown
+	if uses.graphs.projectsKept == nil || !slices.Equal(shown, uses.graphs.projectsKeptShown) {
+		graph := uses.projectsScene()
+		uses.graphs.projectsKept = &graph
+		uses.graphs.projectsKeptShown = append(uses.graphs.projectsKeptShown[:0], shown...)
+	}
+	return *uses.graphs.projectsKept
 }
 
 // projectsScene lays the projects in sight out in layers, each with an arrow to each project it
@@ -156,7 +174,7 @@ func (uses *Mode) buildProjectsGraph(context *ui.Context) {
 		context.Caption("Reading the projects' builds…")
 		return
 	}
-	graph := uses.projectsScene()
+	graph := uses.keptProjectsScene()
 	if clicked := uses.graphs.projects.build(context, uses.window.Keys(), uses.window.Look(), graph); clicked >= 0 {
 		project := uses.window.Projects()[graph.boxes[clicked].target]
 		uses.window.Toast(project.Name + " publishes " + strings.Join(uses.graphs.builds[graph.boxes[clicked].target].Publishes, ", "))

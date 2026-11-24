@@ -1,6 +1,8 @@
 package viewer
 
 import (
+	"github.com/akrck02/code-review/internal/text"
+	"github.com/akrck02/code-review/internal/workspace"
 	"math"
 	"path/filepath"
 	"strings"
@@ -14,8 +16,11 @@ import (
 )
 
 // IsMarkdown tells whether the file open is written in Markdown, and so can be shown formatted.
-func (view *Viewer) IsMarkdown() bool {
-	switch strings.ToLower(filepath.Ext(view.Reference.Path)) {
+func (view *Viewer) IsMarkdown() bool { return view.markdown }
+
+// isMarkdownPath tells whether a path names a Markdown file, by its extension.
+func isMarkdownPath(path string) bool {
+	switch strings.ToLower(filepath.Ext(path)) {
 	case ".md", ".markdown", ".mdown", ".mkd":
 		return true
 	}
@@ -66,13 +71,31 @@ type shape struct {
 
 // formatting is a text laid out formatted, kept while its text, width and colours stay the same.
 type formatting struct {
-	source    string
+	source    sourceVersion
 	width     float32
 	look      draw2d.Color
 	syntax    *highlight.Palette // the theme's colours of code, so another theme lays it out again
 	charWidth float32
 	shapes    []shape
 	height    float32
+}
+
+// sourceVersion is which text a layout was made of: the document read, the buffer editing it and
+// the buffer's version. Comparing these is enough to know the text is the same, without building
+// it whole every frame.
+type sourceVersion struct {
+	document    *workspace.Document
+	buffer      *text.Buffer
+	editVersion int
+}
+
+// sourceNow is which text the file open has now.
+func (view *Viewer) sourceNow() sourceVersion {
+	now := sourceVersion{document: view.Document, buffer: view.Edit}
+	if view.Edit != nil {
+		now.editVersion = view.Edit.Version()
+	}
+	return now
 }
 
 // source is the text of the file open: as it is edited, or as it was read.
@@ -97,14 +120,14 @@ func (view *Viewer) source() string {
 // layOutFormatted lays the text out for the width it has, unless it was already.
 func (view *Viewer) layOutFormatted(context *ui.Context, window Window, area draw2d.Rectangle) *formatting {
 	width := min(area.Width-2*formattedMargin-pane.ScrollBarWidth, formattedWidth)
-	source, look := view.source(), window.Look()
+	source, look := view.sourceNow(), window.Look()
 	if cached := view.formatting; cached != nil && cached.source == source && cached.width == width && cached.look == look.Editor && cached.syntax == look.Syntax &&
 		cached.charWidth == view.charWidth {
 		return cached
 	}
 	layout := &formatter{context: context, palette: context.Theme, look: look, width: max(width, 120),
 		codeSize: view.codeSize, charWidth: view.charWidth}
-	blocks := markdown.Parse(source)
+	blocks := markdown.Parse(view.source())
 	for index, block := range blocks {
 		layout.block(block)
 		layout.gapAfter(blocks, index)

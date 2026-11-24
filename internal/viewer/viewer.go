@@ -113,6 +113,16 @@ type Viewer struct {
 	Marks map[int]workspace.Mark
 
 	List pane.Scroller
+	// crumbs are the breadcrumb laid out last, kept while the path and the room stay
+	crumbs keptCrumbs
+	// markdown tells whether the file open is Markdown, known once it is chosen
+	markdown bool
+	// measuredSize is the code's size the character was measured at; numbers and foldWords are
+	// the words of line numbers and folds, made once each, as painting needs them every frame
+	measuredSize float32
+	numbers      map[int]string
+	foldWords    map[foldLabel]string
+	added, gone  pane.Words[int]
 
 	// formatted shows a Markdown file as it reads, on from when one opens; formatting is its text
 	// laid out last
@@ -179,6 +189,7 @@ func (view *Viewer) Start(reference workspace.FileReference, project *workspace.
 		view.reopening = false
 	}
 	view.Reference = reference
+	view.markdown = isMarkdownPath(reference.Path)
 	view.Project = project
 	view.MarkedLine = 0
 	view.Document = nil
@@ -546,10 +557,10 @@ func (view *Viewer) buildChange(context *ui.Context, compact bool) {
 		context.Text("from "+change.OldPath, ui.TextStyle{Size: palette.SmallTextSize, Color: palette.InkQuiet})
 	}
 	if view.Added > 0 {
-		context.Text(fmt.Sprintf("+%d", view.Added), ui.TextStyle{Color: palette.Positive, Weight: draw2d.Mono, Size: palette.SmallTextSize})
+		context.Text(view.added.Of(view.Added, addedWords), ui.TextStyle{Color: palette.Positive, Weight: draw2d.Mono, Size: palette.SmallTextSize})
 	}
 	if view.Gone > 0 {
-		context.Text(fmt.Sprintf("−%d", view.Gone), ui.TextStyle{Color: palette.Danger, Weight: draw2d.Mono, Size: palette.SmallTextSize})
+		context.Text(view.gone.Of(view.Gone, goneWords), ui.TextStyle{Color: palette.Danger, Weight: draw2d.Mono, Size: palette.SmallTextSize})
 	}
 }
 
@@ -631,7 +642,12 @@ func statusName(status git.Status) string {
 	return "Modified"
 }
 
+// measure measures a character of the code, the width every column is, when its size changed.
 func (view *Viewer) measure(context *ui.Context) {
+	if view.measuredSize == view.codeSize && view.charWidth > 0 {
+		return
+	}
+	view.measuredSize = view.codeSize
 	metrics := context.Measurer().MeasureText("M", view.codeSize, draw2d.Mono, 1)
 	view.charWidth = metrics.Width
 	view.codeAscent, view.codeDescent = metrics.Ascent, metrics.Descent
@@ -731,7 +747,7 @@ func (view *Viewer) paintFileLine(painter painting, index int, top, baseline flo
 	if view.Edit != nil {
 		view.paintSelection(painter, index, top)
 	}
-	view.paintCode(drawing, painter.window, view.fileLine(index), painter.codeArea, baseline)
+	view.paintCode(drawing, painter.look, view.fileLine(index), painter.codeArea, baseline)
 	if editing {
 		view.paintCaret(painter, index, top)
 	}
@@ -743,11 +759,31 @@ func (view *Viewer) paintFold(painter painting, row workspace.Row, top, baseline
 	rowArea := draw2d.Rectangle{X: area.X, Y: top, Width: area.Width, Height: view.rowHeight}
 	painter.drawing.Rectangle(rowArea, 0, painter.look.Hover.WithAlpha(0.6), draw2d.Color{}, 0)
 	painter.drawing.Icon("unfold-vertical", area.X+painter.gutter-20, top+(view.rowHeight-12)/2, 12, palette.InkQuiet)
-	label := fmt.Sprintf("%d unchanged lines", row.Folded)
-	if view.Mode == UsesView {
-		label = fmt.Sprintf("%d lines without uses", row.Folded)
-	}
+	label := view.foldWordsOf(foldLabel{row.Folded, view.Mode == UsesView})
 	painter.drawing.Text(label, painter.codeArea.X, baseline, palette.SmallTextSize, draw2d.Regular, palette.InkQuiet)
+}
+
+// foldLabel is what a fold's words say: how many lines it holds, and whether they are lines
+// without uses or unchanged.
+type foldLabel struct {
+	lines      int
+	withoutUse bool
+}
+
+// foldWordsOf are a fold's words, made the first time a fold of that size shows.
+func (view *Viewer) foldWordsOf(label foldLabel) string {
+	if words, made := view.foldWords[label]; made {
+		return words
+	}
+	if view.foldWords == nil {
+		view.foldWords = map[foldLabel]string{}
+	}
+	words := fmt.Sprintf("%d unchanged lines", label.lines)
+	if label.withoutUse {
+		words = fmt.Sprintf("%d lines without uses", label.lines)
+	}
+	view.foldWords[label] = words
+	return words
 }
 
 // lineStyle is how a line of the diff is drawn: its code, its sign and the colours of a change.
@@ -796,7 +832,7 @@ func (view *Viewer) paintDiffLine(painter painting, index int, top, baseline flo
 	if style.sign != "" {
 		drawing.Text(style.sign, area.X+painter.numberWidth*2+view.charWidth/2, baseline, view.codeSize, draw2d.Mono, style.signColour)
 	}
-	view.paintCode(drawing, painter.window, style.code, painter.codeArea, baseline)
+	view.paintCode(drawing, painter.look, style.code, painter.codeArea, baseline)
 }
 
 // paintUseLine paints a line of the uses view: its number and code, washed when it uses the name,
@@ -825,7 +861,7 @@ func (view *Viewer) paintUseLine(painter painting, index int, top, baseline floa
 		numberInk = look.ActiveLineNumber
 	}
 	view.paintNumber(drawing, number, area.X, painter.numberWidth, baseline, numberInk)
-	view.paintCode(drawing, painter.window, lineAt(view.lines(), number), painter.codeArea, baseline)
+	view.paintCode(drawing, painter.look, lineAt(view.lines(), number), painter.codeArea, baseline)
 }
 
 // paintWash paints a changed line's background, its edge, and a stronger wash behind the words that
@@ -911,13 +947,26 @@ func (view *Viewer) paintNumber(drawing *draw2d.List, number int, left, width, b
 	if number <= 0 {
 		return
 	}
-	text := strconv.Itoa(number)
+	text := view.numberText(number)
 	x := left + width - 8 - float32(len(text))*view.charWidth
 	drawing.Text(text, x, baseline, view.codeSize, draw2d.Mono, colour)
 }
 
+// numberText is a line's number in words, each made once, the first time its line shows.
+func (view *Viewer) numberText(number int) string {
+	if text, made := view.numbers[number]; made {
+		return text
+	}
+	if view.numbers == nil {
+		view.numbers = map[int]string{}
+	}
+	text := strconv.Itoa(number)
+	view.numbers[number] = text
+	return text
+}
+
 // paintCode paints a line's coloured pieces, shifted by the sideways scroll and cut at the area.
-func (view *Viewer) paintCode(drawing *draw2d.List, window Window, line highlight.Line, area draw2d.Rectangle, baseline float32) {
+func (view *Viewer) paintCode(drawing *draw2d.List, look theme.Look, line highlight.Line, area draw2d.Rectangle, baseline float32) {
 	width := float32(line.Columns) * view.charWidth
 	view.List.Width = max(view.List.Width, width)
 	drawing.PushClip(area)
@@ -929,7 +978,7 @@ func (view *Viewer) paintCode(drawing *draw2d.List, window Window, line highligh
 		if x+float32(len(span.Text))*view.charWidth < area.X || isBlank(span.Text) {
 			continue
 		}
-		drawing.Text(span.Text, x, baseline, view.codeSize, draw2d.Mono, window.Look().Syntax.Colour(span.Kind))
+		drawing.Text(span.Text, x, baseline, view.codeSize, draw2d.Mono, look.Syntax.Colour(span.Kind))
 	}
 	drawing.PopClip()
 }
@@ -942,3 +991,6 @@ func isBlank(text string) bool {
 	}
 	return true
 }
+
+func addedWords(count int) string { return fmt.Sprintf("+%d", count) }
+func goneWords(count int) string  { return fmt.Sprintf("−%d", count) }

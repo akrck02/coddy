@@ -125,6 +125,12 @@ type Window struct {
 	tell         func(problem error)
 	// settingsScreen shows the settings in place of the sidebar and the viewer, when open
 	settingsScreen settings.Screen
+	// counted is the mode's progress as counted last, and status the status bar's words: kept, as
+	// they change far less often than frames are drawn
+	counted progressCount
+	status  statusWords
+	// commandTable is every command, in the order keys are matched: see allCommands
+	commandTable []command
 	// explorer shows a folder in the viewer's place, chosen in the breadcrumb
 	explorer explorer.Explorer
 	// onlyChanged hides the projects with no changes, in the sidebar and the finder

@@ -51,8 +51,13 @@ func modeOf(views []serverView) (mode serversMode, fraction float32, broken bool
 
 // modeWords say the mode in a few words, for the button's tooltip.
 func modeWords(mode serversMode) string {
-	title, explanation := modeTitle(mode)
-	return title + ": " + explanation
+	switch mode { // whole sentences, not joined, so the bar drawn each frame makes none
+	case serversFull:
+		return "Ready: names are followed by what they mean"
+	case serversLoading:
+		return "Reading the projects: uses found meanwhile by their text are marked ?"
+	}
+	return "Text only: no server answers, so uses are found by their text, marked ?"
 }
 
 // modeTitle is the mode's name and a short line of what it means for following names.

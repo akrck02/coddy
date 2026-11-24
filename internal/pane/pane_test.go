@@ -1,6 +1,7 @@
 package pane
 
 import (
+	"strconv"
 	"testing"
 
 	"github.com/akrck02/go-renderer/draw2d"
@@ -61,5 +62,19 @@ func TestAMarginKeepsRoomAboveTheFirstRowAndBelowTheLast(test *testing.T) {
 	}
 	if first, last := list.Visible(); first != 5 || last != 10 {
 		test.Errorf("scrolled to the end, rows %d to %d are in sight, want 5 to 10", first, last)
+	}
+}
+
+func TestWordsAreWrittenAgainOnlyWhenTheirValueChanges(test *testing.T) {
+	var words Words[int]
+	writes := 0
+	count := func(value int) string { writes++; return strconv.Itoa(value) + " files" }
+	for range 3 {
+		if got := words.Of(2, count); got != "2 files" {
+			test.Fatalf("the words for 2 are %q", got)
+		}
+	}
+	if got := words.Of(3, count); got != "3 files" || writes != 2 {
+		test.Errorf("after 2 three times and 3 once: %q, written %d times, want 2", got, writes)
 	}
 }

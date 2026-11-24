@@ -110,6 +110,7 @@ func (uses *Mode) SetUses(name string, home int, found []mode.Use, note string) 
 		uses.graphs = graphs{}
 	}
 	uses.name, uses.home, uses.note = name, home, note
+	uses.forgetNameScene()
 	uses.uses = append(uses.uses[:0], found...)
 	uses.sortUses()
 	uses.byFile = map[workspace.FileReference][]int{}

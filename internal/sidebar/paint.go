@@ -58,7 +58,14 @@ func (sidebar *Sidebar) paint(context *ui.Context, window Window, drawing *draw2
 // row under the pointer, if no dialog takes the pointer.
 func (sidebar *Sidebar) startPainting(context *ui.Context, window Window, drawing *draw2d.List) painting {
 	pointerX, pointerY := context.Pointer()
-	sidebar.badges, sidebar.leftOut = map[int][2]float32{}, map[int][2]float32{}
+	if sidebar.badges == nil {
+		sidebar.badges, sidebar.leftOut = map[int][2]float32{}, map[int][2]float32{}
+	}
+	clear(sidebar.badges)
+	clear(sidebar.leftOut)
+	if sidebar.decoratedWithoutStatus == sidebar.ShowsStatus() {
+		sidebar.decorateRows() // git's status was hidden or shown since the rows were made
+	}
 	hovered := -1
 	if !window.ModalOpen() {
 		hovered = sidebar.list.RowAt(pointerX, pointerY)
@@ -88,7 +95,7 @@ func (sidebar *Sidebar) paintRow(painter painting, index int) {
 	case ProjectRow, FolderRow:
 		text = paintFolderIcons(painter, row, text, iconTop)
 	case FileRow:
-		text = sidebar.paintFileIcons(painter, row, text, iconTop)
+		text = paintFileIcons(painter, row, sidebar.decorations[index], text, iconTop)
 	case NoteRow:
 		text.ink = palette.InkQuiet
 	}
@@ -150,10 +157,9 @@ func paintFolderIcons(painter painting, row Row, text rowText, iconTop float32) 
 
 // paintFileIcons draws a file's mark and icon, and returns where its name starts, the name and
 // its ink.
-func (sidebar *Sidebar) paintFileIcons(painter painting, row Row, text rowText, iconTop float32) rowText {
+func paintFileIcons(painter painting, row Row, decoration Decoration, text rowText, iconTop float32) rowText {
 	palette := painter.context.Theme
 	// when the mode marks files, the room a folder gives its chevron holds the mark
-	decoration := sidebar.decorate(row)
 	switch decoration.Mark {
 	case OpenMark:
 		painter.drawing.Icon("circle", text.x, iconTop, treeIconSize, palette.InkQuiet)
@@ -259,7 +265,7 @@ func (sidebar *Sidebar) paintRight(painter painting, row Row, index int, right, 
 	default:
 		return side.right
 	}
-	sidebar.paintDecoration(side, row, top)
+	paintDecoration(side, sidebar.decorations[index], top)
 	return side.right
 }
 
@@ -279,10 +285,9 @@ func (sidebar *Sidebar) ShowsStatus() bool {
 }
 
 // paintDecoration paints what the mode adds on a row's right: words, a bar of progress and a dot.
-func (sidebar *Sidebar) paintDecoration(side *rightSide, row Row, top float32) {
+func paintDecoration(side *rightSide, decoration Decoration, top float32) {
 	palette := side.painter.context.Theme
 	drawing := side.painter.drawing
-	decoration := sidebar.decorate(row)
 	for _, word := range decoration.Words {
 		side.text(word.Text, word.Ink.colour(palette))
 	}

@@ -22,6 +22,7 @@ const callerGap = 120 // between a file and the files that use its declaration
 // open opens a file of the name graph a level further, asking its server who uses the declaration
 // a use of it is in; or closes it again.
 func (uses *Mode) open(file workspace.FileReference) {
+	uses.forgetNameScene()
 	if uses.graphs.opened[file] != nil {
 		delete(uses.graphs.opened, file)
 		uses.graphs.name.fitted = false
@@ -37,6 +38,7 @@ func (uses *Mode) open(file workspace.FileReference) {
 	book := uses.graphs.opened // a new search starts another
 	book[file] = &opened{asking: true}
 	asked := host.UsersOf(uses.askedUse(file), func(declaration string, users []mode.Use) {
+		uses.forgetNameScene()
 		if declaration == "" {
 			delete(book, file)
 			return

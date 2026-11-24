@@ -247,7 +247,7 @@ func (application *Window) buildStatusBar(context *ui.Context) {
 	context.Box(ui.Layout{Width: ui.Grow(), Height: ui.Fixed(28), Padding: ui.PadXY(14, 0), Gap: 16, AlignY: ui.Center}, func() {
 		application.buildCounts(context, small)
 		if application.loading > 0 {
-			context.Text(fmt.Sprintf("reading %d…", application.loading), small)
+			context.Text(application.status.loading.Of(application.loading, readingWords), small)
 		}
 		context.Spacer()
 		if application.viewer.IsOpen() {
@@ -278,11 +278,13 @@ func (application *Window) buildCounts(context *ui.Context, small ui.TextStyle) 
 		})
 		context.Tooltip(words)
 	}
+	status := &application.status
 	files, changed, projects := len(application.changedOrder), application.projectsWithChanges(), len(application.projects)
-	counted("file-diff", strconv.Itoa(files), plural(files, "file")+" changed", nil)
-	counted("folder-git-2", fmt.Sprintf("%d/%d", changed, projects), fmt.Sprintf("%d of %d projects have changes", changed, projects), nil)
+	counted("file-diff", status.files.Of(files, strconv.Itoa), status.filesWords.Of(files, changedFilesWords), nil)
+	counted("folder-git-2", status.projects.Of([2]int{changed, projects}, fraction),
+		status.projectsWords.Of([2]int{changed, projects}, projectsWords), nil)
 	if viewed, total, words := application.progress(); total > 0 {
-		counted("eye", fmt.Sprintf("%d/%d", viewed, total), words, func() { application.buildProgress(context, viewed, total) })
+		counted("eye", status.progress.Of([2]int{viewed, total}, fraction), words, func() { application.buildProgress(context, viewed, total) })
 	}
 }
 
@@ -311,13 +313,42 @@ func (application *Window) buildBranch(context *ui.Context, small ui.TextStyle) 
 			project = current
 		}
 	}
-	if project.Base != "" {
-		context.Box(ui.Layout{Gap: 6, AlignY: ui.Center}, func() {
-			context.IconSized("git-branch", 12, context.Theme.InkQuiet)
-			context.Text(project.Branch+" ← "+project.Base, small)
-		})
-		context.Tooltip(fmt.Sprintf("%s is %s ahead of %s", project.Branch, plural(project.Ahead, "commit"), project.Base))
+	if project.Base == "" {
+		return
 	}
+	branch := branchState{project.Branch, project.Base, project.Ahead}
+	context.Box(ui.Layout{Gap: 6, AlignY: ui.Center}, func() {
+		context.IconSized("git-branch", 12, context.Theme.InkQuiet)
+		context.Text(application.status.branch.Of(branch, branchWords), small)
+	})
+	context.Tooltip(application.status.branchWords.Of(branch, aheadWords))
+}
+
+// statusWords are the status bar's words, each kept until what it says changes.
+type statusWords struct {
+	loading, files, filesWords pane.Words[int]
+	projects, projectsWords    pane.Words[[2]int]
+	progress                   pane.Words[[2]int]
+	branch, branchWords        pane.Words[branchState]
+}
+
+// branchState is where a project's branch stands: its name, its base and how far ahead it is.
+type branchState struct {
+	branch, base string
+	ahead        int
+}
+
+func readingWords(count int) string        { return fmt.Sprintf("reading %d…", count) }
+func changedFilesWords(count int) string   { return plural(count, "file") + " changed" }
+func fraction(parts [2]int) string         { return fmt.Sprintf("%d/%d", parts[0], parts[1]) }
+func branchWords(state branchState) string { return state.branch + " ← " + state.base }
+
+func projectsWords(parts [2]int) string {
+	return fmt.Sprintf("%d of %d projects have changes", parts[0], parts[1])
+}
+
+func aheadWords(state branchState) string {
+	return fmt.Sprintf("%s is %s ahead of %s", state.branch, plural(state.ahead, "commit"), state.base)
 }
 
 func (application *Window) openBaseDialog() {

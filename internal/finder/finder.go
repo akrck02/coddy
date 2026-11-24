@@ -5,6 +5,7 @@ package finder
 import (
 	"context"
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -89,6 +90,16 @@ type ContentHit struct {
 	status  git.Status
 	git.Hit
 	length int // how many characters were found, for a use of a name; 0 is the query's length
+	// where names the file and the line, and text is the line with its tabs as spaces: made with
+	// the hit, as its row is painted every frame
+	where, text string
+}
+
+// newContentHit is a hit of a project of the window, with the words its row shows.
+func newContentHit(window Window, project int, change git.Change, changed bool, hit git.Hit, length int) ContentHit {
+	return ContentHit{project: project, changed: changed, status: change.Status, Hit: hit, length: length,
+		where: fmt.Sprintf("%s/%s:%d", window.Projects()[project].Name, hit.Path, hit.Line),
+		text:  strings.ReplaceAll(hit.Text, "\t", "    ")}
 }
 
 // Project is the place of the hit's project in the window.
@@ -229,7 +240,7 @@ func (finder *Finder) takeHits(window Window, projects []searchedProject, found 
 		project := window.Projects()[index]
 		for _, hit := range hits {
 			change, changed := project.ChangeOf(hit.Path)
-			finder.Hits = append(finder.Hits, ContentHit{index, changed, change.Status, hit, 0})
+			finder.Hits = append(finder.Hits, newContentHit(window, index, change, changed, hit, 0))
 		}
 	}
 	// the development's own files first: they are what is being reviewed
@@ -483,7 +494,7 @@ func (finder *Finder) paintHit(context *ui.Context, window Window, drawing *draw
 	drawing.PushClip(draw2d.Rectangle{X: row.X, Y: row.Y, Width: row.Width - 8, Height: row.Height})
 	// the line from its first letter, or from a little before what was found in a long line
 	before := hit.Text[:min(hit.Column, len(hit.Text))]
-	text := strings.ReplaceAll(hit.Text, "\t", "    ")
+	text := hit.text
 	column := len(before) + 3*strings.Count(before, "\t")
 	start := len(text) - len(strings.TrimLeft(text, " "))
 	if column-start > 48 {
@@ -500,7 +511,7 @@ func (finder *Finder) paintHit(context *ui.Context, window Window, drawing *draw
 	wash := draw2d.Rectangle{X: matchX - 1, Y: row.Y + 6, Width: float32(found)*code.Width + 2, Height: code.Ascent + code.Descent + 4}
 	drawing.Rectangle(wash, 3, palette.Primary.WithAlpha(0.3), draw2d.Color{}, 0)
 	drawing.Text(shown, left, codeBaseline, codeSize, draw2d.Mono, window.Look().Syntax.RoleColour(highlight.Plain))
-	where := fmt.Sprintf("%s/%s:%d", window.Projects()[hit.project].Name, hit.Path, hit.Line)
+	where := hit.where
 	whereInk := palette.InkQuiet
 	if hit.changed {
 		whereInk = theme.StatusColour(palette, hit.status).WithAlpha(0.85)
@@ -513,18 +524,18 @@ func (finder *Finder) paintHit(context *ui.Context, window Window, drawing *draw
 // query in bold and in the accent, and returns where it ends.
 func paintMatched(drawing *draw2d.List, measurer draw2d.Measurer, label string, positions []int, start, end int, x, baseline, size float32,
 	ink, accent draw2d.Color) float32 {
-	matched := map[int]bool{}
-	for _, position := range positions {
-		matched[position] = true
+	matched := func(index int) bool { // positions grow, so a search finds one without a map
+		found, at := slices.BinarySearch(positions, index)
+		return at && found >= 0
 	}
 	for start < end {
 		next := start + 1
-		for next < end && matched[next] == matched[start] {
+		for next < end && matched(next) == matched(start) {
 			next++
 		}
 		piece := label[start:next]
 		weight, colour := draw2d.Regular, ink
-		if matched[start] {
+		if matched(start) {
 			weight, colour = draw2d.Bold, accent
 		}
 		drawing.Text(piece, x, baseline, size, weight, colour)

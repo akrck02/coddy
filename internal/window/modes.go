@@ -22,6 +22,7 @@ func (application *Window) startModes(modes []mode.Mode, name string) {
 		}
 	}
 	application.sidebar.Listing = application.mode
+	application.commandTable = append(append(application.declaredCommands(true), commands...), application.modeCommands()...)
 }
 
 // setMode turns a mode on. The file open stays open, shown as the mode shows a file: on its
@@ -114,16 +115,32 @@ func (application *Window) ownCommands() []command {
 	return own
 }
 
-// allCommands are the keys of the mode that is on kept to it, then the window's, then the modes'.
-func (application *Window) allCommands() []command {
-	return append(append(application.declaredCommands(true), commands...), application.modeCommands()...)
-}
+// allCommands are the keys of the mode that is on kept to it, then the window's, then the modes':
+// made once the modes start, as they never change, so reading the keys each frame builds nothing.
+func (application *Window) allCommands() []command { return application.commandTable }
 
 // progress is how far the mode on has gone in its work, for the status bar, with the words the
-// mode says it in; a mode with no work to count shows none.
+// mode says it in; a mode with no work to count shows none. It is counted again only when the
+// sidebar's rows are made again, as what it counts changes only then.
 func (application *Window) progress() (done, total int, words string) {
-	if done, total = application.mode.Progress(); total > 0 {
-		return done, total, application.mode.Header()
+	counted := &application.counted
+	rebuilds := application.sidebar.Rebuilds()
+	if counted.rebuilds != rebuilds || counted.mode != application.mode || !counted.made {
+		counted.done, counted.total = application.mode.Progress()
+		counted.words = ""
+		if counted.total > 0 {
+			counted.words = application.mode.Header()
+		}
+		counted.rebuilds, counted.mode, counted.made = rebuilds, application.mode, true
 	}
-	return 0, 0, ""
+	return counted.done, counted.total, counted.words
+}
+
+// progressCount is the mode's progress as it was counted last, and when.
+type progressCount struct {
+	made        bool
+	rebuilds    int
+	mode        mode.Mode
+	done, total int
+	words       string
 }

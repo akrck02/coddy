@@ -52,7 +52,7 @@ func (finder *Finder) setUses(window Window, uses []Use) {
 		}
 		change, changed := window.Projects()[use.Project].ChangeOf(use.Path)
 		hit := git.Hit{Path: use.Path, Line: use.Line, Column: use.Column, Text: use.Text}
-		finder.references = append(finder.references, ContentHit{use.Project, changed, change.Status, hit, use.Length})
+		finder.references = append(finder.references, newContentHit(window, use.Project, change, changed, hit, use.Length))
 	}
 	sort.SliceStable(finder.references, func(first, second int) bool {
 		one, other := finder.references[first], finder.references[second]

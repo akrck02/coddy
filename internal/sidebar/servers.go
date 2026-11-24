@@ -27,7 +27,7 @@ func serverBadge(project *workspace.Project) string {
 // paintServerBadge draws the quiet, dashed badge of what servers wrote in a project, keeps where it
 // is for a click, and moves the row's right side left of it.
 func (sidebar *Sidebar) paintServerBadge(side *rightSide, row Row, index int, top float32) {
-	words := serverBadge(side.painter.window.Projects()[row.Project])
+	words := sidebar.serverBadges[index]
 	if words == "" {
 		return
 	}

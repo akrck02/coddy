@@ -41,12 +41,14 @@ type serverView struct {
 // serverViews are every server the window knows of, running first, each once, by name.
 func (application *Window) serverViews() []serverView {
 	servers := &application.servers
-	views, seen := []serverView{}, map[string]bool{}
+	var views []serverView // none most of the time: then nothing is made, each frame
 	add := func(view serverView) {
-		if !seen[view.name] {
-			seen[view.name] = true
-			views = append(views, view)
+		for _, known := range views {
+			if known.name == view.name {
+				return // a few servers at most: looking through them is cheaper than a map
+			}
 		}
+		views = append(views, view)
 	}
 	for key, client := range servers.running {
 		view := runningView(key, client)

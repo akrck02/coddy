@@ -82,9 +82,21 @@ type Sidebar struct {
 	Listing Listing
 	// expanded keeps the folders and projects opened or closed by hand, by key; the others follow
 	// the default (everything open when only the changes are listed, closed otherwise).
-	expanded map[string]bool
+	expanded map[expansionKey]bool
 	trees    map[treeKey]*workspace.Folder
 	Rows     []Row
+	// decorations are what the mode adds to each row, worked out when the rows are, as they only
+	// change with them; decoratedWithoutStatus is whether git's status was left out of them
+	decorations            []Decoration
+	decoratedWithoutStatus bool
+	// serverBadges are what each project row's badge says of the files servers wrote in it
+	serverBadges []string
+	// anyOpen tells whether a project or a folder listed is open, for the fold button
+	anyOpen bool
+	// rebuilds counts the times the rows were made: see Rebuilds
+	rebuilds int
+	// header is the listing's words beside the title, which change only with the rows
+	header string
 	// badges are where each project's badge of server files was painted last, by row
 	badges map[int][2]float32
 	// leftOut are where each project's mark of being left out of the servers was painted last
@@ -109,6 +121,15 @@ type Sidebar struct {
 	FilterAsked bool
 }
 
+// expansionKey is a project's or a folder's place in a mode's listing, where it was opened or
+// closed by hand.
+type expansionKey struct {
+	listing     string
+	changesOnly bool
+	project     int
+	path        string
+}
+
 type treeKey struct {
 	project int
 	mode    string
@@ -117,7 +138,7 @@ type treeKey struct {
 }
 
 func New() Sidebar {
-	return Sidebar{expanded: map[string]bool{}, trees: map[treeKey]*workspace.Folder{}, Stale: true, Width: 380, list: pane.Scroller{RowHeight: RowHeight}}
+	return Sidebar{expanded: map[expansionKey]bool{}, trees: map[treeKey]*workspace.Folder{}, Stale: true, Width: 380, list: pane.Scroller{RowHeight: RowHeight}}
 }
 
 func (sidebar *Sidebar) Invalidate() {
@@ -125,8 +146,8 @@ func (sidebar *Sidebar) Invalidate() {
 	sidebar.Stale = true
 }
 
-func (sidebar *Sidebar) expandedKey(project int, path string) string {
-	return fmt.Sprintf("%s|%t|%d|%s", sidebar.Listing.Name(), sidebar.Listing.ChangesOnly(), project, path)
+func (sidebar *Sidebar) expandedKey(project int, path string) expansionKey {
+	return expansionKey{sidebar.Listing.Name(), sidebar.Listing.ChangesOnly(), project, path}
 }
 
 func (sidebar *Sidebar) isExpanded(window Window, project int, path string, isProject bool) bool {
@@ -195,6 +216,11 @@ func (sidebar *Sidebar) Rebuild(window Window) {
 	}
 	sidebar.Stale = false
 	sidebar.list.Count = len(sidebar.Rows)
+	sidebar.decorateRows()
+	sidebar.badgeRows(window)
+	sidebar.anyOpen = anyExpanded(sidebar.Rows)
+	sidebar.header = sidebar.Listing.Header()
+	sidebar.rebuilds++
 	if hadSelection {
 		for index, row := range sidebar.Rows {
 			if row.Kind == previous.Kind && row.Project == previous.Project && row.Path == previous.Path {
@@ -579,7 +605,7 @@ func (sidebar *Sidebar) buildHeader(context *ui.Context, window Window) {
 	titleStyle := ui.TextStyle{Weight: draw2d.Medium, Color: palette.InkSoft}
 	context.Text(title, titleStyle)
 	room := sidebar.headerRoom() - theme.TextWidth(context, title, titleStyle) - toolButtonWidth*2 - headerGap*3
-	if header := sidebar.Listing.Header(); header != "" {
+	if header := sidebar.header; header != "" {
 		progressStyle := ui.TextStyle{Size: palette.SmallTextSize, Color: palette.InkQuiet}
 		if progress := theme.FitText(context, header, progressStyle, room); progress != "" {
 			context.Text(progress, progressStyle)
@@ -593,7 +619,7 @@ func (sidebar *Sidebar) buildHeader(context *ui.Context, window Window) {
 // buildFoldButton folds everything listed while something is open, and opens it all once nothing
 // is: the projects, or inside a project its folders.
 func (sidebar *Sidebar) buildFoldButton(context *ui.Context, window Window) {
-	if sidebar.anyOpen(window) {
+	if sidebar.anyOpen {
 		if theme.ToolButton(context, "Collapse all", "chevrons-down-up", false) {
 			sidebar.setAllOpen(window, false)
 		}
@@ -775,15 +801,41 @@ func (sidebar *Sidebar) rowLeft(row Row) float32 {
 	return sidebar.list.Area.X + sidebarMargin + float32(row.Depth)*indentWidth
 }
 
-// anyOpen tells whether a project or a folder listed is open.
-func (sidebar *Sidebar) anyOpen(window Window) bool {
+// badgeRows works out each project row's badge of the files servers wrote, as the rows are made.
+func (sidebar *Sidebar) badgeRows(window Window) {
+	sidebar.serverBadges = sidebar.serverBadges[:0]
 	for _, row := range sidebar.Rows {
-		isProject := row.Kind == ProjectRow
-		if (isProject || row.Kind == FolderRow) && sidebar.isExpanded(window, row.Project, row.Path, isProject) {
+		badge := ""
+		if row.Kind == ProjectRow {
+			badge = serverBadge(window.Projects()[row.Project])
+		}
+		sidebar.serverBadges = append(sidebar.serverBadges, badge)
+	}
+}
+
+// Rebuilds counts the times the rows were made. They are made again whenever what the listing
+// shows changed (projects read, a file marked, a mode or a filter chosen), so what is worked out
+// from the same things can be kept until it grows.
+func (sidebar *Sidebar) Rebuilds() int { return sidebar.rebuilds }
+
+// anyExpanded tells whether a project or a folder of rows is open.
+func anyExpanded(rows []Row) bool {
+	for _, row := range rows {
+		if (row.Kind == ProjectRow || row.Kind == FolderRow) && row.Expanded {
 			return true
 		}
 	}
 	return false
+}
+
+// decorateRows works out what the mode adds to each row, as the rows are made, or as git's status
+// is hidden or shown.
+func (sidebar *Sidebar) decorateRows() {
+	sidebar.decorations = sidebar.decorations[:0]
+	for _, row := range sidebar.Rows {
+		sidebar.decorations = append(sidebar.decorations, sidebar.decorate(row))
+	}
+	sidebar.decoratedWithoutStatus = !sidebar.ShowsStatus()
 }
 
 // setAllOpen opens or folds every project, or, inside a project, every folder of its tree.

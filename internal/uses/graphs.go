@@ -14,9 +14,30 @@ type graphs struct {
 	name, projects canvas
 	builds         []builds.Build
 	links          [][]int
-	readFor        string // the projects the builds were read for
+	readFor        []*workspace.Project // the projects the builds were read for
 	reading        bool
 	opened         map[workspace.FileReference]*opened // the files of the name graph opened further
+	// nameKept is the name graph as laid out last; nil once the uses or the files opened further
+	// changed, so it is laid out again only then, not every frame
+	nameKept *scene
+	// projectsKept is the projects graph as laid out last, for the projects shown then
+	// (projectsKeptShown); projectsShown is room reused to tell which are shown now
+	projectsKept                     *scene
+	projectsKeptShown, projectsShown []bool
+}
+
+// keptNameScene is the name graph, laid out again only after forgetNameScene.
+func (uses *Mode) keptNameScene() scene {
+	if uses.graphs.nameKept == nil {
+		graph := uses.nameScene()
+		uses.graphs.nameKept = &graph
+	}
+	return *uses.graphs.nameKept
+}
+
+// forgetNameScene has the name graph laid out again, as what it shows changed.
+func (uses *Mode) forgetNameScene() {
+	uses.graphs.nameKept, uses.graphs.projectsKept = nil, nil // the projects graph lights the users
 }
 
 const (
@@ -111,7 +132,7 @@ func (uses *Mode) filesOf(project int) []workspace.FileReference {
 // buildNameGraph shows who uses the name; a click on a file opens it at its first use, a ⌘-click
 // opens it a level further: who uses the declaration its use is in.
 func (uses *Mode) buildNameGraph(context *ui.Context) {
-	graph := uses.nameScene()
+	graph := uses.keptNameScene()
 	keys := uses.window.Keys()
 	if clicked := uses.graphs.name.build(context, keys, uses.window.Look(), graph); clicked >= 0 {
 		chosen := graph.boxes[clicked]

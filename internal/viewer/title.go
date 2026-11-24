@@ -87,8 +87,7 @@ func (view *Viewer) buildPath(context *ui.Context, window Window, room float32, 
 		context.Text(view.Project.Name, quiet)
 		context.IconSized("chevron-right", 12, palette.InkQuiet.WithAlpha(0.6))
 	}
-	width := func(text string) float32 { return theme.TextWidth(context, text, quiet) }
-	for _, crumb := range crumbs(folder, width, room) {
+	for _, crumb := range view.crumbsOf(context, folder, room) {
 		view.buildCrumb(context, window, crumb)
 		context.IconSized("chevron-right", 12, palette.InkQuiet.WithAlpha(0.6))
 	}
@@ -108,7 +107,7 @@ func (view *Viewer) buildCrumb(context *ui.Context, window Window, crumb crumb) 
 	palette := context.Theme
 	hovered := ui.Look{Fill: palette.Sunken, Radius: 4}
 	layout := ui.Layout{Padding: ui.PadXY(crumbPadding, 1), AlignY: ui.Center}
-	name := "Show the folder " + crumb.path
+	name := crumb.name
 	if context.Clickable(name, layout, ui.Looks{Hovered: hovered, Pressed: hovered}, func() {
 		context.Text(crumb.label, ui.TextStyle{Color: palette.InkQuiet})
 	}) {
@@ -127,8 +126,31 @@ const crumbWidth = 2*crumbPadding + 12 + 2*6
 // gathered stands for the folders of a breadcrumb left out for room.
 const gathered = "…"
 
-// crumb is a folder of a breadcrumb: the words it shows and the folder's path in its project.
-type crumb struct{ label, path string }
+// crumb is a folder of a breadcrumb: the words it shows, the folder's path in its project, and
+// the name of its button.
+type crumb struct{ label, path, name string }
+
+// keptCrumbs are the crumbs shown last, and what they were laid out for.
+type keptCrumbs struct {
+	laidOut    bool
+	folder     string
+	room, size float32
+	shown      []crumb
+}
+
+// crumbsOf are the crumbs of a folder for room pixels, laid out again only when the folder, the
+// room or the text's size changed: the title is drawn every frame, the path changes far less.
+func (view *Viewer) crumbsOf(context *ui.Context, folder string, room float32) []crumb {
+	kept := &view.crumbs
+	size := context.Theme.TextSize
+	if kept.laidOut && kept.folder == folder && kept.room == room && kept.size == size {
+		return kept.shown
+	}
+	quiet := ui.TextStyle{Color: context.Theme.InkQuiet}
+	width := func(text string) float32 { return theme.TextWidth(context, text, quiet) }
+	*kept = keptCrumbs{laidOut: true, folder: folder, room: room, size: size, shown: crumbs(folder, width, room)}
+	return kept.shown
+}
 
 // crumbs are the folders of a path, a crumb each, that fit in room pixels: those nearest the file,
 // the ones before them gathered as one "…", which stands for the last of them; none for a file at
@@ -152,13 +174,18 @@ func crumbs(folder string, width func(string) float32, room float32) []crumb {
 	}
 	var shown []crumb
 	if first > 0 {
-		shown = append(shown, crumb{gathered, strings.Join(folders[:first], "/")})
+		path := strings.Join(folders[:first], "/")
+		shown = append(shown, crumb{gathered, path, crumbName(path)})
 	}
 	for index := first; index < len(folders); index++ {
-		shown = append(shown, crumb{folders[index], strings.Join(folders[:index+1], "/")})
+		path := strings.Join(folders[:index+1], "/")
+		shown = append(shown, crumb{folders[index], path, crumbName(path)})
 	}
 	return shown
 }
+
+// crumbName is the name of a folder's crumb, which says what it does.
+func crumbName(path string) string { return "Show the folder " + path }
 
 // showsStatus tells whether the file says how it changed: always as a diff, which is its changes,
 // and as a whole file unless the window hides git's status.
