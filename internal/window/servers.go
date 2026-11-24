@@ -23,7 +23,7 @@ type languageServers struct {
 	table    []lsp.Server
 	running  map[string]*lsp.Client // by key: the server's name, and its root when it has one
 	starting map[string]bool
-	told     map[string]told // what each server was told of each file, by key and path
+	told     map[string]told // the file each server was told last, by key: the one open
 	version  int             // grows with each text told, for every file and server
 	missing  map[string]bool // servers not installed, by name
 	// installable are the missing servers whose install command can run here, by name;
@@ -107,9 +107,10 @@ func (application *Window) serverOfOpenFile() (server lsp.Server, root, path str
 	return server, root, path, true
 }
 
-// told is the text of a file a server was told: the document read and the buffer editing it, at
-// a version of the buffer, and the version it was told at.
+// told is the text of a file a server was told: its path, the document read and the buffer
+// editing it, at a version of the buffer, and the version it was told at.
 type told struct {
+	path        string
 	document    *workspace.Document
 	buffer      *text.Buffer
 	editVersion int
@@ -118,12 +119,14 @@ type told struct {
 
 // serveOpenFile starts the server of the file open if it is not running, and tells it the file's
 // text, edits included, whenever that changed: an edit, or the file read again from disk. It runs
-// every frame and is cheap when nothing changed. It gives the server and what it was told last.
-func (application *Window) serveOpenFile() (*lsp.Client, told, string) {
+// every frame and costs nothing when nothing changed: the text is only built to be sent. The file
+// told before is closed on the server, so it keeps the open file only. It gives the server and
+// what it was told last.
+func (application *Window) serveOpenFile() (*lsp.Client, told) {
 	servers := &application.servers
 	server, root, path, found := application.serverOfOpenFile()
 	if !found || servers.missing[server.Name] || servers.failed[server.Name] != "" {
-		return nil, told{}, ""
+		return nil, told{}
 	}
 	key := serverKey(server, root)
 	client := servers.running[key]
@@ -133,35 +136,54 @@ func (application *Window) serveOpenFile() (*lsp.Client, told, string) {
 		if !servers.starting[key] && servers.resting[key] == "" && !application.Loading() {
 			application.startServer(server, root, key, application.viewer.Project.Path)
 		}
-		return nil, told{}, ""
+		return nil, told{}
 	}
 	if server.OnePerWindow {
 		application.followSight(client, server, key)
 	}
-	now, text := application.textNow()
-	last := servers.told[key+"|"+path]
-	if last.document == now.document && last.buffer == now.buffer && last.editVersion == now.editVersion {
-		return client, last, text
+	now := application.toldNow(path)
+	last := servers.told[key]
+	if now.sameText(last) {
+		return client, last
 	}
+	text := application.openText()
 	servers.version++
 	now.version = servers.version
-	servers.told[key+"|"+path] = now
+	servers.told[key] = now
 	application.work.run("", func(cancellation) func() {
+		if last.path != "" && last.path != path {
+			// a server that stopped meanwhile has nothing open to close
+			_ = client.CloseOlder(last.path, last.version)
+		}
 		_ = client.Tell(path, text, now.version) // an older text, sent late, is dropped
 		return nil
 	})
-	return client, now, text
+	return client, now
 }
 
-// textNow is the text of the file open, edits included, and what it is made of.
-func (application *Window) textNow() (told, string) {
+// sameText tells whether two told texts are of the same file, document, buffer and edit.
+func (now told) sameText(last told) bool {
+	return now.path == last.path && now.document == last.document && now.buffer == last.buffer &&
+		now.editVersion == last.editVersion
+}
+
+// toldNow is what the file open is made of now, to tell whether its text changed since it was told.
+func (application *Window) toldNow(path string) told {
 	view := &application.viewer
-	now := told{document: view.Document, buffer: view.Edit}
-	if view.Edit == nil {
-		return now, view.Document.Text
+	now := told{path: path, document: view.Document, buffer: view.Edit}
+	if view.Edit != nil {
+		now.editVersion = view.Edit.Version()
 	}
-	now.editVersion = view.Edit.Version()
-	return now, view.Edit.Text()
+	return now
+}
+
+// openText is the text of the file open, edits included: built whole, so only when it is sent.
+func (application *Window) openText() string {
+	view := &application.viewer
+	if view.Edit == nil {
+		return view.Document.Text
+	}
+	return view.Edit.Text()
 }
 
 // startServer starts a server in the background for a project, once what its projects hold is
@@ -315,11 +337,7 @@ func (application *Window) serverEnded(name, key string, client *lsp.Client) {
 		return // the window stopped it
 	}
 	delete(servers.running, key)
-	for told := range servers.told {
-		if strings.HasPrefix(told, key+"|") {
-			delete(servers.told, told)
-		}
-	}
+	delete(servers.told, key)
 	servers.crashes[name]++
 	if servers.crashes[name] >= crashLimit {
 		servers.failed[name] = "it stopped " + strconv.Itoa(crashLimit) + " times"

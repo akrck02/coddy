@@ -2,6 +2,9 @@ package git
 
 import (
 	"bytes"
+	"context"
+	"errors"
+	"os/exec"
 	"strconv"
 	"strings"
 	"unicode"
@@ -29,8 +32,9 @@ type GrepOptions struct {
 }
 
 // Grep finds the lines of a repository's text files that hold a text, as written: ignoring case
-// unless the text has a capital letter in it. It only reads.
-func Grep(repository, text string, options GrepOptions) ([]Hit, error) {
+// unless the text has a capital letter in it. It only reads, and stops when stop is cancelled.
+// Finding nothing gives no hits and no error.
+func Grep(stop context.Context, repository, text string, options GrepOptions) ([]Hit, error) {
 	arguments := []string{"grep", "-n", "-z", "--column", "-I", "--no-color", "-F", "--no-textconv"}
 	if !hasUpper(text) {
 		arguments = append(arguments, "-i")
@@ -48,12 +52,19 @@ func Grep(repository, text string, options GrepOptions) ([]Hit, error) {
 	if !options.WorkingTree {
 		arguments = append(arguments, "HEAD")
 	}
-	output, err := run(repository, append(append(arguments, "--"), options.Files...)...)
-	if err != nil && len(output) == 0 {
-		return nil, nil // git grep fails when nothing matches
+	output, err := runStoppable(stop, repository, append(append(arguments, "--"), options.Files...)...)
+	var exit *exec.ExitError
+	if errors.As(err, &exit) && exit.ExitCode() == nothingMatched {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
 	}
 	return parseGrep(output, !options.WorkingTree), nil
 }
+
+// nothingMatched is the exit code git grep ends with when no line matches.
+const nothingMatched = 1
 
 // parseGrep reads `git grep -n -z --column`: "path\0line\0column\0text" per line, the path led by
 // "HEAD:" when a commit was searched.

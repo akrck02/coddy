@@ -620,7 +620,9 @@ func (sidebar *Sidebar) followPointer(context *ui.Context, window Window) {
 	case sidebar.onBadge(index, x):
 		window.ShowServerFiles(row.Project)
 	case sidebar.onLeftOutMark(index, x):
-		window.(LeftOuter).ShowServers()
+		if outer, leavesOut := window.(LeftOuter); leavesOut {
+			outer.ShowServers()
+		}
 	case sidebar.onEnter(index, x):
 		sidebar.Enter(window, row.Project)
 	case sidebar.onCheck(index, x):

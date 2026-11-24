@@ -1,6 +1,6 @@
 # 11. An architecture for the long run
 
-> Status: proposed · Author's approval: proposal ☐ plan ☐
+> Status: being built · Author's approval: proposal ☑ ("dale", 2026-11-24) plan ☑ ("dale, implementa todo", 2026-11-24)
 
 ## Why
 
@@ -146,7 +146,7 @@ Every task of R1 comes with its allocation test, so it stays fixed.
 The order keeps every commit green and does the cheap, safe things first. Tests of a behaviour
 go in before the code that moves it (the viewer and sidebar have few: about 190 and 94 lines).
 
-- [ ] T1 — bugs: the file copy, the race, the link, the unchecked assertion, grep's errors · `window/servers.go`, `lsp/models.go`, `workspace/save.go`, `sidebar`, `git/grep.go` · R1, R2, R9 · tests: `an idle frame with a big file open copies nothing`, `-race`, `a new file under a link that leads out is refused`, `a broken repository's search tells its error`
+- [x] T1 — bugs: the file copy, the race, the link, the unchecked assertion, grep's errors · `window/servers.go`, `lsp/models.go`, `workspace/save.go`, `sidebar`, `git/grep.go` · R1, R2, R9 · tests: `an idle frame with a big file open copies nothing`, `-race`, `a new file under a link that leads out is refused`, `a broken repository's search tells its error`
 - [ ] T2 — the idle-frame allocation test, and everything it finds: commands, progress, decorations, badges, Markdown, the uses graph, crumbs, counts, metrics · `window`, `review`, `sidebar`, `viewer`, `uses`, `finder` · R1 · test: `an idle frame allocates no more than the interface itself`, in each mode
 - [ ] T3 — `work` out of `window`; overlays as a list; the command table kept · `internal/work`, `window` · R3
 - [ ] T4 — `servers` out of `window`, behind `Host`; `told` holds the open file only and closes the last one · `internal/servers` · R3, R8

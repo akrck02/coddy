@@ -81,3 +81,18 @@ func TestSavingALinkWritesTheFileItPointsAt(test *testing.T) {
 		test.Errorf("the file pointed at holds %q", content)
 	}
 }
+
+// A new file under a folder that links out of the project would be written outside it.
+func TestANewFileUnderALinkThatLeadsOutIsRefused(test *testing.T) {
+	project := &Project{Path: test.TempDir()}
+	elsewhere := test.TempDir()
+	if err := os.Symlink(elsewhere, filepath.Join(project.Path, "out")); err != nil {
+		test.Fatal(err)
+	}
+	if _, err := Save(project, "out/new.txt", "hello", Stamp{}); !errors.Is(err, OutsideTheProject) {
+		test.Errorf("saving a new file through a link out gave %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(elsewhere, "new.txt")); err == nil {
+		test.Error("the new file was written outside the project")
+	}
+}

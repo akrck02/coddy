@@ -210,7 +210,7 @@ func grepProjects(stop context.Context, window Window, projects []searchedProjec
 		go func() {
 			defer group.Done()
 			window.Read(stop, func() {
-				found[position], _ = git.Grep(project.path, text, options) // a project git cannot search shows no lines
+				found[position], _ = git.Grep(stop, project.path, text, options) // a project git cannot search shows no lines
 			})
 		}()
 	}

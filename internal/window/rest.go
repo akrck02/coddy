@@ -1,7 +1,6 @@
 package window
 
 import (
-	"strings"
 	"time"
 
 	"github.com/akrck02/code-review/internal/lsp"
@@ -48,11 +47,7 @@ func (application *Window) restServers(now time.Time) {
 func (application *Window) restServer(key string, client *lsp.Client) {
 	servers := &application.servers
 	delete(servers.running, key) // so its end is not taken for a crash
-	for told := range servers.told {
-		if strings.HasPrefix(told, key+"|") {
-			delete(servers.told, told)
-		}
-	}
+	delete(servers.told, key)
 	servers.resting[key] = client.Server.Name
 	application.stopServer(key, client)
 }

@@ -5,6 +5,7 @@ package git
 
 import (
 	"bytes"
+	"context"
 	"os"
 	"os/exec"
 	"strings"
@@ -40,10 +41,18 @@ var safetyOptions = []string{
 
 // run runs a read-only git command in a repository and returns what it printed.
 func run(repository string, arguments ...string) ([]byte, error) {
+	return runStoppable(context.Background(), repository, arguments...)
+}
+
+// runStoppable is run, its process killed once stop is cancelled.
+func runStoppable(stop context.Context, repository string, arguments ...string) ([]byte, error) {
 	if len(arguments) == 0 || !readOnlyCommands[arguments[0]] {
 		return nil, CommandNotReadOnly
 	}
-	command := exec.Command("git", append(append([]string{}, safetyOptions...), arguments...)...)
+	if err := stop.Err(); err != nil {
+		return nil, err
+	}
+	command := exec.CommandContext(stop, "git", append(append([]string{}, safetyOptions...), arguments...)...)
 	command.Dir = repository
 	command.Env = append(os.Environ(),
 		"GIT_OPTIONAL_LOCKS=0",
@@ -55,6 +64,9 @@ func run(repository string, arguments ...string) ([]byte, error) {
 	command.Stdout = &output
 	command.Stderr = &errorOutput
 	if err := command.Run(); err != nil {
+		if stopped := stop.Err(); stopped != nil {
+			return nil, stopped
+		}
 		message := strings.TrimSpace(errorOutput.String())
 		if message == "" {
 			message = err.Error()

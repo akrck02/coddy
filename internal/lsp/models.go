@@ -310,7 +310,7 @@ func (client *Client) anyProjectIn(whole map[string]any) bool {
 	if len(listOf(whole["modules"])) == 0 {
 		return true
 	}
-	for project := range client.folders {
+	for _, project := range client.Folders() { // a copy: the window changes the folders meanwhile
 		if _, modules := modelOf(whole, project); modules > 0 {
 			return true
 		}

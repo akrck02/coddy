@@ -72,11 +72,7 @@ func (application *Window) restartServer(server lsp.Server, key string, client *
 		return // it stopped meanwhile, or the projects came back to those it reads
 	}
 	delete(servers.running, key)
-	for told := range servers.told {
-		if strings.HasPrefix(told, key+"|") {
-			delete(servers.told, told)
-		}
-	}
+	delete(servers.told, key)
 	application.toast = server.Name + " starts again to read the " + strconv.Itoa(len(wanted)) + " projects in sight"
 	application.stopServer(key, client)
 }

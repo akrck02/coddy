@@ -280,3 +280,35 @@ func TestAServerWaitsForAnotherToHaveImportedTheProjects(test *testing.T) {
 		test.Errorf("second did not start once fakels was ready; the status says %q", application.serverStatus())
 	}
 }
+
+// Telling the server the file open runs every frame: while the file does not change it must cost
+// the same for a file of any size, never a copy of its text.
+func TestServingTheOpenFileCopiesNothingWhileItIsUnchanged(test *testing.T) {
+	log := filepath.Join(test.TempDir(), "log")
+	application := readerWithServers(test, "lighthouse/src/lamp.go", fakeGo(test, log))
+	window := newWindow(test, application)
+	window.Frames(2)
+	if !logSays(test, log, "opened lamp.go") {
+		test.Fatal("the server was not told of lamp.go")
+	}
+	small := testing.AllocsPerRun(50, func() { application.serveOpenFile() })
+	application.viewer.Edit.Insert(strings.Repeat("// a line of a long file\n", 3000))
+	application.serveOpenFile() // told once, as it changed
+	big := testing.AllocsPerRun(50, func() { application.serveOpenFile() })
+	if big > small {
+		test.Errorf("serving an unchanged file of 3,000 lines allocates %v times, one of 5 lines %v", big, small)
+	}
+}
+
+// A server is told of the file open only: the file left for another is closed on it.
+func TestTheFileLeftIsClosedOnItsServer(test *testing.T) {
+	log := filepath.Join(test.TempDir(), "log")
+	application := readerWithServers(test, "lighthouse/src/lamp.go", fakeGo(test, log))
+	window := newWindow(test, application)
+	window.Frames(2)
+	application.openFile(workspace.FileReference{Project: 0, Path: "src/beam.go"})
+	window.Frames(2)
+	if !logSays(test, log, "opened beam.go") || !logSays(test, log, "closed lamp.go") {
+		test.Error("opening beam.go did not close lamp.go on the server")
+	}
+}

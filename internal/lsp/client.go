@@ -333,6 +333,18 @@ func (client *Client) IsOpen(path string) bool {
 	return open
 }
 
+// CloseOlder closes a document told to the server, unless a newer text of it than version was told
+// since: a file left for another closes, but not when it was opened again meanwhile.
+func (client *Client) CloseOlder(path string, version int) error {
+	client.lock.Lock()
+	sent, open := client.versions[FileURI(path)]
+	client.lock.Unlock()
+	if !open || sent > version {
+		return nil
+	}
+	return client.Close(path)
+}
+
 // Close tells the server a document told to it is no longer open: it reads it from disk again.
 func (client *Client) Close(path string) error {
 	uri := FileURI(path)

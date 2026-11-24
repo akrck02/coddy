@@ -77,7 +77,7 @@ func (application *Window) runningServer(waking bool) (asking, string) {
 	case servers.failed[server.Name] != "":
 		return asking{}, server.Name + " did not start: " + servers.failed[server.Name]
 	}
-	client, told, text := application.serveOpenFile()
+	client, told := application.serveOpenFile()
 	if client == nil && application.Loading() {
 		return asking{}, server.Name + " starts once the projects are read"
 	}
@@ -87,7 +87,7 @@ func (application *Window) runningServer(waking bool) (asking, string) {
 	if client == nil {
 		return asking{}, server.Name + " is starting: try again in a moment"
 	}
-	return asking{client: client, path: path, text: text, version: told.version}, ""
+	return asking{client: client, path: path, text: application.openText(), version: told.version}, ""
 }
 
 // positionOf is a place of the file open as the protocol counts it.

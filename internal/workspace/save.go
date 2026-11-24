@@ -113,15 +113,35 @@ func pathIn(project *Project, path string) (string, error) {
 	if filepath.IsAbs(path) || !inside(project.Path, full) {
 		return "", failure.Wrap(OutsideTheProject, path, nil)
 	}
-	target, err := filepath.EvalSymlinks(full)
-	if err != nil || target == full {
-		return full, nil // a new file, or not a link
+	target, err := resolved(full)
+	if err != nil {
+		return "", failure.Wrap(OutsideTheProject, path, err)
+	}
+	if target == full {
+		return full, nil // no link on the way
 	}
 	root, err := filepath.EvalSymlinks(project.Path)
 	if err != nil || !inside(root, target) {
 		return "", failure.Wrap(OutsideTheProject, path, err)
 	}
 	return target, nil
+}
+
+// resolved is a path with its links followed: the file's own, or, for a file not written yet, the
+// links of the folders it will be written in.
+func resolved(full string) (string, error) {
+	target, err := filepath.EvalSymlinks(full)
+	if err == nil {
+		return target, nil
+	}
+	if !errors.Is(err, fs.ErrNotExist) {
+		return "", err
+	}
+	folder, err := resolved(filepath.Dir(full)) // ends at the file system's root, which exists
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(folder, filepath.Base(full)), nil
 }
 
 // inside tells whether a path lies inside a folder.

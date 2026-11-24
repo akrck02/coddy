@@ -95,7 +95,10 @@ func (application *Window) grepAll(stop cancellation, projects []string, name st
 		group.Add(1)
 		go func() {
 			defer group.Done()
-			application.work.read(stop, func() { found[position], _ = git.Grep(project, name, options) })
+			application.work.read(stop, func() {
+				// a project git cannot search adds no places to check
+				found[position], _ = git.Grep(stop, project, name, options)
+			})
 		}()
 	}
 	group.Wait()

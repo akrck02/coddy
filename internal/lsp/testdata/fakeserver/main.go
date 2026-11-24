@@ -78,6 +78,8 @@ func (fake *server) handle(method string, params json.RawMessage) (any, error) {
 		fake.open(params)
 	case "textDocument/didChange":
 		fake.change(params)
+	case "textDocument/didClose":
+		fake.close(params)
 	case "textDocument/definition", "textDocument/references", "textDocument/hover":
 		return fake.request(method, params)
 	case "textDocument/documentSymbol":
@@ -274,6 +276,21 @@ func (fake *server) open(params json.RawMessage) {
 		fake.documents[opened.TextDocument.URI] = opened.TextDocument.Text
 		fake.lock.Unlock()
 		logLine("opened " + filepath.Base(lsp.PathOf(opened.TextDocument.URI)) + " " + firstLine(opened.TextDocument.Text))
+	}
+}
+
+// close forgets a document, as a server reads it from disk again once it is closed.
+func (fake *server) close(params json.RawMessage) {
+	var closed struct {
+		TextDocument struct {
+			URI string `json:"uri"`
+		} `json:"textDocument"`
+	}
+	if json.Unmarshal(params, &closed) == nil {
+		fake.lock.Lock()
+		delete(fake.documents, closed.TextDocument.URI)
+		fake.lock.Unlock()
+		logLine("closed " + filepath.Base(lsp.PathOf(closed.TextDocument.URI)))
 	}
 }
 
