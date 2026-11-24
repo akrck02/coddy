@@ -179,29 +179,40 @@ Built on 24 November 2026, one commit per task, pending the author's review. `go
 
 | Task | Commit | What it gave |
 |---|---|---|
-| T1 | `6613ef9` | The five bugs fixed, each with its test |
-| T2 | `b81256d` | The idle-frame test; an idle frame went from about 80 and 126 allocations to 34 and 52 (files, review) |
-| T3 | `df308fa` | `internal/work`; the overlays are one list, which `ModalOpen` walks |
-| T4 | `86b1ecc` | `internal/servers`, a `Fleet` behind `Host` (`Loading`, `Projects`, `InSight`, `LoadOptions`, `Toast`) |
-| T5 | `67e0688` | `internal/navigation`: definitions, the trail, the hover card's lines, uses across projects |
-| T6 | `896ac2f` | `internal/session`; documents kept by bytes, least recently opened first, read again when their file's time or size changed |
-| T7 | `bfd0ed4` | `internal/language`, one table read by the icons, the highlighting, the servers and Markdown |
-| T8 | `0feda62` | `mode.Mode` down to what every mode does; its other powers are interfaces found once |
-| T9 | `ba8cfa8` | The viewer's three presentations; `viewer.go` from 1,012 lines to 330 |
-| T10 | `3784cff` | `sidebar.go` from 971 lines to 158; trees kept for the last 4 filters |
-| T11 | `b39a9dd`, `e267044` | `finder.source`, `workspace.Layout`, `builds.Reader`; `internal/gradle` out of `lsp`, which keeps the protocol |
-| T12 | `3621436` | One breadcrumb, folder icon, key cap, row background and list step; `internal/english` |
-| T13 | `d7b764f` | Codes up to the interface, no `_ =` without its reason, long git commands cancelled, `lsp.message-too-large` |
-| T14 | this one | `docs/4-how-it-is-made.md` rewritten, `docs/5-guides/` (a language, a server, a theme, a mode), the package list checked by a test |
+| T1 | `53fb088` | The five bugs fixed, each with its test |
+| T2 | `cce0906` | The idle-frame test; an idle frame went from about 80 and 126 allocations to 34 and 52 (files, review) |
+| T3 | `51f1095` | `internal/work`; the overlays are one list, which `ModalOpen` walks |
+| T4 | `c966b72` | `internal/servers`, a `Fleet` behind `Host` (`Loading`, `Projects`, `InSight`, `LoadOptions`, `Toast`) |
+| T5 | `a668397` | `internal/navigation`: definitions, the trail, the hover card's lines, uses across projects |
+| T6 | `bfb87f1` | `internal/session`; documents kept by bytes, least recently opened first, read again when their file's time or size changed |
+| T7 | `bcd32b2` | `internal/language`, one table read by the icons, the highlighting, the servers and Markdown |
+| T8 | `586ada7` | `mode.Mode` down to what every mode does; its other powers are interfaces found once |
+| T9 | `8aded1f` | The viewer's three presentations; `viewer.go` from 1,012 lines to 330 |
+| T10 | `8e01030` | `sidebar.go` from 971 lines to 158; trees kept for the last 4 filters |
+| T11 | `3de955f`, `99ea7f7` | `finder.source`, `workspace.Layout`, `builds.Reader`; `internal/gradle` out of `lsp`, which keeps the protocol |
+| T12 | `9f40eee` | One breadcrumb, folder icon, key cap, row background and list step; `internal/english` |
+| T13 | `0cc53a1` | Codes up to the interface, no `_ =` without its reason, long git commands cancelled, `lsp.message-too-large` |
+| T14 | `904dc66` | `docs/4-how-it-is-made.md` rewritten, `docs/5-guides/` (a language, a server, a theme, a mode), the package list checked by a test |
 
-`window` has 25 files besides its tests, down from 32. The requirements' checks:
+`window` has 24 files besides its tests, down from 32. The requirements' checks:
 
 - R1, R8: the idle-frame and cache tests pass; R2: `-race` and the link test pass; R3, R5, R6, R7,
   R9, R10: each has its rule or test in `cmd/code-review/rules_test.go` or beside its package.
-- R4: no file of the program is above 400 lines, checked by `TestNoFileIsLongerThanFourHundredLines`.
-  Splitting the last three (`window/build.go`, `window/window.go`, `lsp/client.go`) took `window` to
-  29 files besides its tests, over R3's 25: each holds one part of the shell (the status bar, the
-  base dialog, the projects, opening files), so the count is left for the author to judge.
+- R3, R4: no file of the program is above 400 lines (`TestNoFileIsLongerThanFourHundredLines`, from
+  `bac0193`) and no package holds more than 25 (`TestNoPackageHoldsMoreThanTwentyFiveFiles`): the
+  window's small files joined the file of their concept (`805e751`).
+
+**After the review.** A reviewer with a clean context read the whole change. What it found is
+fixed, each with its test or rule:
+
+| Finding | Commit |
+|---|---|
+| Marking a file viewed or a use seen left the ticks and counts stale until another file opened | `f1ad585` |
+| No rule for files per package, nor for the imports' groups; `ctx` and `pkg` | `805e751` |
+| `.java`, `.kt`, `.kts` and the servers' language ids written outside the table; now a rule | `90283c7` |
+| The cancelling test only cancelled before git started; a failed second ask of the uses was silent | `f5e26cf` |
+| A save over a link to nothing replaced the link with a file; now `workspace.dangling-link` | `e5bfdb9` |
+| The uses mode's idle frame was not measured: 139 allocations, now 61 (budget 65) | `32956f2` |
 
 **What a person still has to review:**
 
@@ -217,5 +228,6 @@ Built on 24 November 2026, one commit per task, pending the author's review. `go
   server configured for them gets their files; `.markdown`, `.mdown` and `.mkd` are Markdown; a
   file that stopped changing maps its rows to lines in the changes view; a newer reading of the
   projects stops the git of the one it replaces.
-- Not done: the uses mode still checks its `uses.Host` at each call; two readings of projects (a
+- Not done: the servers' views are made each frame while a server runs (about 9 allocations, a
+  `TODO(akrck02)` in `idle_test.go`); the uses mode still checks its `uses.Host` at each call; two readings of projects (a
   server's snapshot, `notCommitted`) cannot be stopped yet.
