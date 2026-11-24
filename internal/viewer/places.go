@@ -28,7 +28,7 @@ func (view *Viewer) fileLineOfRow(index int) int {
 	if index < 0 {
 		return -1
 	}
-	if view.Mode == FileView {
+	if !view.showsRows() {
 		return index
 	}
 	if index >= len(view.rows) || view.rows[index].IsFold() || view.rows[index].Line.Kind == git.Removal {
