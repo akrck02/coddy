@@ -96,3 +96,19 @@ func TestANewFileUnderALinkThatLeadsOutIsRefused(test *testing.T) {
 		test.Error("the new file was written outside the project")
 	}
 }
+
+// A save writes the file a link points at, never over the link: a link to nothing has no such
+// file, so the save is refused and the link left as it was.
+func TestASaveOverADanglingLinkIsRefusedAndTheLinkKept(test *testing.T) {
+	project := &Project{Path: test.TempDir()}
+	link := filepath.Join(project.Path, "lamp.txt")
+	if err := os.Symlink(filepath.Join(project.Path, "gone.txt"), link); err != nil {
+		test.Fatal(err)
+	}
+	if _, err := Save(project, "lamp.txt", "hello", Stamp{}); !errors.Is(err, DanglingLink) {
+		test.Errorf("saving over a link to nothing gave %v", err)
+	}
+	if info, err := os.Lstat(link); err != nil || info.Mode()&os.ModeSymlink == 0 {
+		test.Error("the link was replaced by a plain file")
+	}
+}

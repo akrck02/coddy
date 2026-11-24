@@ -24,6 +24,8 @@ func TestEachErrorCarriesItsCode(test *testing.T) {
 	large := &Project{Path: test.TempDir()}
 	os.WriteFile(filepath.Join(large.Path, "large"), bytes.Repeat([]byte("a"), largestShown+1), 0o644)
 	tooLarge := OpenDocument(large, "large", true).Error
+	os.Symlink(filepath.Join(project.Path, "gone"), filepath.Join(project.Path, "dangling")) // its error is checked below
+	_, dangling := Save(project, "dangling", "mine", Stamp{})
 	cases := []struct {
 		name string
 		err  error
@@ -36,6 +38,7 @@ func TestEachErrorCarriesItsCode(test *testing.T) {
 		{"a base the repository does not have", baseNotFound, BaseNotFound},
 		{"a repository with no usual base branch", noBase, NoBase},
 		{"a file too large to show", tooLarge, TooLarge},
+		{"a link to nothing", dangling, DanglingLink},
 	}
 	for _, kind := range cases {
 		if !errors.Is(kind.err, kind.code) {

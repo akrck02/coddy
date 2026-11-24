@@ -15,6 +15,8 @@ var (
 	BaseNotFound = failure.Define("workspace.base-not-found", "the base asked for is not in the repository; the default branch is used")
 	// NoBase is a repository with none of the usual base branches (main, master, develop).
 	NoBase = failure.Define("workspace.no-base", "no base branch found (main, master, develop)")
+	// DanglingLink is a file that is a link to nothing: saving would write over the link.
+	DanglingLink = failure.Define("workspace.dangling-link", "the file is a link to a file that does not exist")
 	// TooLarge is a file too large to show.
 	TooLarge = failure.Define("workspace.too-large", "the file is too large to show")
 	// RecordNotKept is the record of the files language servers wrote, which could not be written

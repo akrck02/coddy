@@ -107,11 +107,15 @@ func writeWhole(full string, content []byte) error {
 }
 
 // pathIn is the full path of a file of a project, refusing a path that leads out of it. A link is
-// followed, so saving writes the file it points at, never over the link, and only inside the project.
+// followed, so saving writes the file it points at, never over the link, and only inside the
+// project; a link to nothing is refused, as there is no file to write but the link itself.
 func pathIn(project *Project, path string) (string, error) {
 	full := filepath.Join(project.Path, filepath.FromSlash(path))
 	if filepath.IsAbs(path) || !inside(project.Path, full) {
 		return "", failure.Wrap(OutsideTheProject, path, nil)
+	}
+	if isDanglingLink(full) {
+		return "", failure.Wrap(DanglingLink, path, nil)
 	}
 	target, err := resolved(full)
 	if err != nil {
@@ -142,6 +146,16 @@ func resolved(full string) (string, error) {
 		return "", err
 	}
 	return filepath.Join(folder, filepath.Base(full)), nil
+}
+
+// isDanglingLink tells whether a path is a link that leads to nothing.
+func isDanglingLink(full string) bool {
+	info, err := os.Lstat(full)
+	if err != nil || info.Mode()&fs.ModeSymlink == 0 {
+		return false
+	}
+	_, err = os.Stat(full)
+	return errors.Is(err, fs.ErrNotExist)
 }
 
 // inside tells whether a path lies inside a folder.
