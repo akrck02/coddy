@@ -47,3 +47,20 @@ func TestANewNoteAloneDoesNotLayTheUsesOutAgain(test *testing.T) {
 		test.Error("a use found was not laid out")
 	}
 }
+
+// A server asked again for the uses once it has read the projects may fail: the uses found stay,
+// and the note says the list may lack some, instead of the search ending as if it were whole.
+func TestAServerThatFailsWhenAskedAgainIsToldInTheNote(test *testing.T) {
+	host := &shownHost{}
+	uses := NewUses(host, nil)
+	search := &Search{known: true, found: map[string]lsp.Location{"somewhere:9": {}}}
+	search.Asked.Client = &lsp.Client{Server: lsp.Server{Name: "gopls"}}
+	uses.search = search
+	uses.answeredAgain(search, nil, lsp.RequestFailed)
+	if !strings.Contains(host.noted, "gopls could not be asked again") {
+		test.Errorf("the note after a failed second ask is %q", host.noted)
+	}
+	if len(search.found) != 1 {
+		test.Errorf("the uses found before were lost: %d left", len(search.found))
+	}
+}

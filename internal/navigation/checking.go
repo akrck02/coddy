@@ -108,16 +108,21 @@ func (uses *Uses) askAgain(search *Search) {
 		requestContext, cancel := context.WithTimeout(stop, RequestWait)
 		defer cancel()
 		locations, err := asked.Client.References(requestContext, asked.Path, at)
-		return func() {
-			if err != nil || uses.search != search {
-				return
-			}
-			for _, location := range locations {
-				search.found[placeKey(location)] = location
-			}
-			uses.show(search, false)
-		}
+		return func() { uses.answeredAgain(search, locations, err) }
 	})
+}
+
+// answeredAgain keeps the uses the server gave when asked again, or tells in the note why it gave
+// none: the uses found before stay, but the person knows the list may lack some.
+func (uses *Uses) answeredAgain(search *Search, locations []lsp.Location, err error) {
+	if uses.search != search {
+		return // a newer search
+	}
+	search.askedAgain = err
+	for _, location := range locations {
+		search.found[placeKey(location)] = location
+	}
+	uses.show(search, false)
 }
 
 // show shows the uses found so far, with the note on how the search goes; opening tells that the

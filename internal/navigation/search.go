@@ -34,6 +34,8 @@ type Answer struct {
 type Search struct {
 	Question
 	busy bool
+	// askedAgain is why the server, asked again once it had read the projects, did not answer
+	askedAgain error
 	// declaration is where the name is declared, in a project open; known tells whether it is
 	declaration lsp.Location
 	known       bool
@@ -82,6 +84,9 @@ func (search *Search) note() string {
 	var words []string
 	if search.busy {
 		words = append(words, "more once "+servers.StatusOf(asked.Server.Name, asked.Progress(), time.Now()))
+	}
+	if search.askedAgain != nil {
+		words = append(words, asked.Server.Name+" could not be asked again, some may be missing: "+search.askedAgain.Error())
 	}
 	if waiting := search.waitingFor; waiting != nil && waiting != asked {
 		words = append(words, "some wait for "+servers.StatusOf(waiting.Server.Name, waiting.Progress(), time.Now()))
