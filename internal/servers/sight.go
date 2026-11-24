@@ -89,6 +89,7 @@ func (fleet *Fleet) restart(server lsp.Server, key string, client *lsp.Client) {
 		return // it stopped meanwhile, or the projects came back to those it reads
 	}
 	delete(fleet.running, key)
+	fleet.touched()
 	delete(fleet.told, key)
 	fleet.host.Toast(server.Name + " starts again to read the " + strconv.Itoa(len(wanted)) + " projects in sight")
 	fleet.stop(key, client)
@@ -127,6 +128,7 @@ func (fleet *Fleet) importable(server lsp.Server, project string) bool {
 	if !known {
 		why = gradle.CannotImport(project)
 		fleet.cannotImport[project] = why
+		fleet.touched()
 	}
 	return why == ""
 }

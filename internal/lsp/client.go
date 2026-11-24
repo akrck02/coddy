@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/akrck02/code-review/internal/gradle"
@@ -43,6 +44,9 @@ type Client struct {
 	idleAt      time.Time // when the work it reported last ended
 	askedAt     time.Time // when it was last asked something, or answered
 	changes     chan struct{}
+	// version grows each time what the server says of itself changes, so a reader can keep what it
+	// made of it and tell when to make it again by comparing a number
+	version atomic.Uint64
 	// followsFolders tells whether the server says it follows workspace folders added and removed
 	// while it runs; one that does not reads those it started with.
 	followsFolders bool

@@ -154,6 +154,7 @@ func (client *Client) noteImport(params json.RawMessage) {
 	project := client.projectOf(strings.TrimSpace(folder))
 	client.imported[project] = time.Now()
 	client.importing = filepath.Base(project)
+	client.changed()
 }
 
 // noteLog keeps a message a server logged or showed (window/logMessage, window/showMessage).
@@ -177,6 +178,7 @@ func (client *Client) noteLog(params json.RawMessage) {
 
 // changed tells the window, without waiting, that what the server says of itself changed.
 func (client *Client) changed() {
+	client.version.Add(1)
 	select {
 	case client.changes <- struct{}{}:
 	default:
@@ -185,6 +187,10 @@ func (client *Client) changed() {
 
 // Changes tells when what the server says of itself changed, to show it.
 func (client *Client) Changes() <-chan struct{} { return client.changes }
+
+// Version grows each time what the server says of itself (Progress) changes: what was made of it
+// stays true while the version stays the same, but for the time it has been at its work.
+func (client *Client) Version() uint64 { return client.version.Load() }
 
 // Progress is what the server is doing now.
 func (client *Client) Progress() Progress {

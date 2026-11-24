@@ -57,6 +57,7 @@ func (fleet *Fleet) statusParts() []statusPart {
 	for name, other := range fleet.queued {
 		if server, found := fleet.Named(name); found && fleet.importingBefore(server) == "" {
 			delete(fleet.queued, name) // the other is done: the next frame that needs it starts it
+			fleet.touched()
 			continue
 		}
 		parts = append(parts, statusPart{name, name + " waits for " + other + " to import"})

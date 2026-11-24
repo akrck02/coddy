@@ -91,6 +91,10 @@ type Fleet struct {
 	// cannotImport says, by project folder, why a server that imports builds leaves it out ("" for
 	// none), worked out once per project as it reads the disk
 	cannotImport map[string]string
+	// revision grows each time a map the views are made from changes (touched), and shown keeps
+	// the views made last with what they were made from (view.go)
+	revision int
+	shown    shownViews
 }
 
 // New is a fleet with no server running yet. Its jobs run on a queue; wake redraws the window
@@ -182,4 +186,5 @@ func (fleet *Fleet) Stop() {
 	}
 	waiting.Wait()
 	fleet.running = map[string]*lsp.Client{}
+	fleet.touched()
 }

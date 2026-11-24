@@ -24,6 +24,7 @@ func (client *Client) changeFolder(folder string, add bool) error {
 	if known == add {
 		return nil
 	}
+	client.changed()
 	changed := []map[string]string{{"uri": FileURI(client.serverFolder(folder)), "name": filepath.Base(folder)}}
 	event := map[string]any{"added": changed, "removed": []map[string]string{}}
 	if !add {

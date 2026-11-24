@@ -96,6 +96,7 @@ What is kept, and what makes it stale:
 | Markdown laid out | `viewer` | the document or its edit version changes |
 | The documents read | `session` | the file's time or size on disk changed, checked when it is opened |
 | What each server was told | `servers` | the open file's text changed |
+| The servers' views (status bar, panel) | `servers.Fleet.Views` | a server says something new (`lsp.Client.Version`), one starts, stops or rests, the projects change; each second while one is at work |
 
 Two of these deserve a word more.
 

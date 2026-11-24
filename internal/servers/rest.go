@@ -49,10 +49,12 @@ func (fleet *Fleet) Pause(key string, client *lsp.Client) {
 	delete(fleet.running, key) // so its end is not taken for a crash
 	delete(fleet.told, key)
 	fleet.resting[key] = client.Server.Name
+	fleet.touched()
 	fleet.stop(key, client)
 }
 
 // Wake lets a resting server start again, as it is asked something.
 func (fleet *Fleet) Wake(key string) {
 	delete(fleet.resting, key)
+	fleet.touched()
 }

@@ -28,10 +28,12 @@ func (fleet *Fleet) Start(server lsp.Server, root, key, project string) {
 	if other := fleet.importingBefore(server); fleet.stopping[key] || other != "" {
 		// started on a later frame, once the one before has ended or the other is ready
 		fleet.queued[server.Name] = other // "" while the one before ends: the status shows no wait
+		fleet.touched()
 		return
 	}
 	delete(fleet.queued, server.Name)
 	fleet.starting[key] = true
+	fleet.touched()
 	folders := fleet.foldersFor(server)
 	projects := folders
 	if !server.OnePerWindow {
@@ -45,6 +47,7 @@ func (fleet *Fleet) Start(server lsp.Server, root, key, project string) {
 			return func() {
 				delete(fleet.starting, key)
 				fleet.failed[server.Name] = why
+				fleet.touched()
 				fleet.host.Toast(server.Name + " did not start: " + why)
 			}
 		}
@@ -123,6 +126,7 @@ func (fleet *Fleet) keepSnapshots(snapshots map[string]*workspace.Snapshot) {
 // the server runs.
 func (fleet *Fleet) started(server lsp.Server, key string, client *lsp.Client, err error) bool {
 	delete(fleet.starting, key)
+	fleet.touched()
 	switch {
 	case errors.Is(err, lsp.ServerNotFound):
 		fleet.missing[server.Name] = true
@@ -150,6 +154,7 @@ func (fleet *Fleet) ended(name, key string, client *lsp.Client) {
 		return // the window stopped it
 	}
 	delete(fleet.running, key)
+	fleet.touched()
 	delete(fleet.told, key)
 	fleet.crashes[name]++
 	if fleet.crashes[name] >= crashLimit {

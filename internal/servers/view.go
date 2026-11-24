@@ -3,6 +3,7 @@ package servers
 import (
 	"fmt"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/akrck02/code-review/internal/english"
 	"github.com/akrck02/code-review/internal/lsp"
+	"github.com/akrck02/code-review/internal/workspace"
 )
 
 // State is where a language server stands.
@@ -46,8 +48,59 @@ type View struct {
 // LeftOutProject is a project a server does not read, and why.
 type LeftOutProject struct{ Name, Why string }
 
-// Views are every server the fleet knows of, each once, sorted by name.
+// shownViews are the views made last, and what they were made from: kept while none of it
+// changes, so the status bar reads the servers every frame and makes nothing.
+type shownViews struct {
+	made     bool
+	revision int    // the fleet's revision
+	versions uint64 // the running servers' versions, added up: each only grows
+	second   int64  // the second the views were made in, while a server is at work; else 0
+	projects []*workspace.Project
+	views    []View
+}
+
+// Views are every server the fleet knows of, each once, sorted by name. They are made again
+// only when a server or the projects change, and each second while a server is at work, as how
+// long it has worked on each project shows; the views given are kept, so they must not be changed.
 func (fleet *Fleet) Views() []View {
+	shown := &fleet.shown
+	versions, second, projects := fleet.runningVersions(), shown.workingSecond(), fleet.host.Projects()
+	if shown.made && shown.revision == fleet.revision && shown.versions == versions && shown.second == second &&
+		slices.Equal(shown.projects, projects) {
+		return shown.views
+	}
+	shown.views = fleet.makeViews()
+	shown.made, shown.revision, shown.versions, shown.second = true, fleet.revision, versions, shown.workingSecond()
+	shown.projects = append(shown.projects[:0], projects...)
+	return shown.views
+}
+
+// touched tells the views that a map they are made from changed.
+func (fleet *Fleet) touched() { fleet.revision++ }
+
+// runningVersions are the versions of the running servers, added up: as each only grows, the sum
+// changes whenever one of them does.
+func (fleet *Fleet) runningVersions() uint64 {
+	var sum uint64
+	for _, client := range fleet.running {
+		sum += client.Version()
+	}
+	return sum
+}
+
+// workingSecond is the second it is now while a server shown is at work, whose times change
+// each second; 0 while none is.
+func (shown *shownViews) workingSecond() int64 {
+	for _, view := range shown.views {
+		if view.Client != nil && (view.State == Working || view.State == Starting) {
+			return time.Now().Unix()
+		}
+	}
+	return 0
+}
+
+// makeViews makes the views of every server the fleet knows of, each once, sorted by name.
+func (fleet *Fleet) makeViews() []View {
 	var views []View // none most of the time: then nothing is made, each frame
 	add := func(view View) {
 		for _, known := range views {

@@ -18,6 +18,7 @@ func (fleet *Fleet) Install(name string) {
 		return
 	}
 	fleet.installing[name] = true
+	fleet.touched()
 	fleet.work.Run("install "+name, func(context.Context) func() {
 		requestContext, cancel := context.WithTimeout(context.Background(), installWait)
 		defer cancel()
@@ -35,6 +36,7 @@ func (fleet *Fleet) InstallCommand(name string) string {
 // installed keeps how a server's install ended: missing no more, or why it did not work.
 func (fleet *Fleet) installed(name string, err error) {
 	delete(fleet.installing, name)
+	fleet.touched()
 	if err != nil {
 		fleet.installFailed[name] = err.Error()
 		fleet.host.Toast(name + " could not be installed")
