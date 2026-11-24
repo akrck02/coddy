@@ -87,11 +87,7 @@ func (finder *Finder) paintHit(context *ui.Context, window Window, drawing *draw
 	before := hit.Text[:min(hit.Column, len(hit.Text))]
 	text := hit.text
 	column := len(before) + 3*strings.Count(before, "\t")
-	start := len(text) - len(strings.TrimLeft(text, " "))
-	if column-start > 48 {
-		start = column - 24
-	}
-	start = min(start, column, len(text))
+	start := excerptStart(text, column)
 	shown := text[start:]
 	codeBaseline := row.Y + 8 + code.Ascent
 	found := utf8.RuneCountInString(strings.TrimSpace(finder.asked))
@@ -134,4 +130,26 @@ func paintMatched(drawing *draw2d.List, measurer draw2d.Measurer, label string, 
 		start = next
 	}
 	return x
+}
+
+// A long line is shown from a little before its match: when the match lies further than
+// longLineLead bytes from the line's first letter, the line is shown from matchLead bytes before it.
+const (
+	longLineLead = 48
+	matchLead    = 24
+)
+
+// excerptStart is where the shown part of a hit's line starts: its first letter, or a little before
+// the match in a long line. It never starts on a space, inside a character or after the match, so
+// the line shows no indentation and the match stays in sight.
+func excerptStart(text string, column int) int {
+	column = min(column, len(text))
+	start := len(text) - len(strings.TrimLeft(text, " "))
+	if column-start > longLineLead {
+		start = column - matchLead
+	}
+	for start < column && (text[start] == ' ' || !utf8.RuneStart(text[start])) {
+		start++
+	}
+	return min(start, column)
 }
