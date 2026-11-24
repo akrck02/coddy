@@ -196,8 +196,10 @@ Built on 24 November 2026, one commit per task, pending the author's review. `go
 
 - R1, R8: the idle-frame and cache tests pass; R2: `-race` and the link test pass; R3, R5, R6, R7,
   R9, R10: each has its rule or test in `cmd/code-review/rules_test.go` or beside its package.
-- R4 is not quite met: three files are still above 400 lines, `window/build.go` (469),
-  `window/window.go` (493) and `lsp/client.go` (551).
+- R4: no file of the program is above 400 lines, checked by `TestNoFileIsLongerThanFourHundredLines`.
+  Splitting the last three (`window/build.go`, `window/window.go`, `lsp/client.go`) took `window` to
+  29 files besides its tests, over R3's 25: each holds one part of the shell (the status bar, the
+  base dialog, the projects, opening files), so the count is left for the author to judge.
 
 **What a person still has to review:**
 

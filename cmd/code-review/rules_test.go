@@ -214,6 +214,19 @@ func TestNoFunctionIsLongerThanFortyLines(test *testing.T) {
 	}
 }
 
+// longestFile is how many lines a file of the program may take: a longer one is usually two concepts.
+const longestFile = 400
+
+// Each file is one concept a reader can hold in mind, so none of the program's is longer than
+// four hundred lines. Tests are left out: their length is their cases.
+func TestNoFileIsLongerThanFourHundredLines(test *testing.T) {
+	for path, content := range goSources(test) {
+		if lines := strings.Count(content, "\n"); lines > longestFile {
+			test.Errorf("%s is %d lines long; split it by part into files of %d at most", path, lines, longestFile)
+		}
+	}
+}
+
 // modePackages are the modes, whose methods are checked by TestNoModeHasAMethodThatDoesNothing.
 var modePackages = []string{"internal/files", "internal/review", "internal/uses"}
 

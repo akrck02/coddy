@@ -68,6 +68,7 @@ How these lean on each other, floor by floor, is in [how it is made](4-how-it-is
 | `TestGradleKnowsNothingOfTheLanguageServers` | `gradle` does not import `lsp` |
 | `TestTheContributingGuideListsEveryPackage` | the list above names every package of `internal/`, and only those |
 | `TestNoFunctionIsLongerThanFortyLines` | a function fits on a screen |
+| `TestNoFileIsLongerThanFourHundredLines` | a file of the program is one concept, 400 lines at most |
 | `TestNoErrorIsDroppedWithoutAReasonOnItsLine` | every `_ =` says why on its line |
 
 ## How a pane talks to the window
