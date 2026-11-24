@@ -12,6 +12,10 @@ import (
 // keeping the last few still makes going back with Backspace instant.
 const keptFilters = 4
 
+// projectLayouts are the kinds of project laid out otherwise than as their folders are on disk,
+// tried in order; a project none fits is laid out plain.
+var projectLayouts = []workspace.Layout{java.Layout}
+
 // treeKey is what a project's tree depends on: the mode, whether only changes are listed, and
 // the filter when it chooses the files.
 type treeKey struct {
@@ -38,12 +42,7 @@ func (sidebar *Sidebar) tree(window Window, project int) *workspace.Folder {
 		paths = sidebar.found(paths)
 		sidebar.keepFilter(key.filter)
 	}
-	// a Gradle or Maven project is shown as IntelliJ shows it: modules, source roots, packages
-	build := workspace.BuildTree
-	if java.IsProject(model.Files) {
-		build = java.BuildTree
-	}
-	tree := build(paths, isChanged)
+	tree := workspace.LayoutOf(projectLayouts, model.Files).Tree(paths, isChanged)
 	sidebar.trees[key] = tree
 	return tree
 }
