@@ -2,6 +2,7 @@ package servers
 
 import (
 	"context"
+	"github.com/akrck02/code-review/internal/language"
 	"slices"
 	"strconv"
 	"strings"
@@ -132,10 +133,8 @@ func (fleet *Fleet) importable(server lsp.Server, project string) bool {
 // hasFileOf tells whether a project has a file a server reads.
 func hasFileOf(project *workspace.Project, server lsp.Server) bool {
 	for _, path := range project.Files {
-		for _, language := range server.Languages {
-			if lsp.LanguageOf(path) == language {
-				return true
-			}
+		if slices.Contains(server.Languages, language.ServerLanguageOf(path)) {
+			return true
 		}
 	}
 	return false

@@ -2,6 +2,7 @@ package servers
 
 import (
 	"context"
+	"github.com/akrck02/code-review/internal/language"
 
 	"github.com/akrck02/code-review/internal/lsp"
 	"github.com/akrck02/code-review/internal/text"
@@ -52,7 +53,7 @@ func (now told) sameText(last told) bool {
 
 // serverFor is the server for a file of a project, and its root, when one reads it.
 func (fleet *Fleet) serverFor(project, path string) (server lsp.Server, root string, found bool) {
-	server, found = lsp.ServerFor(fleet.table, lsp.LanguageOf(path))
+	server, found = lsp.ServerFor(fleet.table, language.ServerLanguageOf(path))
 	if !found {
 		return lsp.Server{}, "", false
 	}
@@ -155,7 +156,7 @@ func (fleet *Fleet) Asked(open OpenFile, waking bool) (*lsp.Client, int, string)
 // ClientFor is the running server of a file of a project, starting it when it is not, and its
 // key; reads is false when no server reads the file, or its server is not installed or failed.
 func (fleet *Fleet) ClientFor(project, path string) (client *lsp.Client, key string, reads bool) {
-	server, found := lsp.ServerFor(fleet.table, lsp.LanguageOf(path))
+	server, found := lsp.ServerFor(fleet.table, language.ServerLanguageOf(path))
 	if !found || !fleet.usable(server) {
 		return nil, "", false
 	}

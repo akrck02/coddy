@@ -3,6 +3,7 @@ package lsp
 import (
 	"context"
 	"encoding/json"
+	"github.com/akrck02/code-review/internal/language"
 	"maps"
 	"os"
 	"os/exec"
@@ -321,7 +322,7 @@ func (client *Client) Tell(path, text string, version int) error {
 		})
 	}
 	return client.conn.Notify("textDocument/didOpen", map[string]any{"textDocument": map[string]any{
-		"uri": uri, "languageId": LanguageOf(path), "version": version, "text": text,
+		"uri": uri, "languageId": language.ServerLanguageOf(path), "version": version, "text": text,
 	}})
 }
 

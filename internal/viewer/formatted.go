@@ -1,10 +1,10 @@
 package viewer
 
 import (
+	"github.com/akrck02/code-review/internal/language"
 	"github.com/akrck02/code-review/internal/text"
 	"github.com/akrck02/code-review/internal/workspace"
 	"math"
-	"path/filepath"
 	"strings"
 
 	"github.com/akrck02/code-review/internal/highlight"
@@ -20,11 +20,8 @@ func (view *Viewer) IsMarkdown() bool { return view.markdown }
 
 // isMarkdownPath tells whether a path names a Markdown file, by its extension.
 func isMarkdownPath(path string) bool {
-	switch strings.ToLower(filepath.Ext(path)) {
-	case ".md", ".markdown", ".mdown", ".mkd":
-		return true
-	}
-	return false
+	known, _ := language.Of(path) // a file of no language is not Markdown
+	return known.Name == language.Markdown
 }
 
 // Formatted tells whether the file is shown formatted, as its Markdown reads, instead of as text.
@@ -200,21 +197,15 @@ func paintShape(drawing *draw2d.List, piece shape, placed draw2d.Rectangle) {
 // codeLines are a block of code's lines, coloured as its language reads when it is known.
 func codeLines(block markdown.Block) []highlight.Line {
 	text := strings.Join(block.Lines, "\n")
-	language := strings.ToLower(block.Language)
-	if extension, known := fenceExtensions[language]; known {
-		language = extension
+	extension := "." + strings.ToLower(block.Language) // a word the table does not know is tried as an extension
+	if known, found := language.OfFence(block.Language); found && len(known.Extensions) > 0 {
+		extension = known.Extensions[0]
 	}
-	if language == "" {
-		language = "txt"
+	if extension == "." {
+		extension = ".txt"
 	}
-	return highlight.Lines("block."+language, text)
+	return highlight.Lines("block"+extension, text)
 }
-
-// fenceExtensions are the extensions of the languages a fence names by a word chroma does not take
-// for one.
-var fenceExtensions = map[string]string{"kotlin": "kt", "javascript": "js", "typescript": "ts", "python": "py",
-	"bash": "sh", "shell": "sh", "zsh": "sh", "rust": "rs", "ruby": "rb", "csharp": "cs", "c#": "cs", "yml": "yaml",
-	"golang": "go", "groovy": "groovy", "gradle": "gradle", "markdown": "md"}
 
 // FormattedWords are the words the formatted text paints, in order, for tests.
 func (view *Viewer) FormattedWords() string {

@@ -2,6 +2,7 @@ package window
 
 import (
 	"fmt"
+	"github.com/akrck02/code-review/internal/language"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -66,14 +67,10 @@ func (application *Window) buildServerList(context *ui.Context) {
 // for one the window does not know.
 func (application *Window) languageOf(name string) string {
 	if server, found := application.servers.Named(name); found && len(server.Languages) > 0 {
-		return languageNames[server.Languages[0]]
+		return language.NameOfServerLanguage(server.Languages[0])
 	}
 	return name
 }
-
-// languageNames are the protocol's names of languages as people write them.
-var languageNames = map[string]string{"go": "Go", "java": "Java", "kotlin": "Kotlin", "typescript": "TypeScript",
-	"javascript": "JavaScript", "python": "Python", "rust": "Rust"}
 
 // buildServerCard is one server: its state, a few words of what it does and how far it is, and
 // on asking, its projects and its last messages.

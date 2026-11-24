@@ -9,6 +9,8 @@ import (
 
 	"github.com/alecthomas/chroma/v2"
 	"github.com/alecthomas/chroma/v2/lexers"
+
+	"github.com/akrck02/code-review/internal/language"
 )
 
 // TabWidth is how many columns a tab takes.
@@ -49,22 +51,13 @@ func Language(fileName string, content string) string {
 	return lexer.Config().Name
 }
 
-// extraFileNames are names chroma does not know by their extension alone.
-var extraFileNames = map[string]string{
-	".gradle":     "groovy",
-	".kts":        "kotlin",
-	".vue":        "vue",
-	".properties": "properties",
-	".env":        "bash",
-}
-
 func lexerFor(fileName string, content string) chroma.Lexer {
 	base := filepath.Base(fileName)
 	if lexer := lexers.Match(base); lexer != nil {
 		return lexer
 	}
-	if name, known := extraFileNames[strings.ToLower(filepath.Ext(base))]; known {
-		if lexer := lexers.Get(name); lexer != nil {
+	if known, found := language.Of(base); found && known.Lexer != "" {
+		if lexer := lexers.Get(known.Lexer); lexer != nil {
 			return lexer
 		}
 	}

@@ -48,6 +48,7 @@ internal/workspace    projects, changes, a file's two sides and its diff, the tr
 internal/text         a file being edited: lines, caret, selection, undo
 internal/lsp          language servers: JSON-RPC over their input and output
 internal/highlight    Chroma's tokens, cut into lines of coloured pieces
+internal/language     what Coddy knows of each language: names, extensions, server, icon, fences
 internal/git          the read-only git commands
 ```
 

@@ -5,6 +5,7 @@
 | `cmd/code-review` | The program: flags and wiring |
 | `internal/git` | The read-only git commands, and reading their output |
 | `internal/highlight` | Chroma's tokens, cut into lines of coloured pieces |
+| `internal/language` | The table of languages: names, extensions, the server's name for each, icon, Markdown fences |
 | `internal/workspace` | Projects, changes, a file's two sides and its diff, folding, the tree, what servers wrote |
 | `internal/text` | A file being edited: lines, caret, selection, undo |
 | `internal/lsp` | Language servers: JSON-RPC over their input and output, the table of servers |

@@ -152,7 +152,7 @@ go in before the code that moves it (the viewer and sidebar have few: about 190 
 - [x] T4 — `servers` out of `window`, behind `Host`; `told` holds the open file only and closes the last one · `internal/servers` · R3, R8
 - [x] T5 — `navigation` out of `window` · `internal/navigation` · R3
 - [x] T6 — `session` out of `window`; the document cache by bytes with a stamp check · `internal/session` · R3, R8
-- [ ] T7 — `language`, the table; every list of extensions and names replaced · `internal/language` · R7
+- [x] T7 — `language`, the table; every list of extensions and names replaced · `internal/language` · R7
 - [ ] T8 — `Mode`'s capabilities; `sidebar.Window` and `viewer.Window` trimmed; capabilities resolved once · `mode`, `files`, `review`, `uses`, `sidebar`, `viewer` · R5
 - [ ] T9 — viewer: tests of each presentation, then `presentation`; `viewer.go` split into layout, navigation, paint · `viewer` · R4, R6
 - [ ] T10 — sidebar split into rows, expansion, filter, selection, header; trees per filter bounded · `sidebar` · R4, R8

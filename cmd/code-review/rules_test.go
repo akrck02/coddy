@@ -136,6 +136,16 @@ func TestNoPaneImportsTheWindow(test *testing.T) {
 	}
 }
 
+// The language table is what every other package reads, so it reads none of them: it is data.
+func TestTheLanguageTableImportsNothingOfTheReader(test *testing.T) {
+	self := "github.com/akrck02/code-review/internal/language"
+	for _, dependency := range dependencies(test, "language") {
+		if dependency != self && strings.HasPrefix(dependency, "github.com/akrck02/code-review/") {
+			test.Errorf("language imports %s", dependency)
+		}
+	}
+}
+
 // A mode is one package and one line in main: the window holds the modes it is given and imports
 // none of them.
 func TestTheWindowImportsNoMode(test *testing.T) {

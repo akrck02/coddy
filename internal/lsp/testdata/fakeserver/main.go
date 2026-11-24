@@ -32,6 +32,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/akrck02/code-review/internal/language"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -435,7 +436,7 @@ func (fake *server) find(pattern *regexp.Regexp, word string) []lsp.Location {
 			if err != nil || entry.IsDir() && strings.HasPrefix(entry.Name(), ".") && path != root {
 				return filepath.SkipDir
 			}
-			if !entry.IsDir() && lsp.LanguageOf(path) != "" {
+			if !entry.IsDir() && language.ServerLanguageOf(path) != "" {
 				found = append(found, fake.matches(path, pattern, word)...)
 			}
 			return nil

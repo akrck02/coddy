@@ -2,11 +2,11 @@ package window
 
 import (
 	"context"
+	"github.com/akrck02/code-review/internal/language"
 	"sort"
 
 	"github.com/akrck02/code-review/internal/finder"
 	"github.com/akrck02/code-review/internal/git"
-	"github.com/akrck02/code-review/internal/lsp"
 	"github.com/akrck02/code-review/internal/navigation"
 	"github.com/akrck02/code-review/internal/viewer"
 	"github.com/akrck02/go-renderer/draw2d"
@@ -69,8 +69,11 @@ func (application *Window) inSightPaths() []string {
 // wordSearch searches for a name as a whole word in the files a server of the table reads.
 func (application *Window) wordSearch() git.GrepOptions {
 	options := git.GrepOptions{WorkingTree: application.session.WorkingTree, Word: true}
-	for extension, language := range lsp.LanguageIDs() {
-		if application.servers.Reads(language) {
+	for _, known := range language.Languages {
+		if known.ServerLanguage == "" || !application.servers.Reads(known.ServerLanguage) {
+			continue
+		}
+		for _, extension := range known.Extensions {
 			options.Files = append(options.Files, "*"+extension)
 		}
 	}
