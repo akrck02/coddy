@@ -30,7 +30,7 @@ func (application *Window) Build(context *ui.Context) {
 	}
 	application.keys = pane.KeysOf(application.tap.state)
 	windowOpen.Store(true)
-	application.work.take()
+	application.work.Take()
 	application.readClassKinds()
 	application.typeInTheFile(context, application.handleKeys(context))
 	application.unfoldForTheKeyboard()
@@ -45,11 +45,7 @@ func (application *Window) Build(context *ui.Context) {
 		application.buildStatusBar(context)
 	})
 
-	application.finder.Build(context, application)
-	application.buildBaseDialog(context)
-	application.buildServers(context)
-	application.buildPicker(context)
-	application.buildQuestions(context)
+	application.buildOverlays(context)
 	application.buildNotes(context)
 	application.pointerX, application.pointerY = context.Pointer()
 	if application.showToast(context, time.Now()) {
@@ -113,15 +109,10 @@ func (application *Window) buildSidebar(context *ui.Context) {
 	context.Frame(ui.Layout{Width: ui.Fixed(1), Height: ui.Grow()}, ui.Look{Fill: context.Theme.Line}, nil)
 }
 
+// applyTheme sets the window's look and gives its theme to the interface.
 func (application *Window) applyTheme(context *ui.Context) {
 	application.setLook()
 	context.Theme = application.look.Theme
-}
-
-func (application *Window) ModalOpen() bool {
-	asked := application.questions
-	return application.finder.Open || application.base.open || application.settingsScreen.Open || application.pickerOpen || application.serversOpen ||
-		asked.unsavedOpen || asked.conflictOpen
 }
 
 // enterCurrentProject takes the sidebar into the project of the selected row, or of the file open.

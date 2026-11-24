@@ -1,31 +1,28 @@
-package window
+// Package work runs jobs off the goroutine that builds the interface and brings each result back
+// to it: the one way the reader does anything slow (reading repositories, asking servers,
+// searching) without stopping a frame.
+package work
 
-import (
-	"context"
-	"sync/atomic"
-
-	platform "github.com/akrck02/go-ui/window"
-)
+import "context"
 
 // readerLimit is how many repositories are read at once, so a workspace of many projects on a
 // slow disk does not start dozens of git processes together.
 const readerLimit = 6
 
-// work runs jobs off the goroutine that builds the interface and brings each result back to it,
+// Queue runs jobs off the goroutine that builds the interface and brings each result back to it,
 // waking the window. A job given a key replaces the job under that key still running: the older
-// one's context is cancelled and its result dropped. Only the interface's goroutine calls run and
-// take.
-type work struct {
+// one's context is cancelled and its result dropped. Only the interface's goroutine calls Run and
+// Take.
+type Queue struct {
 	// synchronous runs every job at once, on the caller's goroutine: for a capture or a test,
 	// where there is one frame to show the result in
 	synchronous bool
 	results     chan func()
 	running     map[string]*job
 	readers     chan struct{}
+	// wake asks the window for a frame, to take a result that came back
+	wake func()
 }
-
-// cancellation tells a job that a newer job took its key: it should stop, and return nil.
-type cancellation = context.Context
 
 // job is one job running under a key.
 type job struct {
@@ -33,29 +30,37 @@ type job struct {
 	replaced bool // a newer job took its key; read and written on the interface's goroutine only
 }
 
-func newWork(synchronous bool) *work {
-	return &work{
+// New makes a queue that wakes the window with wake when a result comes back. A synchronous queue
+// runs every job at once, on the caller's goroutine: for a capture or a test, where there is one
+// frame to show the result in.
+func New(synchronous bool, wake func()) *Queue {
+	return &Queue{
 		synchronous: synchronous,
 		results:     make(chan func(), 256),
 		running:     map[string]*job{},
 		readers:     make(chan struct{}, readerLimit),
+		wake:        wake,
 	}
 }
 
-// run starts a job. The job returns what to do with its result on the interface's goroutine; it
-// should stop early, returning nil, once its context is cancelled. An empty key replaces nothing.
-func (work *work) run(key string, do func(stop cancellation) func()) {
-	work.runSettling(key, do, nil)
+// Synchronous tells whether the queue runs each job at once, for a capture or a test.
+func (work *Queue) Synchronous() bool { return work.synchronous }
+
+// Run starts a job. The job returns what to do with its result on the interface's goroutine; it
+// should stop early, returning nil, once its context is cancelled: a newer job took its key. An
+// empty key replaces nothing.
+func (work *Queue) Run(key string, do func(stop context.Context) func()) {
+	work.RunSettling(key, do, nil)
 }
 
-// runSettling is run, with settle called on the interface's goroutine once the job is over,
+// RunSettling is Run, with settle called on the interface's goroutine once the job is over,
 // whether its result was applied, dropped for a newer job, or there was none: for counting the
 // jobs still running.
-func (work *work) runSettling(key string, do func(stop cancellation) func(), settle func()) {
+func (work *Queue) RunSettling(key string, do func(stop context.Context) func(), settle func()) {
 	stop, cancel := context.WithCancel(context.Background())
 	current := &job{cancel: cancel}
 	if key != "" {
-		work.cancel(key)
+		work.Cancel(key)
 		work.running[key] = current
 	}
 	finish := func(apply func()) func() {
@@ -80,22 +85,22 @@ func (work *work) runSettling(key string, do func(stop cancellation) func(), set
 	go func() {
 		defer cancel()
 		work.results <- finish(do(stop))
-		wake()
+		work.wake()
 	}()
 }
 
-// whenDone runs then on the interface's goroutine once done is closed, waking the window: always
+// WhenDone runs then on the interface's goroutine once done is closed, waking the window: always
 // in the background, even for a capture or a test, as done may close long after.
-func (work *work) whenDone(done <-chan struct{}, then func()) {
+func (work *Queue) WhenDone(done <-chan struct{}, then func()) {
 	go func() {
 		<-done
 		work.results <- then
-		wake()
+		work.wake()
 	}()
 }
 
-// cancel stops the job running under a key, if any, and drops its result.
-func (work *work) cancel(key string) {
+// Cancel stops the job running under a key, if any, and drops its result.
+func (work *Queue) Cancel(key string) {
 	if older, found := work.running[key]; found {
 		older.replaced = true
 		older.cancel()
@@ -103,8 +108,8 @@ func (work *work) cancel(key string) {
 	}
 }
 
-// take applies the results that came back since the last frame.
-func (work *work) take() {
+// Take applies the results that came back since the last frame.
+func (work *Queue) Take() {
 	for {
 		select {
 		case apply := <-work.results:
@@ -115,9 +120,9 @@ func (work *work) take() {
 	}
 }
 
-// read runs a reading of a repository once one of the few readers is free; false when the job
+// Read runs a reading of a repository once one of the few readers is free; false when the job
 // was cancelled while waiting, and nothing was read.
-func (work *work) read(stop cancellation, reading func()) bool {
+func (work *Queue) Read(stop context.Context, reading func()) bool {
 	select {
 	case work.readers <- struct{}{}:
 	case <-stop.Done():
@@ -129,20 +134,4 @@ func (work *work) read(stop cancellation, reading func()) bool {
 	}
 	reading()
 	return true
-}
-
-// windowOpen is set once the window has drawn its first frame and cleared when it closes: the
-// window can only be woken in between. Work that finishes before the first frame needs no waking,
-// as that frame takes its result.
-var windowOpen atomic.Bool
-
-// wake asks the window for a frame, when there is a window to ask.
-func wake() {
-	if !windowOpen.Load() {
-		return
-	}
-	defer func() {
-		_ = recover() // the window closed between the check and the call: there is nothing to wake
-	}()
-	platform.Wake()
 }

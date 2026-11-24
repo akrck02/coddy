@@ -88,14 +88,14 @@ func (application *Window) wordSearch() git.GrepOptions {
 }
 
 // grepAll searches every project for a name at once, as many as are read together, by folder.
-func (application *Window) grepAll(stop cancellation, projects []string, name string, options git.GrepOptions) map[string][]git.Hit {
+func (application *Window) grepAll(stop context.Context, projects []string, name string, options git.GrepOptions) map[string][]git.Hit {
 	found := make([][]git.Hit, len(projects))
 	var group sync.WaitGroup
 	for position, project := range projects {
 		group.Add(1)
 		go func() {
 			defer group.Done()
-			application.work.read(stop, func() {
+			application.work.Read(stop, func() {
 				// a project git cannot search adds no places to check
 				found[position], _ = git.Grep(stop, project, name, options)
 			})
@@ -293,7 +293,7 @@ func (application *Window) clientOf(place candidate) (*lsp.Client, string, strin
 // checkPlaces asks a server where the name at each of some places is declared, in the
 // background; a place whose answer is the declaration searched is a use.
 func (application *Window) checkPlaces(search *usesSearch, key string, client *lsp.Client, places []candidate) {
-	application.work.run("uses "+key, func(stop cancellation) func() {
+	application.work.Run("uses "+key, func(stop context.Context) func() {
 		answers := make([][]lsp.Location, len(places))
 		comments := commentReader{}
 		for index, place := range places {
@@ -356,7 +356,7 @@ func (reader commentReader) mentionOnly(place candidate) bool {
 
 // askDeclaration asks a server where the name at a place is declared, telling it the file when it
 // does not have it open, and closing it after.
-func askDeclaration(stop cancellation, client *lsp.Client, place candidate) []lsp.Location {
+func askDeclaration(stop context.Context, client *lsp.Client, place candidate) []lsp.Location {
 	ctx, cancel := context.WithTimeout(stop, requestWait)
 	defer cancel()
 	defer openFor(client, place.path)()
@@ -389,7 +389,7 @@ func (application *Window) keepChecked(search *usesSearch, places []candidate, a
 func (application *Window) askUsesAgain(search *usesSearch) {
 	search.busy = false
 	asked, at := search.asked, search.at
-	application.work.run("references again", func(stop cancellation) func() {
+	application.work.Run("references again", func(stop context.Context) func() {
 		ctx, cancel := context.WithTimeout(stop, requestWait)
 		defer cancel()
 		locations, err := asked.client.References(ctx, asked.path, at)

@@ -1,6 +1,7 @@
-package window
+package work
 
 import (
+	"context"
 	"testing"
 	"time"
 )
@@ -12,10 +13,10 @@ const waitTo = 2 * time.Second
 const search = "search"
 
 func TestANewerSearchCancelsTheOlderOne(test *testing.T) {
-	jobs := newWork(false)
+	jobs := New(false, func() {})
 	var shown []string
 	olderStopped := make(chan bool, 1)
-	jobs.run(search, func(stop cancellation) func() {
+	jobs.Run(search, func(stop context.Context) func() {
 		select {
 		case <-stop.Done():
 			olderStopped <- true
@@ -26,7 +27,7 @@ func TestANewerSearchCancelsTheOlderOne(test *testing.T) {
 		}
 	})
 	newerDone := make(chan struct{})
-	jobs.run(search, func(stop cancellation) func() {
+	jobs.Run(search, func(stop context.Context) func() {
 		defer close(newerDone)
 		return func() { shown = append(shown, "newer") }
 	})
@@ -38,42 +39,42 @@ func TestANewerSearchCancelsTheOlderOne(test *testing.T) {
 	for len(jobs.results) < 2 && time.Now().Before(deadline) {
 		time.Sleep(time.Millisecond)
 	}
-	jobs.take()
+	jobs.Take()
 	if len(shown) != 1 || shown[0] != "newer" {
 		test.Errorf("the results shown are %v, want only the newer search's", shown)
 	}
 }
 
 func TestJobsWithoutAKeyAllFinish(test *testing.T) {
-	jobs := newWork(false)
+	jobs := New(false, func() {})
 	var finished int
 	for range 3 {
-		jobs.run("", func(cancellation) func() { return func() { finished++ } })
+		jobs.Run("", func(context.Context) func() { return func() { finished++ } })
 	}
 	deadline := time.Now().Add(waitTo)
 	for len(jobs.results) < 3 && time.Now().Before(deadline) {
 		time.Sleep(time.Millisecond)
 	}
-	jobs.take()
+	jobs.Take()
 	if finished != 3 {
 		test.Errorf("%d of 3 jobs without a key showed their result", finished)
 	}
 }
 
 func TestAJobReplacedByANewerOneStillSettles(test *testing.T) {
-	jobs := newWork(false)
+	jobs := New(false, func() {})
 	running := 0
 	for range 2 {
 		running++
-		jobs.runSettling(search, func(stop cancellation) func() {
+		jobs.RunSettling(search, func(stop context.Context) func() {
 			<-stop.Done() // the first waits to be replaced; the second is cancelled below
 			return nil
 		}, func() { running-- })
 	}
-	jobs.cancel(search)
+	jobs.Cancel(search)
 	deadline := time.Now().Add(waitTo)
 	for running > 0 && time.Now().Before(deadline) {
-		jobs.take()
+		jobs.Take()
 		time.Sleep(time.Millisecond)
 	}
 	if running != 0 {

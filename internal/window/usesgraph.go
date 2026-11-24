@@ -26,7 +26,7 @@ func (application *Window) UsersOf(use mode.Use, done func(declaration string, u
 		application.toast = "The server of " + filepath.Base(path) + " is starting: try again in a moment"
 		return false
 	}
-	application.work.run("users of "+path, func(stop cancellation) func() {
+	application.work.Run("users of "+path, func(stop context.Context) func() {
 		ctx, cancel := context.WithTimeout(stop, requestWait)
 		defer cancel()
 		defer openFor(client, path)()

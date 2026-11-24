@@ -19,7 +19,7 @@ func (application *Window) installServer(name string) {
 		return
 	}
 	servers.installing[name] = true
-	application.work.run("install "+name, func(cancellation) func() {
+	application.work.Run("install "+name, func(context.Context) func() {
 		ctx, cancel := context.WithTimeout(context.Background(), installWait)
 		defer cancel()
 		err := lsp.Install(ctx, server)

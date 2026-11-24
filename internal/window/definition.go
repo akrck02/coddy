@@ -109,7 +109,7 @@ func (application *Window) GoToDefinition(place viewer.Place) {
 	from, _ := application.here()
 	home := application.viewer.Reference.Project
 	application.waitFor(asked.client)
-	application.work.run("definition", func(stop cancellation) func() {
+	application.work.Run("definition", func(stop context.Context) func() {
 		ctx, cancel := context.WithTimeout(stop, requestWait)
 		defer cancel()
 		asked.tellFirst()

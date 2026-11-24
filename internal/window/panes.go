@@ -57,15 +57,15 @@ func (application *Window) Synchronous() bool { return application.settings.Sync
 
 // Run starts background work under a key, replacing the work under that key still running.
 func (application *Window) Run(key string, do func(stop context.Context) func()) {
-	application.work.run(key, do)
+	application.work.Run(key, do)
 }
 
 // Cancel stops the work under a key, if any.
-func (application *Window) Cancel(key string) { application.work.cancel(key) }
+func (application *Window) Cancel(key string) { application.work.Cancel(key) }
 
 // Read reads a repository once one of the few readers is free.
 func (application *Window) Read(stop context.Context, reading func()) bool {
-	return application.work.read(stop, reading)
+	return application.work.Read(stop, reading)
 }
 
 // OpenAt opens a file at a line, shows it in the sidebar and gives it the keyboard.

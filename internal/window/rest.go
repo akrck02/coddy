@@ -22,7 +22,7 @@ func (application *Window) watchRest() {
 	servers.watchingRest = true
 	tick := make(chan struct{})
 	time.AfterFunc(max(servers.rest/15, 10*time.Millisecond), func() { close(tick) })
-	application.work.whenDone(tick, func() {
+	application.work.WhenDone(tick, func() {
 		servers.watchingRest = false
 		application.restServers(time.Now())
 		application.watchRest()

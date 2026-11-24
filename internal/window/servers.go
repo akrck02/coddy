@@ -150,7 +150,7 @@ func (application *Window) serveOpenFile() (*lsp.Client, told) {
 	servers.version++
 	now.version = servers.version
 	servers.told[key] = now
-	application.work.run("", func(cancellation) func() {
+	application.work.Run("", func(context.Context) func() {
 		if last.path != "" && last.path != path {
 			// a server that stopped meanwhile has nothing open to close
 			_ = client.CloseOlder(last.path, last.version)
@@ -204,7 +204,7 @@ func (application *Window) startServer(server lsp.Server, root, key, project str
 	}
 	data := application.dataFolder(server)
 	options := application.optionsOf(projects)
-	application.work.run("start "+key, func(cancellation) func() {
+	application.work.Run("start "+key, func(context.Context) func() {
 		removed, _ := lsp.PruneIndexes(data, server, time.Now()) // an index it cannot remove stays
 		if why := roomFor(server, data); why != "" {
 			return func() {
@@ -281,7 +281,7 @@ func takeSnapshots(server string, options map[string]workspace.LoadOptions) map[
 func (application *Window) addFolder(client *lsp.Client, server, project string) {
 	application.servers.adding[project] = true
 	options := application.optionsOf([]string{project})
-	application.work.run("add "+project, func(cancellation) func() {
+	application.work.Run("add "+project, func(context.Context) func() {
 		snapshots := takeSnapshots(server, options)
 		_ = client.AddFolder(project)
 		return func() {
@@ -318,7 +318,7 @@ func (application *Window) serverStarted(server lsp.Server, key string, client *
 		go client.Stop()
 	default:
 		servers.running[key] = client
-		application.work.whenDone(client.Done(), func() { application.serverEnded(server.Name, key, client) })
+		application.work.WhenDone(client.Done(), func() { application.serverEnded(server.Name, key, client) })
 		go watchProgress(client)
 		application.watchRest()
 		return true
@@ -434,7 +434,7 @@ func (application *Window) dataFolder(server lsp.Server) string {
 func (application *Window) stopServer(key string, client *lsp.Client) {
 	application.servers.stopping[key] = true
 	go client.Stop()
-	application.work.whenDone(client.Exited(), func() { delete(application.servers.stopping, key) })
+	application.work.WhenDone(client.Exited(), func() { delete(application.servers.stopping, key) })
 }
 
 // stopServers stops every server, together, and waits for them.

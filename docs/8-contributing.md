@@ -30,12 +30,14 @@ below it.
 cmd/code-review       the program: flags, the modes it registers, the window
 internal/files        the files mode: read any file
 internal/review       the review mode: the changes, each marked as viewed
-internal/window       the window: layout, mode rail, commands, dialogs, background work
+internal/window       the window: layout, mode rail, commands, dialogs
 internal/mode         what a mode is, and what it asks of the window
 internal/viewer       the panes: a file's view, the tree, the finder, the settings
 internal/sidebar
 internal/finder
 internal/settings
+internal/explorer     a folder's files, shown like a file manager
+internal/work         background jobs, and what they give back to the frame
 internal/pane         what every pane shares: the keys, key presses, a scrolling list
 internal/theme        Zed's One colours, file icons, the reader's own controls
 internal/java         the IntelliJ-style tree and the kinds of class

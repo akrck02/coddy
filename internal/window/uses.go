@@ -34,7 +34,7 @@ func (application *Window) searchUses(asked asking, at lsp.Position, name string
 	search := &usesSearch{name: name, home: home, asked: asked, at: at}
 	projects, options := application.inSightPaths(), application.wordSearch()
 	application.waitFor(asked.client)
-	application.work.run("references", func(stop cancellation) func() {
+	application.work.Run("references", func(stop context.Context) func() {
 		ctx, cancel := context.WithTimeout(stop, requestWait)
 		defer cancel()
 		asked.tellFirst()
@@ -101,7 +101,7 @@ type hoverCard struct {
 // once the pointer leaves it. It says nothing when there is no server: resting is not asking.
 func (application *Window) Hover(place viewer.Place, resting bool) {
 	if !resting {
-		application.work.cancel("hover")
+		application.work.Cancel("hover")
 		application.hover = hoverCard{}
 		return
 	}
@@ -111,7 +111,7 @@ func (application *Window) Hover(place viewer.Place, resting bool) {
 	}
 	at := application.positionOf(place)
 	application.hover = hoverCard{place: place, resting: true, x: application.pointerX, y: application.pointerY}
-	application.work.run("hover", func(stop cancellation) func() {
+	application.work.Run("hover", func(stop context.Context) func() {
 		ctx, cancel := context.WithTimeout(stop, requestWait)
 		defer cancel()
 		asked.tellFirst()

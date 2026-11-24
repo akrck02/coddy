@@ -1,6 +1,7 @@
 package window
 
 import (
+	"context"
 	"slices"
 	"strconv"
 	"strings"
@@ -32,8 +33,8 @@ func (application *Window) followSight(client *lsp.Client, server lsp.Server, ke
 		return // never in the middle of an import, which a restart throws away: once it is done
 	}
 	application.servers.restarting[key] = set
-	application.work.run("restart "+key, func(stop cancellation) func() {
-		if !application.work.synchronous {
+	application.work.Run("restart "+key, func(stop context.Context) func() {
+		if !application.work.Synchronous() {
 			select {
 			case <-time.After(restartPause):
 			case <-stop.Done():
@@ -53,7 +54,7 @@ func (application *Window) tellSight(client *lsp.Client, server lsp.Server, want
 	}
 	for _, project := range client.Folders() {
 		if !slices.Contains(wanted, project) && !application.servers.adding[project] {
-			application.work.run("", func(cancellation) func() {
+			application.work.Run("", func(context.Context) func() {
 				_ = client.RemoveFolder(project)
 				return nil
 			})

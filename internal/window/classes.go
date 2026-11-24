@@ -1,6 +1,7 @@
 package window
 
 import (
+	"context"
 	"github.com/akrck02/code-review/internal/git"
 	"github.com/akrck02/code-review/internal/java"
 	"github.com/akrck02/code-review/internal/workspace"
@@ -40,7 +41,7 @@ func (application *Window) readClassKinds() {
 	for index, reference := range wanted {
 		paths[index] = application.projects[reference.Project].Path
 	}
-	application.work.run("", func(cancellation) func() {
+	application.work.Run("", func(context.Context) func() {
 		kinds := make([]java.ClassKind, len(wanted))
 		for index, reference := range wanted {
 			kinds[index] = java.ReadKind(paths[index], reference.Path)

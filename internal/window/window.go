@@ -3,8 +3,10 @@
 package window
 
 import (
+	"context"
 	"github.com/akrck02/code-review/internal/explorer"
 	"github.com/akrck02/code-review/internal/settings"
+	"github.com/akrck02/code-review/internal/work"
 	"sort"
 	"strings"
 	"time"
@@ -94,7 +96,7 @@ type Window struct {
 	loading       int
 	candidates    []finder.Candidate
 	changedOrder  []workspace.FileReference
-	work          *work
+	work          *work.Queue
 	documentCache map[workspace.FileReference]*workspace.Document
 
 	sidebar sidebar.Sidebar
@@ -131,6 +133,8 @@ type Window struct {
 	status  statusWords
 	// commandTable is every command, in the order keys are matched: see allCommands
 	commandTable []command
+	// overlays are the dialogs drawn over the window: see overlaysOf
+	overlays []overlay
 	// explorer shows a folder in the viewer's place, chosen in the breadcrumb
 	explorer explorer.Explorer
 	// onlyChanged hides the projects with no changes, in the sidebar and the finder
@@ -172,7 +176,7 @@ func New(settings Settings, modes ...mode.Mode) (*Window, error) {
 	application := &Window{
 		settings:      settings,
 		projectBases:  map[string]string{},
-		work:          newWork(settings.Synchronous),
+		work:          work.New(settings.Synchronous, wake),
 		documentCache: map[workspace.FileReference]*workspace.Document{},
 		tap:           &inputTap{},
 		onlyChanged:   settings.OnlyChanged,
@@ -181,6 +185,7 @@ func New(settings Settings, modes ...mode.Mode) (*Window, error) {
 		servers:       newLanguageServers(settings.Servers, settings.ServersWrote),
 		classKinds:    map[workspace.FileReference]java.ClassKind{},
 	}
+	application.overlays = overlaysOf(application)
 	application.sidebar = newSidebar(settings)
 	application.startThemes(settings)
 	application.startModes(modes, settings.Mode)
@@ -297,10 +302,10 @@ func (application *Window) reload(index int) {
 	application.loading++
 	settle := func() { application.loading-- } // also when a newer reading replaced this one
 	snapshot, written := application.servers.snapshots[path], application.servers.written
-	application.work.runSettling("project "+path, func(stop cancellation) func() {
+	application.work.RunSettling("project "+path, func(stop context.Context) func() {
 		var loaded *workspace.Project
 		var sorting error
-		if !application.work.read(stop, func() {
+		if !application.work.Read(stop, func() {
 			loaded = workspace.LoadProject(path, options)
 			sorting = written.SortOut(loaded, snapshot, options.WorkingTree)
 		}) {
@@ -397,7 +402,7 @@ func (application *Window) openFile(reference workspace.FileReference) {
 	}
 	workingTree := application.settings.WorkingTree
 	request := application.viewer.Request
-	application.work.run("", func(cancellation) func() {
+	application.work.Run("", func(context.Context) func() {
 		document := workspace.OpenDocument(project, reference.Path, workingTree)
 		return func() {
 			if len(application.documentCache) > 64 {

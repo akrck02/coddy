@@ -1,6 +1,7 @@
 package window
 
 import (
+	"context"
 	"time"
 
 	"github.com/akrck02/code-review/internal/lsp"
@@ -29,7 +30,7 @@ func (application *Window) measureServers(now time.Time) {
 	for key, client := range servers.running {
 		clients[key], before[key] = client, servers.usage[key]
 	}
-	application.work.run("measure servers", func(cancellation) func() {
+	application.work.Run("measure servers", func(context.Context) func() {
 		measured := map[string]serverUsage{}
 		for key, client := range clients {
 			usage := before[key]
