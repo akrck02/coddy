@@ -154,8 +154,8 @@ go in before the code that moves it (the viewer and sidebar have few: about 190 
 - [x] T6 — `session` out of `window`; the document cache by bytes with a stamp check · `internal/session` · R3, R8
 - [x] T7 — `language`, the table; every list of extensions and names replaced · `internal/language` · R7
 - [x] T8 — `Mode`'s capabilities; `sidebar.Window` and `viewer.Window` trimmed; capabilities resolved once · `mode`, `files`, `review`, `uses`, `sidebar`, `viewer` · R5
-- [ ] T9 — viewer: tests of each presentation, then `presentation`; `viewer.go` split into layout, navigation, paint · `viewer` · R4, R6
-- [ ] T10 — sidebar split into rows, expansion, filter, selection, header; trees per filter bounded · `sidebar` · R4, R8
+- [x] T9 — viewer: tests of each presentation, then `presentation`; `viewer.go` split into layout, navigation, paint · `viewer` · R4, R6
+- [x] T10 — sidebar split into rows, expansion, filter, selection, header; trees per filter bounded · `sidebar` · R4, R8
 - [ ] T11 — `finder.source`; `workspace.Layout`; `builds.Reader`; `gradle` out of `lsp` · R6
 - [ ] T12 — shared pieces: breadcrumb, folder icon, key cap, row background, `path` · R4
 - [ ] T13 — errors and context: codes kept to the interface, git and servers cancelled, named limits · R9
