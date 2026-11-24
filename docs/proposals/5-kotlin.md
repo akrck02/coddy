@@ -57,7 +57,7 @@ repositories as SNAPSHOT jars):
   as above when that repository is open.
 - Hover is Markdown with a `java` fence and a four-backtick `kotlin` fence, and a link to the
   package with no address: the card already drops fences and keeps a link's words.
-- **It wrote nothing new in the repository of the big workspace**, whose `.gradle/` and `build/` were already there
+- **It wrote nothing new in that repository**, whose `.gradle/` and `build/` were already there
   and ignored by git. Its index goes in its system path. On a fresh project (the real-server test)
   Gradle's import writes `.gradle/` and `build/` in it, as any build does; where git does not ignore
   them they show apart as the server's files, as in proposal 4.

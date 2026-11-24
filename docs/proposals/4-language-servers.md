@@ -7,7 +7,7 @@
 Reviewing a change that spans many repositories means following names across them: where a class
 is declared, who calls a method, what a type is. Today the reader has only the finder's text search
 for that. Language servers answer it exactly, for Go with `gopls` and for Java with `jdtls`, which
-matters most for the big workspace.
+matters most for the large workspaces of many Gradle repositories it was tried on (the big workspace from here on).
 
 The reader used to have to prove that a server never writes in a repository, and `jdtls` does write
 (`.project`, `.classpath`, `.settings/`, and Gradle's `.gradle/` and `build/`). The author decided
