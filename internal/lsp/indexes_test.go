@@ -26,7 +26,7 @@ func TestOldIndexesAreRemovedAndTheRecentOnesKept(test *testing.T) {
 			os.Chtimes(path, now.Add(-age), now.Add(-age))
 		}
 	}
-	server := Server{Name: "kls", Indexes: "workspaces", KeepIndexes: 2}
+	server := Server{Name: "kls", Index: Index{Folder: "workspaces", Keep: 2}}
 	removed, err := PruneIndexes(data, server, now)
 	if err != nil || len(removed) != 1 || filepath.Base(removed[0]) != "cccccccccccccccccccccccccccccccc" {
 		test.Fatalf("removed %v (%v), want the index used longest ago", removed, err)
@@ -43,7 +43,7 @@ func TestAnIndexWrittenAMomentAgoIsKept(test *testing.T) {
 	for _, name := range []string{"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"} {
 		os.MkdirAll(filepath.Join(data, "workspaces", name), 0o755)
 	}
-	removed, _ := PruneIndexes(data, Server{Indexes: "workspaces", KeepIndexes: 1}, time.Now())
+	removed, _ := PruneIndexes(data, Server{Index: Index{Folder: "workspaces", Keep: 1}}, time.Now())
 	if len(removed) != 0 {
 		test.Errorf("an index another window may be writing was removed: %v", removed)
 	}
@@ -61,12 +61,12 @@ func TestEachSetOfFoldersHasAnIndexOfItsOwn(test *testing.T) {
 	if both == indexFolder(data, server, []string{"/code/lamp"}) {
 		test.Error("fewer folders were given the index of more")
 	}
-	if filepath.Dir(both) != filepath.Join(data, server.Indexes) || !indexName.MatchString(filepath.Base(both)) {
+	if filepath.Dir(both) != filepath.Join(data, server.Index.Folder) || !indexName.MatchString(filepath.Base(both)) {
 		test.Errorf("the index is at %s, not one PruneIndexes knows", both)
 	}
 	options := (&Client{Server: server, data: data}).initializationOptions([]string{"/code/lamp"})
-	if options[server.IndexOption] != indexFolder(data, server, []string{"/code/lamp"}) {
-		test.Errorf("the server is told to keep its index at %v", options[server.IndexOption])
+	if options[server.Index.Option] != indexFolder(data, server, []string{"/code/lamp"}) {
+		test.Errorf("the server is told to keep its index at %v", options[server.Index.Option])
 	}
 }
 
@@ -78,7 +78,7 @@ func TestARetiredIndexIsRemoved(test *testing.T) {
 	for _, path := range []string{old, filepath.Dir(old)} {
 		os.Chtimes(path, now.Add(-time.Hour), now.Add(-time.Hour))
 	}
-	server := Server{Indexes: "indexes", KeepIndexes: 1, RetiredIndexes: []string{"rocks"}}
+	server := Server{Index: Index{Folder: "indexes", Keep: 1, Retired: []string{"rocks"}}}
 	if removed, err := PruneIndexes(data, server, now); err != nil || len(removed) != 1 {
 		test.Fatalf("removed %v (%v), want rocks", removed, err)
 	}

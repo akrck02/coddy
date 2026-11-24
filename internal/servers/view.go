@@ -105,9 +105,9 @@ func (fleet *Fleet) missingView(name string) View {
 }
 
 // leftOutOf are the projects of the window a server leaves out, by name: those of its languages
-// whose build it cannot import (lsp.CannotImport).
+// whose build it cannot import (gradle.CannotImport).
 func (fleet *Fleet) leftOutOf(server lsp.Server) []LeftOutProject {
-	if !server.OwnGradle {
+	if !server.Import.OwnGradle {
 		return nil
 	}
 	var left []LeftOutProject

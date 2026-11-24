@@ -13,7 +13,7 @@ import (
 
 // indexName is how the index of one set of workspace folders is named: by a hash, 32 hexadecimal
 // digits, as kotlin-lsp named them itself and the reader names those it places (indexFolder).
-// Nothing else in a data folder is ever removed, but its RetiredIndexes.
+// Nothing else in a data folder is ever removed, but its Index.Retired.
 var indexName = regexp.MustCompile(`^[0-9a-f]{32}$`)
 
 // indexRest is how long an index must have gone unwritten before it may be removed: one a server
@@ -21,18 +21,18 @@ var indexName = regexp.MustCompile(`^[0-9a-f]{32}$`)
 const indexRest = 10 * time.Minute
 
 // PruneIndexes removes, from a server's data folder, the indexes it built for sets of folders used
-// longest ago, keeping its KeepIndexes most recent: a server that builds one index per set of
+// longest ago, keeping its Index.Keep most recent: a server that builds one index per set of
 // folders (kotlin-lsp, several gigabytes for the big workspace) would otherwise keep every one it ever built.
 // It gives the folders removed. The data folder is the reader's own, never a repository.
 func PruneIndexes(dataFolder string, server Server, now time.Time) ([]string, error) {
-	if dataFolder == "" || server.Indexes == "" || server.KeepIndexes <= 0 {
+	if dataFolder == "" || server.Index.Folder == "" || server.Index.Keep <= 0 {
 		return nil, nil
 	}
-	indexes := indexesOf(filepath.Join(dataFolder, server.Indexes))
+	indexes := indexesOf(filepath.Join(dataFolder, server.Index.Folder))
 	sort.Slice(indexes, func(first, second int) bool { return indexes[first].used.After(indexes[second].used) })
-	old := indexes[min(server.KeepIndexes, len(indexes)):]
-	for _, name := range server.RetiredIndexes {
-		if path := filepath.Join(dataFolder, name); name != "" && name != server.Indexes {
+	old := indexes[min(server.Index.Keep, len(indexes)):]
+	for _, name := range server.Index.Retired {
+		if path := filepath.Join(dataFolder, name); name != "" && name != server.Index.Folder {
 			if _, err := os.Stat(path); err == nil {
 				old = append(old, index{path, lastWritten(path)})
 			}
@@ -70,15 +70,15 @@ func indexesOf(folder string) []index {
 	return indexes
 }
 
-// indexFolder is where a server that is told where to keep its index (IndexOption) keeps the one
+// indexFolder is where a server that is told where to keep its index (Index.Option) keeps the one
 // of the folders it starts with, in that order: a folder of its Indexes named by their hash; its
 // data folder when it has no Indexes.
 func indexFolder(dataFolder string, server Server, folders []string) string {
-	if server.Indexes == "" {
+	if server.Index.Folder == "" {
 		return dataFolder
 	}
 	hash := md5.Sum([]byte(strings.Join(folders, "\n")))
-	return filepath.Join(dataFolder, server.Indexes, hex.EncodeToString(hash[:]))
+	return filepath.Join(dataFolder, server.Index.Folder, hex.EncodeToString(hash[:]))
 }
 
 // lastWritten is when anything in a folder, three levels down, was written last: an index's

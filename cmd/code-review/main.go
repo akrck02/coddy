@@ -140,11 +140,11 @@ func serversFor(capturePath, memory string, keep int) []lsp.Server {
 	}
 	servers := slices.Clone(lsp.Servers)
 	for index := range servers {
-		if servers[index].Memory != "" && memory != "" {
-			servers[index].Memory = memory
+		if servers[index].Memory.Most != "" && memory != "" {
+			servers[index].Memory.Most = memory
 		}
-		if servers[index].Indexes != "" && keep > 0 {
-			servers[index].KeepIndexes = keep
+		if servers[index].Index.Folder != "" && keep > 0 {
+			servers[index].Index.Keep = keep
 		}
 	}
 	return servers

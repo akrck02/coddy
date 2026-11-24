@@ -73,7 +73,7 @@ func (client *Client) noteProgress(params json.RawMessage) {
 	token, value := string(progress.Token), progress.Value
 	finished := false
 	defer func() { // after the lock is let go: becoming ready takes it
-		if finished && client.Server.ReadyAfterWork {
+		if finished && client.Server.Ready.AfterWork {
 			client.becomeReady()
 		}
 	}()
@@ -124,7 +124,7 @@ func (client *Client) noteStatus(params json.RawMessage) {
 	if json.Unmarshal(params, &status) != nil {
 		return
 	}
-	if status.Type == client.Server.ReadyStatus && status.Type != "" {
+	if status.Type == client.Server.Ready.Status && status.Type != "" {
 		client.becomeReady()
 	}
 	client.lock.Lock()
@@ -366,7 +366,7 @@ func (client *Client) QuietSince() time.Time {
 	return quiet
 }
 
-// workGrace is how long a server ready after its first work (ReadyAfterWork) may take to begin
+// workGrace is how long a server ready after its first work (Ready.AfterWork) may take to begin
 // it: kotlin-lsp began importing 10 to 24 s after it was initialized on the big workspace.
 const workGrace = 45 * time.Second
 

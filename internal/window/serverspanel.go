@@ -209,7 +209,7 @@ func plural(count int, thing string) string {
 // buildGradleLine says what a server that imports Gradle builds does with Gradle: its daemons
 // running, or those the reader stopped once it was done importing.
 func (application *Window) buildGradleLine(context *ui.Context, view servers.View) {
-	if !view.Client.Server.OwnGradle {
+	if !view.Client.Server.Import.OwnGradle {
 		return
 	}
 	palette := context.Theme
@@ -233,7 +233,7 @@ func (application *Window) buildGradleLine(context *ui.Context, view servers.Vie
 // buildModelsLine says, for a server given the models of its projects, how it read them: from
 // their models, or imported with Gradle and their models kept.
 func buildModelsLine(context *ui.Context, view servers.View) {
-	if !view.Client.Server.Models {
+	if !view.Client.Server.Import.Models {
 		return
 	}
 	words, trouble := modelWords(view.Client.Models())

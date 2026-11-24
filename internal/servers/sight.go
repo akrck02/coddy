@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/akrck02/code-review/internal/gradle"
 	"github.com/akrck02/code-review/internal/lsp"
 	"github.com/akrck02/code-review/internal/workspace"
 )
@@ -117,14 +118,14 @@ func (fleet *Fleet) foldersFor(server lsp.Server) []string {
 }
 
 // importable tells whether a server can read a project: one that imports Gradle builds leaves out
-// those it would fail to import each time it starts (lsp.CannotImport), noting why.
+// those it would fail to import each time it starts (gradle.CannotImport), noting why.
 func (fleet *Fleet) importable(server lsp.Server, project string) bool {
-	if !server.OwnGradle {
+	if !server.Import.OwnGradle {
 		return true
 	}
 	why, known := fleet.cannotImport[project]
 	if !known {
-		why = lsp.CannotImport(project)
+		why = gradle.CannotImport(project)
 		fleet.cannotImport[project] = why
 	}
 	return why == ""

@@ -98,7 +98,7 @@ func TestAServerWokenWhileTheOneBeforeSavesStartsOnceItHasEnded(test *testing.T)
 func TestAServerStillImportingNeverRests(test *testing.T) {
 	log := filepath.Join(test.TempDir(), "log")
 	servers := fakeGo(test, log)
-	servers[0].ReadyStatus = "ServiceReady" // never sent: it imports for as long as the test runs
+	servers[0].Ready.Status = "ServiceReady" // never sent: it imports for as long as the test runs
 	application := readerWithServers(test, "lighthouse/src/lamp.go", servers)
 	application.servers.Rest = 100 * time.Millisecond
 	window := newWindow(test, application)

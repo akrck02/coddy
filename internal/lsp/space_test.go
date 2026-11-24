@@ -24,7 +24,7 @@ func TestTheIndexesOfAServerAreMeasured(test *testing.T) {
 	_ = os.MkdirAll(index, 0o755)
 	_ = os.WriteFile(filepath.Join(index, "lamp"), make([]byte, 1000), 0o644)
 	_ = os.WriteFile(filepath.Join(data, "other"), make([]byte, 50), 0o644)
-	if size := IndexesSize(data, Server{Indexes: "workspaces"}); size != 1000 {
+	if size := IndexesSize(data, Server{Index: Index{Folder: "workspaces"}}); size != 1000 {
 		test.Errorf("the indexes take %d bytes, want 1000", size)
 	}
 }

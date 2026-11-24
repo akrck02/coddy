@@ -65,15 +65,15 @@ func (fleet *Fleet) Start(server lsp.Server, root, key, project string) {
 // roomFor says why a server that asks for free space on its data folder's disk cannot start there;
 // "" when it can.
 func (fleet *Fleet) roomFor(server lsp.Server, data string) string {
-	if server.NeedsFree == 0 || data == "" {
+	if server.Index.NeedsFree == 0 || data == "" {
 		return ""
 	}
 	free, err := fleet.FreeSpace(data)
-	if err != nil || free >= server.NeedsFree {
+	if err != nil || free >= server.Index.NeedsFree {
 		return "" // a disk it cannot measure is not kept from it
 	}
 	return fmt.Sprintf("it needs %s free on the disk of %s, which has %s (its index takes %s): "+
-		"free some, or keep its index on another disk with -server-data", bytesOf(int64(server.NeedsFree)), data,
+		"free some, or keep its index on another disk with -server-data", bytesOf(int64(server.Index.NeedsFree)), data,
 		bytesOf(int64(free)), bytesOf(lsp.IndexesSize(data, server)))
 }
 
@@ -172,12 +172,12 @@ func (fleet *Fleet) ended(name, key string, client *lsp.Client) {
 // "" for none.
 func (fleet *Fleet) importingBefore(server lsp.Server) string {
 	for key := range fleet.starting {
-		if slices.Contains(server.After, strings.Fields(key)[0]) {
+		if slices.Contains(server.Import.After, strings.Fields(key)[0]) {
 			return strings.Fields(key)[0]
 		}
 	}
 	for key, client := range fleet.running {
-		if slices.Contains(server.After, client.Server.Name) && !client.Ready() {
+		if slices.Contains(server.Import.After, client.Server.Name) && !client.Ready() {
 			return strings.Fields(key)[0]
 		}
 	}

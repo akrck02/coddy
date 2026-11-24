@@ -9,6 +9,8 @@
 | `internal/workspace` | Projects, changes, a file's two sides and its diff, folding, the tree, what servers wrote |
 | `internal/text` | A file being edited: lines, caret, selection, undo |
 | `internal/lsp` | Language servers: JSON-RPC over their input and output, the table of servers |
+| `internal/gradle` | What servers that import Gradle builds need: their own Gradle home and its daemons, the builds they cannot import, the models kept between starts |
+| `internal/builds` | What a project's builds publish and depend on, read as text: one reader per build system (Gradle, Maven) |
 | `internal/java` | The IntelliJ-style tree and the kinds of class |
 | `internal/theme` | Zed's One colours, file icons and the reader's own controls |
 | `internal/pane` | What every pane shares: the keys and a scrolling list |

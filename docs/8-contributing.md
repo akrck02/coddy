@@ -46,7 +46,9 @@ internal/theme        Zed's One colours, file icons, the reader's own controls
 internal/java         the IntelliJ-style tree and the kinds of class
 internal/workspace    projects, changes, a file's two sides and its diff, the tree
 internal/text         a file being edited: lines, caret, selection, undo
-internal/lsp          language servers: JSON-RPC over their input and output
+internal/lsp          language servers: JSON-RPC over their input and output, the table of servers
+internal/gradle       what servers that import Gradle builds need: their own Gradle home, its daemons, kept models
+internal/builds       what a project's builds publish and depend on, one reader per build system
 internal/highlight    Chroma's tokens, cut into lines of coloured pieces
 internal/language     what Coddy knows of each language: names, extensions, server, icon, fences
 internal/git          the read-only git commands

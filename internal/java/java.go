@@ -6,14 +6,10 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/akrck02/code-review/internal/builds"
 	"github.com/akrck02/code-review/internal/git"
 	"github.com/akrck02/code-review/internal/workspace"
 )
-
-// buildFiles mark a folder as a module.
-var buildFiles = map[string]bool{
-	"build.gradle": true, "build.gradle.kts": true, "pom.xml": true, "settings.gradle": true, "settings.gradle.kts": true,
-}
 
 // sourceRoot matches the folders Gradle and Maven take sources and resources from:
 // src/<source set>/<language or resources>.
@@ -22,7 +18,7 @@ var sourceRoot = regexp.MustCompile(`(^|/)src/([A-Za-z0-9_-]+)/(java|kotlin|groo
 // IsProject tells whether a project's files are laid out as Gradle or Maven lay them out.
 func IsProject(paths []string) bool {
 	for _, path := range paths {
-		if buildFiles[workspace.BaseName(path)] || strings.Contains(path, "src/main/java/") || strings.Contains(path, "src/main/kotlin/") {
+		if builds.IsBuildFile(workspace.BaseName(path)) || strings.Contains(path, "src/main/java/") || strings.Contains(path, "src/main/kotlin/") {
 			return true
 		}
 	}
@@ -41,7 +37,7 @@ func BuildTree(paths []string, isChanged func(path string) bool) *workspace.Fold
 // markRoles marks each folder's role from where it is, and joins the packages of source roots.
 func markRoles(folder *workspace.Folder, inside workspace.FolderRole) {
 	for _, path := range folder.Files {
-		if buildFiles[workspace.BaseName(path)] && folder.Path != "" {
+		if builds.IsBuildFile(workspace.BaseName(path)) && folder.Path != "" {
 			folder.Role = workspace.ModuleFolder
 		}
 	}

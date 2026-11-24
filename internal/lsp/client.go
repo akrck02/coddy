@@ -3,7 +3,6 @@ package lsp
 import (
 	"context"
 	"encoding/json"
-	"github.com/akrck02/code-review/internal/language"
 	"maps"
 	"os"
 	"os/exec"
@@ -13,6 +12,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/akrck02/code-review/internal/gradle"
+	"github.com/akrck02/code-review/internal/language"
 	"github.com/akrck02/go-renderer/failure"
 )
 
@@ -78,10 +79,10 @@ func Start(ctx context.Context, server Server, root string, folders []string, da
 	client := &Client{Server: server, Root: root, command: command, exited: make(chan struct{}), data: dataFolder, versions: map[string]int{}, folders: map[string]bool{},
 		ready: make(chan struct{}), working: map[string]*work{}, started: time.Now(), statusSince: time.Now(),
 		imported: map[string]time.Time{}, changes: make(chan struct{}, 1)}
-	if server.Models && dataFolder != "" && root == "" {
+	if server.Import.Models && dataFolder != "" && root == "" {
 		client.chooseModels(folders)
 	}
-	if server.ReadyStatus == "" && !server.ReadyAfterWork {
+	if server.Ready.Status == "" && !server.Ready.AfterWork {
 		client.becomeReady()
 	}
 	client.conn = NewConn(output, input, client.handle)
@@ -101,10 +102,10 @@ func Start(ctx context.Context, server Server, root string, folders []string, da
 // Gradle daemons, the models of the projects it imports, how long it takes to read them.
 func (client *Client) watch() {
 	server := client.Server
-	if server.OwnGradle && client.data != "" {
+	if server.Import.OwnGradle && client.data != "" {
 		go client.releaseGradle()
 	}
-	if server.ReadyAfterWork {
+	if server.Ready.AfterWork {
 		go client.readyWithoutWork()
 	}
 	if len(client.toImport) > 0 {
@@ -124,15 +125,15 @@ func commandOf(path string, server Server, dataFolder string) *exec.Cmd {
 		arguments = append(arguments, server.DataFlag, dataFolder)
 	}
 	environment := append(os.Environ(), server.Environment...)
-	if server.OwnGradle && dataFolder != "" {
-		environment = append(environment, prepareGradleHome(dataFolder)...)
+	if server.Import.OwnGradle && dataFolder != "" {
+		environment = append(environment, gradle.PrepareHome(dataFolder)...)
 	}
 	switch {
-	case server.Memory != "" && server.MemoryFlag != "":
-		arguments = append(arguments, server.MemoryFlag+server.Memory)
-	case server.Memory != "" && server.MemoryVariable != "":
-		options := append([]string{"-Xmx" + server.Memory}, server.JVMOptions...)
-		environment = append(environment, server.MemoryVariable+"="+strings.Join(options, " "))
+	case server.Memory.Most != "" && server.Memory.Flag != "":
+		arguments = append(arguments, server.Memory.Flag+server.Memory.Most)
+	case server.Memory.Most != "" && server.Memory.Variable != "":
+		options := append([]string{"-Xmx" + server.Memory.Most}, server.Memory.JVMOptions...)
+		environment = append(environment, server.Memory.Variable+"="+strings.Join(options, " "))
 	}
 	command := exec.Command(path, arguments...)
 	command.Env = environment
@@ -190,7 +191,7 @@ func (client *Client) initialize(ctx context.Context, root string, folders []str
 // one project's build changing does not make another index.
 func (client *Client) initializationOptions(folders []string) map[string]any {
 	server := client.Server
-	ownIndex := server.IndexOption != "" && client.data != ""
+	ownIndex := server.Index.Option != "" && client.data != ""
 	if server.Settings == nil && !server.FoldersInOptions && !ownIndex && len(client.standIns) == 0 {
 		return server.Options
 	}
@@ -202,7 +203,7 @@ func (client *Client) initializationOptions(folders []string) map[string]any {
 		options["settings"] = server.Settings
 	}
 	if ownIndex {
-		options[server.IndexOption] = indexFolder(client.data, server, folders)
+		options[server.Index.Option] = indexFolder(client.data, server, folders)
 	}
 	if len(client.standIns) > 0 {
 		options["buildTools"] = client.buildTools()
@@ -533,8 +534,8 @@ func (client *Client) Stop() {
 	case <-ctx.Done():
 	}
 	client.kill()
-	if client.Server.OwnGradle && client.data != "" {
-		StopGradleDaemons(client.data)
+	if client.Server.Import.OwnGradle && client.data != "" {
+		gradle.StopDaemons(client.data)
 	}
 }
 

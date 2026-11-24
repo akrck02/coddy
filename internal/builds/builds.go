@@ -1,13 +1,13 @@
-// Package builds reads what a project's Gradle or Maven build says it publishes and depends on,
-// as text: fast, writing nothing and running nothing, and enough for the plain declarations a
-// build mostly has. What it cannot read, a coordinate made in code, it says it did not understand.
+// Package builds reads what a project's builds say it publishes and depends on, as text: fast,
+// writing nothing and running nothing, and enough for the plain declarations a build mostly has.
+// What it cannot read, a coordinate made in code, it says it did not understand. Each build
+// system is a Reader; adding one is a file of its own and a line in Readers.
 package builds
 
 import (
-	"encoding/xml"
 	"os"
 	"path/filepath"
-	"regexp"
+	"slices"
 	"sort"
 	"strings"
 )
@@ -20,119 +20,74 @@ type Build struct {
 	NotUnderstood []string
 }
 
-var (
-	gradleGroup    = regexp.MustCompile(`(?m)^\s*group\s*=?\s*["']([^"'$]+)["']`)
-	gradleName     = regexp.MustCompile(`(?m)^\s*rootProject\.name\s*=\s*["']([^"']+)["']`)
-	gradleArtifact = regexp.MustCompile(`(?m)\b(?:artifactId|archivesBaseName)\s*=\s*["']([^"'$]+)["']`)
-	// a dependency declared with its coordinates in a string: implementation "group:artifact:1.0"
-	gradleDependency = regexp.MustCompile(`(?m)^\s*(?:api|implementation|compileOnly|runtimeOnly|testImplementation|` +
-		`testCompileOnly|testRuntimeOnly|annotationProcessor|kapt|ksp|compile|testCompile|runtime)\s*\(?\s*["']([^"']+)["']`)
-	// one declared otherwise: from a catalog (libs.lamp), or with a coordinate made in code
-	gradleOther = regexp.MustCompile(`(?m)^\s*(?:api|implementation|compileOnly|runtimeOnly)\s*\(?\s*(libs\.[\w.]+|[a-z]\w*\([^)]*\))`)
-)
+// Reader reads the build files of one build system (Gradle, Maven).
+type Reader interface {
+	// Files are the names of its build files: "pom.xml".
+	Files() []string
+	// Read adds to a build what its files say, in the order the project lists them. folder names
+	// the project when its build does not.
+	Read(build *Build, folder string, files []File)
+}
 
-// Read reads a project's build files among its files (paths from its folder, with slashes): the
-// Gradle settings and builds, and Maven's pom.xml, at any depth but in a build's output.
+// File is a build file of a project: its path from the project's folder, with slashes, and its
+// content.
+type File struct {
+	Path    string
+	Content []byte
+}
+
+// Readers are the build systems read, each by its own Reader.
+var Readers = []Reader{Gradle, Maven}
+
+// notBuildFolders are folders whose files a build or a tool wrote: never a build to read.
+var notBuildFolders = []string{"build", "target", "node_modules"}
+
+// Read reads a project's build files among its files (paths from its folder, with slashes), at
+// any depth but in a build's output, each by the reader of its build system.
 func Read(folder string, files []string) Build {
 	var build Build
-	group, name := "", filepath.Base(folder)
-	for _, path := range files {
-		if !isBuildFile(path) {
-			continue
-		}
-		content, err := os.ReadFile(filepath.Join(folder, filepath.FromSlash(path)))
-		if err != nil {
-			continue
-		}
-		text := string(content)
-		switch base := filepath.Base(path); {
-		case base == "pom.xml":
-			build.readPom(content)
-		case strings.HasPrefix(base, "settings.gradle"):
-			if found := gradleName.FindStringSubmatch(text); found != nil {
-				name = found[1]
-			}
-		default:
-			group = build.readGradle(text, group)
-			if found := gradleArtifact.FindStringSubmatch(text); found != nil {
-				build.Publishes = append(build.Publishes, group+":"+found[1])
-			}
-		}
-	}
-	if group != "" {
-		build.Publishes = append(build.Publishes, group+":"+name)
+	for _, reader := range Readers {
+		reader.Read(&build, folder, readFiles(folder, files, reader.Files()))
 	}
 	build.tidy()
 	return build
 }
 
-// isBuildFile tells whether a file of a project is a build file to read, not one a build wrote.
-func isBuildFile(path string) bool {
+// readFiles reads the files of a project that are build files of the given names; one that cannot
+// be read is left out, as if the build had no such file.
+func readFiles(folder string, files, names []string) []File {
+	var read []File
+	for _, path := range files {
+		if inBuildOutput(path) || !slices.Contains(names, filepath.Base(path)) {
+			continue
+		}
+		content, err := os.ReadFile(filepath.Join(folder, filepath.FromSlash(path)))
+		if err == nil {
+			read = append(read, File{Path: path, Content: content})
+		}
+	}
+	return read
+}
+
+// inBuildOutput tells whether a file of a project is in a folder a build or a tool wrote, or in a
+// hidden one.
+func inBuildOutput(path string) bool {
 	for _, part := range strings.Split(path, "/") {
-		if part == "build" || part == "target" || part == "node_modules" || strings.HasPrefix(part, ".") {
-			return false
+		if slices.Contains(notBuildFolders, part) || strings.HasPrefix(part, ".") {
+			return true
 		}
 	}
-	base := filepath.Base(path)
-	return base == "pom.xml" || base == "build.gradle" || base == "build.gradle.kts" ||
-		base == "settings.gradle" || base == "settings.gradle.kts"
+	return false
 }
 
-// readGradle reads a Gradle build: its group, if it says one, and its dependencies.
-func (build *Build) readGradle(text, group string) string {
-	if found := gradleGroup.FindStringSubmatch(text); found != nil {
-		group = found[1]
-	}
-	for _, found := range gradleDependency.FindAllStringSubmatch(text, -1) {
-		parts := strings.Split(found[1], ":")
-		if len(parts) < 2 || strings.Contains(parts[0]+parts[1], "$") {
-			build.NotUnderstood = append(build.NotUnderstood, found[1])
-			continue
-		}
-		build.Depends = append(build.Depends, parts[0]+":"+parts[1])
-	}
-	for _, found := range gradleOther.FindAllStringSubmatch(text, -1) {
-		if !strings.HasPrefix(found[1], "project(") && !strings.HasPrefix(found[1], "platform(") {
-			build.NotUnderstood = append(build.NotUnderstood, found[1])
+// IsBuildFile tells whether a file name is a build file of a build system read: "pom.xml".
+func IsBuildFile(name string) bool {
+	for _, reader := range Readers {
+		if slices.Contains(reader.Files(), name) {
+			return true
 		}
 	}
-	return group
-}
-
-// pom is what the reader takes of a Maven build.
-type pom struct {
-	GroupID    string `xml:"groupId"`
-	ArtifactID string `xml:"artifactId"`
-	Parent     struct {
-		GroupID string `xml:"groupId"`
-	} `xml:"parent"`
-	Dependencies []struct {
-		GroupID    string `xml:"groupId"`
-		ArtifactID string `xml:"artifactId"`
-	} `xml:"dependencies>dependency"`
-}
-
-// readPom reads a Maven build: what it publishes, its group from its parent's when it has none.
-func (build *Build) readPom(content []byte) {
-	var read pom
-	if xml.Unmarshal(content, &read) != nil {
-		return
-	}
-	group := read.GroupID
-	if group == "" {
-		group = read.Parent.GroupID
-	}
-	if read.ArtifactID != "" {
-		build.Publishes = append(build.Publishes, group+":"+read.ArtifactID)
-	}
-	for _, dependency := range read.Dependencies {
-		coordinate := dependency.GroupID + ":" + dependency.ArtifactID
-		if strings.Contains(coordinate, "$") {
-			build.NotUnderstood = append(build.NotUnderstood, coordinate)
-			continue
-		}
-		build.Depends = append(build.Depends, coordinate)
-	}
+	return false
 }
 
 // tidy sorts each list and drops what is twice in it.

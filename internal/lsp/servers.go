@@ -23,60 +23,80 @@ type Server struct {
 	Environment  []string // added to the reader's own, as "NAME=value"
 	// InstallEnvironment is added to the reader's own environment while Install runs
 	InstallEnvironment []string
-	// ReadyStatus, when set, is the language/status type the server sends once it has read the
-	// projects (jdtls's ServiceReady); until then requests wait. Without it, a server is ready
-	// once initialized.
-	ReadyStatus string
-	// ReadyAfterWork makes a server without ReadyStatus ready once the first work it reports ends
-	// (kotlin-lsp, whose import begins seconds after it is initialized, and which answers with
-	// nothing meanwhile), or after workGrace if it reports none.
-	ReadyAfterWork bool
 	// Options are the server's own initializationOptions, as it documents them.
 	Options map[string]any
 	// Settings are the server's settings, by section as workspace/configuration asks them
 	// ({"java": {"autobuild": …}}): given at initialize and to each question for a section.
 	Settings map[string]any
-	// Memory is the most memory the server's JVM may take ("2g"), given with MemoryFlag on its
-	// command line, or in MemoryVariable, an environment variable of JVM options.
-	Memory         string
-	MemoryFlag     string
-	MemoryVariable string
-	// JVMOptions are more options of the server's JVM, given in MemoryVariable after its memory.
+	// FoldersInOptions gives the workspace folders in initializationOptions too: jdtls reads them
+	// there, and from the parameters only the first.
+	FoldersInOptions bool
+	// ReadsAll reads every project of the window with a file of its languages, not only those in
+	// sight: a server whose index is per set of projects (Index) would build another, cold, each
+	// time the filter changed what is in sight.
+	ReadsAll bool
+	Ready    Readiness
+	Memory   Memory
+	Index    Index
+	Import   Import
+}
+
+// Readiness is when a server has read the projects and answers. Without either field, a server is
+// ready once initialized.
+type Readiness struct {
+	// Status, when set, is the language/status type the server sends once it has read the
+	// projects (jdtls's ServiceReady); until then requests wait.
+	Status string
+	// AfterWork makes a server without Status ready once the first work it reports ends
+	// (kotlin-lsp, whose import begins seconds after it is initialized, and which answers with
+	// nothing meanwhile), or after workGrace if it reports none.
+	AfterWork bool
+}
+
+// Memory is what a server's JVM may take, and how it is told.
+type Memory struct {
+	// Most is the most memory the server's JVM may take ("2g"), given with Flag on its command
+	// line, or in Variable, an environment variable of JVM options.
+	Most     string
+	Flag     string
+	Variable string
+	// JVMOptions are more options of the server's JVM, given in Variable after its memory.
 	JVMOptions []string
-	// Indexes, when set, is the folder of its data folder where the server builds one index per
-	// set of workspace folders (kotlin-lsp's workspaces); the reader keeps the KeepIndexes used
-	// last and removes the others before it starts the server.
-	Indexes     string
-	KeepIndexes int
-	// IndexOption, when set, is the initialization option that names where the server keeps its
-	// index: the reader gives it a folder of Indexes named after the set of folders it starts with
+}
+
+// Index is where a server keeps its index in its data folder, and how much of it the reader keeps.
+type Index struct {
+	// Folder, when set, is the folder of its data folder where the server builds one index per
+	// set of workspace folders (kotlin-lsp's workspaces); the reader keeps the Keep used last and
+	// removes the others before it starts the server.
+	Folder string
+	Keep   int
+	// Option, when set, is the initialization option that names where the server keeps its
+	// index: the reader gives it a folder of Folder named after the set of folders it starts with
 	// (indexFolder). kotlin-lsp 271 keeps them in the person's caches otherwise
 	// (~/Library/Caches/JetBrains/IntelliJServer), whatever --system-path says, where the reader
 	// neither keeps one nor removes the old.
-	IndexOption string
-	// RetiredIndexes are folders of its data folder where an older reader kept its indexes, removed
-	// as old indexes are.
-	RetiredIndexes []string
+	Option string
+	// Retired are folders of its data folder where an older reader kept its indexes, removed as
+	// old indexes are.
+	Retired []string
+	// NeedsFree is how many bytes must be free on its data folder's disk for it to start: an index
+	// that fills the disk breaks the server, and whatever else writes there.
+	NeedsFree uint64
+}
+
+// Import is how a server that imports Gradle builds is helped with them (the gradle package).
+type Import struct {
 	// Models keeps, for each project the server imports with Gradle, the model it imported, and
 	// starts it with that model instead while the project's build files do not change: kotlin-lsp's
 	// json importer and its exportWorkspace (models.go).
 	Models bool
-	// OwnGradle gives a server that imports Gradle builds a Gradle home of its own, in its data
-	// folder, whose daemons stop soon after it and with it (gradle.go).
+	// OwnGradle gives the server a Gradle home of its own, in its data folder, whose daemons stop
+	// soon after it and with it (gradle.go).
 	OwnGradle bool
-	// FoldersInOptions gives the workspace folders in initializationOptions too: jdtls reads them
-	// there, and from the parameters only the first.
-	FoldersInOptions bool
 	// After are the servers whose import of the projects it waits for before it starts: two
 	// imports at once, each with its Gradle daemons, take more memory than a laptop has.
 	After []string
-	// ReadsAll reads every project of the window with a file of its languages, not only those in
-	// sight: a server whose index is per set of projects (Indexes) would build another, cold, each
-	// time the filter changed what is in sight.
-	ReadsAll bool
-	// NeedsFree is how many bytes must be free on its data folder's disk for it to start: an index
-	// that fills the disk breaks the server, and whatever else writes there.
-	NeedsFree uint64
 }
 
 // Servers are the language servers the reader runs, found on the PATH.
@@ -91,7 +111,7 @@ var Servers = []Server{
 	// build file changed is not imported again on its own.
 	{Name: "jdtls", Command: "jdtls", Languages: []string{"java"}, OnePerWindow: true, DataFlag: "-data", FoldersInOptions: true,
 		Arguments: []string{"--jvm-arg=-Djava.import.generatesMetadataFilesAtProjectRoot=false"},
-		Install:   "brew install jdtls", ReadyStatus: "ServiceReady",
+		Install:   "brew install jdtls", Ready: Readiness{Status: "ServiceReady"},
 		// every Java project of the window from the start: jdtls drops from its workspace the
 		// projects it was not started with, and imports each one added later with Gradle again
 		ReadsAll: true,
@@ -104,7 +124,7 @@ var Servers = []Server{
 			"configuration": map[string]any{"updateBuildConfiguration": "disabled"},
 		}},
 		// its Gradle import (Buildship) honours GRADLE_USER_HOME: its daemons time out, as kotlin-lsp's
-		Memory: "2g", MemoryFlag: "--jvm-arg=-Xmx", OwnGradle: true},
+		Memory: Memory{Most: "2g", Flag: "--jvm-arg=-Xmx"}, Import: Import{OwnGradle: true}},
 	// JetBrains' server, still a preview. It imports each Gradle build first (minutes, cold) and
 	// answers with nothing meanwhile, telling its work by $/progress; a name in a jar answers
 	// jar:///…!/package/Class.class. Gradle's import writes .gradle/ and build/ in the project, as
@@ -118,11 +138,12 @@ var Servers = []Server{
 		// paths by the place of their folder among those it started with ($WORKSPACE_7$/src/main),
 		// and started with fewer folders it cannot read them and hangs, answering nothing. So one
 		// per set, in indexes/, the last kept; rocks/ was the one for every set
-		Indexes: "indexes", KeepIndexes: 1, IndexOption: "indexDir", RetiredIndexes: []string{"rocks"}, ReadsAll: true, Models: true, OwnGradle: true, NeedsFree: 10 << 30, ReadyAfterWork: true,
+		Index: Index{Folder: "indexes", Keep: 1, Option: "indexDir", Retired: []string{"rocks"}, NeedsFree: 10 << 30}, ReadsAll: true,
+		Import: Import{Models: true, OwnGradle: true, After: []string{"jdtls"}}, Ready: Readiness{AfterWork: true},
 		// no -Dcom.jetbrains.ls.imports.gradle.daemon.no.idle.timeout: it gives each daemon an idle
 		// time of 1 ms, so none was used twice (148 times on the big workspace); the reader stops its daemons
 		// itself once the import is done (gradle.go)
-		Memory: "2g", MemoryVariable: "IJ_JAVA_OPTIONS", After: []string{"jdtls"}},
+		Memory: Memory{Most: "2g", Variable: "IJ_JAVA_OPTIONS"}},
 }
 
 // setting is the value of a section of settings, "java" or "java.import", if there is one.

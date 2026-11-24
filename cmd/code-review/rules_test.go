@@ -63,8 +63,10 @@ func TestOnlyTheSaveWritesInARepository(test *testing.T) {
 		filepath.Join(moduleRoot, "internal/workspace/written.go"): true,
 		// old indexes of servers, in their data folder: the reader's own, never a repository
 		filepath.Join(moduleRoot, "internal/lsp/indexes.go"): true,
-		// the Gradle home of a server that imports Gradle builds, in its data folder
-		filepath.Join(moduleRoot, "internal/lsp/gradle.go"): true,
+		// the Gradle home of a server that imports Gradle builds, in its data folder, and the models
+		// of the projects it imported, there too
+		filepath.Join(moduleRoot, "internal/gradle/home.go"):   true,
+		filepath.Join(moduleRoot, "internal/gradle/models.go"): true,
 		// how long a server took to read the projects, in its data folder
 		filepath.Join(moduleRoot, "internal/lsp/reading.go"): true,
 		// the models of the projects a server imported, in its data folder
@@ -143,6 +145,14 @@ func TestTheLanguageTableImportsNothingOfTheReader(test *testing.T) {
 		if dependency != self && strings.HasPrefix(dependency, "github.com/akrck02/code-review/") {
 			test.Errorf("language imports %s", dependency)
 		}
+	}
+}
+
+// The language servers' client calls the gradle package for a server that imports Gradle builds;
+// gradle knows builds and their daemons, and nothing of the protocol, so the arrow points one way.
+func TestGradleKnowsNothingOfTheLanguageServers(test *testing.T) {
+	if found := importsAny(test, "gradle", "github.com/akrck02/code-review/internal/lsp"); found != "" {
+		test.Errorf("gradle imports %s", found)
 	}
 }
 

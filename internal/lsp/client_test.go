@@ -75,7 +75,7 @@ func TestAServersRootIsTheFolderOfItsMarker(test *testing.T) {
 func TestARequestIsAnsweredByAServerStillReadingTheProjects(test *testing.T) {
 	folder := project(test, map[string]string{"lamp.go": "package lamp\n\nfunc Beam() int { return 2 }\n"})
 	server, _ := fake(test, false, "FAKE_LSP_READY=ServiceReady")
-	server.ReadyStatus = "ServiceReady"
+	server.Ready.Status = "ServiceReady"
 	client, err := Start(within(test), server, folder, nil, "")
 	if err != nil {
 		test.Fatal(err)
@@ -93,7 +93,7 @@ func TestARequestIsAnsweredByAServerStillReadingTheProjects(test *testing.T) {
 func TestARequestAnsweredWithNothingWhileTheServerReadsWaitsForItToBeReady(test *testing.T) {
 	folder := project(test, map[string]string{"lamp.go": "package lamp\n\nfunc Beam() int { return 2 }\n"})
 	server, _ := fake(test, false, "FAKE_LSP_READY=ServiceReady", "FAKE_LSP_BLANK=1")
-	server.ReadyStatus = "ServiceReady"
+	server.Ready.Status = "ServiceReady"
 	client, err := Start(within(test), server, folder, nil, "")
 	if err != nil {
 		test.Fatal(err)
@@ -157,8 +157,8 @@ func TestAServerIsGivenItsSettingsItsFoldersAndItsMemory(test *testing.T) {
 	folder := project(test, map[string]string{"go.mod": "module lamp\n"})
 	server, log := fake(test, true, "FAKE_LSP_ASKS=java.import")
 	server.Settings = map[string]any{"java": map[string]any{"import": map[string]any{"generatesMetadataFilesAtProjectRoot": false}}}
-	server.Memory, server.MemoryVariable = "2g", "FAKE_JVM_OPTIONS"
-	server.JVMOptions = []string{"-Dlamp.lit=true"}
+	server.Memory.Most, server.Memory.Variable = "2g", "FAKE_JVM_OPTIONS"
+	server.Memory.JVMOptions = []string{"-Dlamp.lit=true"}
 	server.FoldersInOptions = true
 	client, err := Start(within(test), server, "", []string{folder}, "")
 	if err != nil {
@@ -179,7 +179,7 @@ func TestAServerIsGivenItsSettingsItsFoldersAndItsMemory(test *testing.T) {
 func TestAServerOfAMemoryFlagHasItOnItsCommandLine(test *testing.T) {
 	folder := project(test, map[string]string{"go.mod": "module lamp\n"})
 	server, log := fake(test, false)
-	server.Memory, server.MemoryFlag = "2g", "--jvm-arg=-Xmx"
+	server.Memory.Most, server.Memory.Flag = "2g", "--jvm-arg=-Xmx"
 	client, err := Start(within(test), server, folder, nil, "")
 	if err != nil {
 		test.Fatal(err)

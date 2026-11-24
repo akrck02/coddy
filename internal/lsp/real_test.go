@@ -11,6 +11,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/akrck02/code-review/internal/gradle"
 )
 
 // realServer is a server of the table found on the PATH; the test skips when it is not installed.
@@ -131,8 +133,8 @@ func TestKotlinLspFollowsANameAcrossFiles(test *testing.T) {
 	test.Logf("kotlin-lsp wrote: %v", newFiles(before, filesIn(test, folder)))
 	// its index in the folder the reader gives it, one for every set of projects; not in the
 	// person's caches, where the reader removes nothing
-	if indexes, _ := filepath.Glob(filepath.Join(data, server.Indexes, "*")); len(indexes) == 0 {
-		test.Errorf("kotlin-lsp built no index in its data folder's %s: it went elsewhere (%v)", server.Indexes, entriesOf(data))
+	if indexes, _ := filepath.Glob(filepath.Join(data, server.Index.Folder, "*")); len(indexes) == 0 {
+		test.Errorf("kotlin-lsp built no index in its data folder's %s: it went elsewhere (%v)", server.Index.Folder, entriesOf(data))
 	}
 }
 
@@ -197,7 +199,7 @@ func theDaemonsStopped(test *testing.T, client *Client, data string) {
 	if len(logs) == 0 {
 		test.Error("no Gradle daemon ran in the server's own Gradle home")
 	}
-	if stopped := len(runningDaemons(data)); stopped > 0 {
+	if stopped := gradle.Daemons(data); stopped > 0 {
 		test.Errorf("%d Gradle daemons outlived the server", stopped)
 	}
 }

@@ -104,7 +104,7 @@ func TestAServerThatImportsBuildsLeavesOutABuildItCannotImport(test *testing.T) 
 	_ = os.WriteFile(filepath.Join(wrapper, "gradle-wrapper.properties"),
 		[]byte("distributionUrl=https\\://services.gradle.org/distributions/gradle-4.10.3-bin.zip\n"), 0o644)
 	servers := []lsp.Server{{Name: "fakels", Command: fakeServer(test), Languages: []string{"go"}, OnePerWindow: true,
-		ReadsAll: true, OwnGradle: true, Environment: []string{"FAKE_LSP_LOG=" + log}}}
+		ReadsAll: true, Import: lsp.Import{OwnGradle: true}, Environment: []string{"FAKE_LSP_LOG=" + log}}}
 	application := newReader(Settings{Folders: []string{folder}, WorkingTree: true, Synchronous: true,
 		Open: "lighthouse/src/lamp.go", Servers: servers})
 	test.Cleanup(application.servers.Stop)

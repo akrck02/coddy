@@ -240,7 +240,7 @@ func TestAProjectWhereOnlyAServerWroteStaysListed(test *testing.T) {
 func TestAServerThatNeedsMoreFreeSpaceThanTheDiskHasDoesNotStart(test *testing.T) {
 	log := filepath.Join(test.TempDir(), "log")
 	servers := fakeGo(test, log)
-	servers[0].DataFlag, servers[0].NeedsFree = "--data", 10<<30
+	servers[0].DataFlag, servers[0].Index.NeedsFree = "--data", 10<<30
 	application := newReader(Settings{Folders: []string{makeRepository(test)}, WorkingTree: true, Synchronous: true,
 		Open: "lighthouse/src/lamp.go", Servers: servers, ServerData: test.TempDir()})
 	test.Cleanup(application.servers.Stop)
@@ -259,8 +259,8 @@ func TestAServerThatNeedsMoreFreeSpaceThanTheDiskHasDoesNotStart(test *testing.T
 func TestAServerWaitsForAnotherToHaveImportedTheProjects(test *testing.T) {
 	log := filepath.Join(test.TempDir(), "log")
 	first := fakeGo(test, log, "FAKE_LSP_READY=ServiceReady")[0]
-	first.ReadyStatus = "ServiceReady"
-	second := lsp.Server{Name: "second", Command: fakeServer(test), Languages: []string{"kotlin"}, After: []string{"fakels"}}
+	first.Ready.Status = "ServiceReady"
+	second := lsp.Server{Name: "second", Command: fakeServer(test), Languages: []string{"kotlin"}, Import: lsp.Import{After: []string{"fakels"}}}
 	application := readerWithServers(test, "lighthouse/src/lamp.go", []lsp.Server{first, second})
 	window := newWindow(test, application)
 	window.Frames(1)

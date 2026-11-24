@@ -41,8 +41,8 @@ func FolderSize(folder string) int64 {
 
 // IndexesSize is how many bytes a server's indexes take in its data folder.
 func IndexesSize(dataFolder string, server Server) int64 {
-	if server.Indexes == "" || dataFolder == "" {
+	if server.Index.Folder == "" || dataFolder == "" {
 		return 0
 	}
-	return FolderSize(filepath.Join(dataFolder, server.Indexes))
+	return FolderSize(filepath.Join(dataFolder, server.Index.Folder))
 }

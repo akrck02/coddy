@@ -55,6 +55,36 @@ func TestAMavenBuildTakesItsGroupFromItsParent(test *testing.T) {
 	}
 }
 
+func TestEachReaderReadsOnlyItsOwnBuildFiles(test *testing.T) {
+	folder, files := project(test, map[string]string{
+		"settings.gradle": "rootProject.name = 'lamp'\n",
+		"build.gradle":    "group 'org.lighthouse'\n",
+		"pom.xml":         "<project><groupId>org.harbour</groupId><artifactId>quay</artifactId></project>",
+	})
+	cases := []struct {
+		reader    Reader
+		publishes []string
+	}{
+		{Gradle, []string{"org.lighthouse:lamp"}},
+		{Maven, []string{"org.harbour:quay"}},
+	}
+	for _, each := range cases {
+		var build Build
+		each.reader.Read(&build, folder, readFiles(folder, files, each.reader.Files()))
+		if !slices.Equal(build.Publishes, each.publishes) {
+			test.Errorf("%v publishes %v, not %v", each.reader.Files(), build.Publishes, each.publishes)
+		}
+	}
+}
+
+func TestABuildFileIsKnownByItsName(test *testing.T) {
+	for name, known := range map[string]bool{"pom.xml": true, "build.gradle.kts": true, "settings.gradle": true, "go.mod": false, "build.xml": false} {
+		if IsBuildFile(name) != known {
+			test.Errorf("%s is a build file: %v, not %v", name, !known, known)
+		}
+	}
+}
+
 func TestProjectsAreLinkedByWhatTheyPublish(test *testing.T) {
 	links := Links([]Build{
 		{Publishes: []string{"org.lighthouse:lamp"}},

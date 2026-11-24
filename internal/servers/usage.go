@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/akrck02/code-review/internal/gradle"
 	"github.com/akrck02/code-review/internal/lsp"
 )
 
@@ -45,8 +46,8 @@ func (fleet *Fleet) Measure(now time.Time) {
 func measure(client *lsp.Client, before usage) usage {
 	taken := before
 	taken.memory = lsp.MemoryOf(client.Process())
-	if client.Server.OwnGradle && client.DataFolder() != "" {
-		taken.daemons = lsp.GradleDaemons(client.DataFolder())
+	if client.Server.Import.OwnGradle && client.DataFolder() != "" {
+		taken.daemons = gradle.Daemons(client.DataFolder())
 	}
 	if !taken.indexKnown {
 		taken.index, taken.indexKnown = lsp.IndexesSize(client.DataFolder(), client.Server), true
