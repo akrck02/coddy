@@ -27,6 +27,8 @@ gets them.
 | `Lexer` | The highlighter's name, only when Chroma does not know the extension | `"groovy"` for `.gradle` |
 | `Fences` | Words a Markdown fence may use besides the extension | `"golang"` |
 | `Icon`, `Tint` | A Lucide icon and the role in the code's theme it is tinted by | `"file-code"`, `"keyword"` |
+| `JVM` | It runs on the Java virtual machine: its imports are read to find uses, and a name may live in a jar | `true` for Kotlin |
+| `Classes` | Each file declares a class named as the file, so the sidebar lists it by its class | `true` for Java |
 
 ## Checking it
 
@@ -36,7 +38,8 @@ go test ./internal/language ./internal/highlight ./internal/theme
 
 `TestEveryLanguageOfTheTableIsHighlightedIconedAndServedTheSameWay` checks each entry is coloured,
 iconed and served as the table says. `TestEachExtensionAndNameBelongsToOneLanguage` fails if your
-extension is already another language's.
+extension is already another language's. `TestNoLanguageIsNamedOutsideItsTable`, in the rules
+test, fails if code elsewhere writes the extension of a served, JVM or class language by hand.
 
 An icon theme chosen in the settings (Catppuccin's, say) draws its own icons over `Icon`; the
 table's icon is the built-in one.

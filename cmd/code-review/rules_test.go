@@ -9,8 +9,11 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/akrck02/code-review/internal/language"
 )
 
 // moduleRoot is the folder of go.mod, seen from this package's folder.
@@ -267,6 +270,38 @@ func TestTheStandardLibraryIsImportedApartFromTheModules(test *testing.T) {
 func isStandard(imported *ast.ImportSpec) bool {
 	first, _, _ := strings.Cut(strings.Trim(imported.Path.Value, `"`), "/")
 	return !strings.Contains(first, ".")
+}
+
+// What Coddy knows of each language is in its table, so no other package names the files of a
+// language it treats in a way of its own (served, of the JVM, a class per file) by their extension:
+// it asks the table (language.Of, IsJVM, ClassName…). Other extensions may name a folder or a
+// fallback (".gradle", ".txt").
+func TestNoLanguageIsNamedOutsideItsTable(test *testing.T) {
+	extensions := map[string]bool{}
+	for _, known := range language.Languages {
+		if known.ServerLanguage == "" && !known.JVM && !known.Classes {
+			continue
+		}
+		for _, extension := range known.Extensions {
+			extensions[strconv.Quote(extension)] = true
+		}
+	}
+	files := token.NewFileSet()
+	for path, content := range goSources(test) {
+		if strings.Contains(filepath.ToSlash(path), "internal/language/") {
+			continue
+		}
+		file, err := parser.ParseFile(files, path, content, 0)
+		if err != nil {
+			test.Fatal(err)
+		}
+		ast.Inspect(file, func(node ast.Node) bool {
+			if literal, isLiteral := node.(*ast.BasicLit); isLiteral && extensions[literal.Value] {
+				test.Errorf("%s: %s names a language outside its table", files.Position(literal.Pos()), literal.Value)
+			}
+			return true
+		})
+	}
 }
 
 // modePackages are the modes, whose methods are checked by TestNoModeHasAMethodThatDoesNothing.

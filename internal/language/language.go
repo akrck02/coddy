@@ -25,19 +25,32 @@ type Language struct {
 	// colour of the code it is drawn in, by its role in the code's theme ("keyword").
 	Icon string
 	Tint string
+	// JVM tells whether it runs on the Java virtual machine: its files import names by package,
+	// and a name they use may be declared in a jar.
+	JVM bool
+	// Classes tells whether each of its files declares a class named as the file ("Lamp.kt"
+	// declares Lamp), so the file can be listed as its class.
+	Classes bool
 }
 
-// Markdown is the Name of the Markdown language, which the viewer can show formatted.
-const Markdown = "Markdown"
+// The Names of the languages the reader treats in a way of their own.
+const (
+	// Markdown can be shown formatted.
+	Markdown = "Markdown"
+	// Go, Java and Kotlin have the language servers the reader knows.
+	Go     = "Go"
+	Java   = "Java"
+	Kotlin = "Kotlin"
+)
 
 // Languages are every language Coddy knows, in the order a server's language is named by.
 var Languages = []Language{
-	{Name: "Java", Extensions: []string{".java"}, ServerLanguage: "java", Icon: "coffee", Tint: "number"},
-	{Name: "Kotlin", Extensions: []string{".kt"}, ServerLanguage: "kotlin", Fences: []string{"kotlin"}, Icon: "file-code", Tint: "keyword"},
-	{Name: "Kotlin script", Extensions: []string{".kts"}, ServerLanguage: "kotlin", Lexer: "kotlin", Icon: "file-cog", Tint: "keyword"},
+	{Name: Java, Extensions: []string{".java"}, ServerLanguage: "java", Icon: "coffee", Tint: "number", JVM: true, Classes: true},
+	{Name: Kotlin, Extensions: []string{".kt"}, ServerLanguage: "kotlin", Fences: []string{"kotlin"}, Icon: "file-code", Tint: "keyword", JVM: true, Classes: true},
+	{Name: "Kotlin script", Extensions: []string{".kts"}, ServerLanguage: "kotlin", Lexer: "kotlin", Icon: "file-cog", Tint: "keyword", JVM: true},
 	{Name: "Gradle", Extensions: []string{".gradle"}, Lexer: "groovy", Fences: []string{"gradle"}, Icon: "file-cog", Tint: "string"},
-	{Name: "Gradle in Kotlin", Extensions: []string{".gradle.kts"}, ServerLanguage: "kotlin", Lexer: "kotlin", Icon: "file-cog", Tint: "string"},
-	{Name: "Go", Extensions: []string{".go"}, ServerLanguage: "go", Fences: []string{"golang"}, Icon: "file-code", Tint: "type"},
+	{Name: "Gradle in Kotlin", Extensions: []string{".gradle.kts"}, ServerLanguage: "kotlin", Lexer: "kotlin", Icon: "file-cog", Tint: "string", JVM: true},
+	{Name: Go, Extensions: []string{".go"}, ServerLanguage: "go", Fences: []string{"golang"}, Icon: "file-code", Tint: "type"},
 	{Name: "TypeScript", Extensions: []string{".ts", ".tsx"}, ServerLanguage: "typescript", Fences: []string{"typescript"}, Icon: "file-code", Tint: "function"},
 	{Name: "JavaScript", Extensions: []string{".js", ".mjs", ".jsx"}, ServerLanguage: "javascript", Fences: []string{"javascript"}, Icon: "file-code", Tint: "constant"},
 	{Name: "Python", Extensions: []string{".py"}, ServerLanguage: "python", Fences: []string{"python"}, Icon: "file-code", Tint: "function"},

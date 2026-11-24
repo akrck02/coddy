@@ -11,7 +11,7 @@ Make sure the language is in the table, with its `ServerLanguage` (see
 `internal/lsp/servers.go`:
 
 ```go
-{Name: "zls", Command: "zls", Languages: []string{"zig"}, RootMarkers: []string{"build.zig"},
+{Name: "zls", Command: "zls", Languages: language.ServerLanguages("Zig"), RootMarkers: []string{"build.zig"},
 	Install: "brew install zls"},
 ```
 

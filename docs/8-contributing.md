@@ -70,6 +70,9 @@ How these lean on each other, floor by floor, is in [how it is made](4-how-it-is
 | `TestTheContributingGuideListsEveryPackage` | the list above names every package of `internal/`, and only those |
 | `TestNoFunctionIsLongerThanFortyLines` | a function fits on a screen |
 | `TestNoFileIsLongerThanFourHundredLines` | a file of the program is one concept, 400 lines at most |
+| `TestNoPackageHoldsMoreThanTwentyFiveFiles` | a package is one concept, 25 files at most, tests left out |
+| `TestTheStandardLibraryIsImportedApartFromTheModules` | imports come in two groups, the standard library first, as `goimports` leaves them |
+| `TestNoLanguageIsNamedOutsideItsTable` | the extensions of the languages Coddy serves or reads as classes are written only in `language` |
 | `TestNoErrorIsDroppedWithoutAReasonOnItsLine` | every `_ =` says why on its line |
 
 ## How a pane talks to the window

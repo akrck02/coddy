@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/akrck02/code-review/internal/language"
 	"github.com/akrck02/code-review/internal/lsp"
 	"github.com/akrck02/code-review/internal/workspace"
 )
@@ -38,9 +39,13 @@ func FromJar(projects []*workspace.Project, location lsp.Location, name string) 
 // for the class NameKt Kotlin makes of a file's functions, or else a Kotlin file of the folder that
 // declares the class, as one Kotlin file may hold several.
 func sourceOfClass(projects []*workspace.Project, folder, class string) (string, bool) {
-	names := []string{class + ".java", class + ".kt"}
+	kotlin := kotlinExtension()
+	var names []string
+	for _, extension := range language.ClassExtensions() {
+		names = append(names, class+extension)
+	}
 	if facade, isFacade := strings.CutSuffix(class, "Kt"); isFacade && facade != "" {
-		names = append(names, facade+".kt")
+		names = append(names, facade+kotlin)
 	}
 	for _, name := range names {
 		if source, found := sourceOf(projects, folder+"/"+name); found {
@@ -50,7 +55,7 @@ func sourceOfClass(projects []*workspace.Project, folder, class string) (string,
 	declared := typeDeclaration(class)
 	for _, project := range projects {
 		for _, file := range project.Files {
-			if !strings.HasSuffix(file, ".kt") || !inFolder(file, folder) {
+			if !strings.HasSuffix(file, kotlin) || !inFolder(file, folder) {
 				continue
 			}
 			full := filepath.Join(project.Path, filepath.FromSlash(file))
@@ -136,4 +141,11 @@ func wordColumn(line, name string) int {
 		return -1
 	}
 	return len([]rune(line[:at[0]]))
+}
+
+// kotlinExtension is the extension of Kotlin's files, the language whose rules (a class per
+// file's functions, several classes in a file) sourceOfClass follows besides the plain one.
+func kotlinExtension() string {
+	kotlin, _ := language.Named(language.Kotlin) // the table holds Kotlin, as its test checks
+	return kotlin.Extensions[0]
 }

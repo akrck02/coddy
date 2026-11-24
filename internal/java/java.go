@@ -8,6 +8,7 @@ import (
 
 	"github.com/akrck02/code-review/internal/builds"
 	"github.com/akrck02/code-review/internal/git"
+	"github.com/akrck02/code-review/internal/language"
 	"github.com/akrck02/code-review/internal/workspace"
 )
 
@@ -125,10 +126,8 @@ func KindOf(path string, content []byte) ClassKind {
 	return NoClass
 }
 
-// IsClassFile tells whether a file is a Java or Kotlin source whose class can be read.
-func IsClassFile(path string) bool {
-	return strings.HasSuffix(path, ".java") || strings.HasSuffix(path, ".kt")
-}
+// IsClassFile tells whether a file is a source of one class, whose kind can be read.
+func IsClassFile(path string) bool { return language.IsClassFile(path) }
 
 // headSize is how much of a source file is read to find what it declares: the package, the
 // imports and the declaration fit in it nearly always.

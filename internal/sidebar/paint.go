@@ -1,11 +1,10 @@
 package sidebar
 
 import (
-	"strings"
-
 	"github.com/akrck02/code-review/internal/git"
 	"github.com/akrck02/code-review/internal/icons"
 	"github.com/akrck02/code-review/internal/java"
+	"github.com/akrck02/code-review/internal/language"
 	"github.com/akrck02/code-review/internal/pane"
 	"github.com/akrck02/code-review/internal/theme"
 	"github.com/akrck02/code-review/internal/workspace"
@@ -202,7 +201,7 @@ func paintFileIcon(painter painting, row Row, text rowText, iconTop float32) str
 	reference := workspace.FileReference{Project: row.Project, Path: row.Path}
 	if kind := painter.classKind(reference); kind != java.UnknownKind && kind != java.NoClass {
 		paintClassBadge(painter.drawing, painter.look, kind, text.x, iconTop, treeIconSize, quiet)
-		return strings.TrimSuffix(strings.TrimSuffix(row.Label, ".java"), ".kt")
+		return language.ClassName(row.Label)
 	}
 	icon := theme.FileIcon(row.Label, painter.look)
 	if quiet {

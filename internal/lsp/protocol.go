@@ -6,6 +6,8 @@ import (
 	"net/url"
 	"path/filepath"
 	"strings"
+
+	"github.com/akrck02/code-review/internal/language"
 )
 
 // Position is a place in a text document, as the protocol counts it: a line and a character,
@@ -72,7 +74,7 @@ func ClassInJar(uri string) (packageName, class string, found bool) {
 		}
 		packageName, file = strings.ReplaceAll(inside[:slash], "/", "."), inside[slash+1:]
 	}
-	class, _, _ = strings.Cut(strings.TrimSuffix(strings.TrimSuffix(file, ".class"), ".java"), "$")
+	class, _, _ = strings.Cut(language.ClassName(strings.TrimSuffix(file, ".class")), "$")
 	if packageName == "" || class == "" {
 		return "", "", false
 	}

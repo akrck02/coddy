@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/akrck02/code-review/internal/language"
 )
 
 // Server is a language server the reader knows how to run.
@@ -101,7 +103,7 @@ type Import struct {
 
 // Servers are the language servers the reader runs, found on the PATH.
 var Servers = []Server{
-	{Name: "gopls", Command: "gopls", Languages: []string{"go"}, RootMarkers: []string{"go.mod"},
+	{Name: "gopls", Command: "gopls", Languages: language.ServerLanguages(language.Go), RootMarkers: []string{"go.mod"},
 		Install: "go install golang.org/x/tools/gopls@latest",
 		// the latest gopls may need a newer Go than the one installed, which a Linux's own Go
 		// (GOTOOLCHAIN=local) would not download
@@ -109,7 +111,7 @@ var Servers = []Server{
 	// jdtls reads Java only: Kotlin has kotlin-lsp, below. It writes nothing in the repositories: .project, .classpath and .settings go in its data
 	// folder (a JVM property, read before the setting is), and no build fills bin/ or target/; a
 	// build file changed is not imported again on its own.
-	{Name: "jdtls", Command: "jdtls", Languages: []string{"java"}, OnePerWindow: true, DataFlag: "-data", FoldersInOptions: true,
+	{Name: "jdtls", Command: "jdtls", Languages: language.ServerLanguages(language.Java), OnePerWindow: true, DataFlag: "-data", FoldersInOptions: true,
 		Arguments: []string{"--jvm-arg=-Djava.import.generatesMetadataFilesAtProjectRoot=false"},
 		Install:   "brew install jdtls", Ready: Readiness{Status: "ServiceReady"},
 		// every Java project of the window from the start: jdtls drops from its workspace the
@@ -130,7 +132,7 @@ var Servers = []Server{
 	// jar:///…!/package/Class.class. Gradle's import writes .gradle/ and build/ in the project, as
 	// a build does. It follows workspace folders added and removed.
 	{Name: "kotlin-lsp", Command: "kotlin-lsp", Arguments: []string{"--stdio"}, DataFlag: "--system-path",
-		Languages: []string{"kotlin"}, OnePerWindow: true, Install: "brew install JetBrains/utils/kotlin-lsp",
+		Languages: language.ServerLanguages(language.Kotlin), OnePerWindow: true, Install: "brew install JetBrains/utils/kotlin-lsp",
 		// up to 263 it built an index per set of projects it started with, in the system path's
 		// workspaces/; since 271 that went to the person's caches, ~/Library/Caches/JetBrains/
 		// IntelliJServer/workspaces, one per set again, 12 GB in a day. Given indexDir it keeps its

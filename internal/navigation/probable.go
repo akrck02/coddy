@@ -2,10 +2,9 @@ package navigation
 
 import (
 	"os"
-	"path/filepath"
 	"regexp"
-	"strings"
 
+	"github.com/akrck02/code-review/internal/language"
 	"github.com/akrck02/code-review/internal/lsp"
 )
 
@@ -52,19 +51,13 @@ func markProbable(search *Search) {
 	for _, place := range search.pending {
 		if _, read := names[place.path]; !read {
 			text, _ := os.ReadFile(place.path) // a file gone names nothing: its place is checked by its server
-			names[place.path] = isJavaOrKotlin(place.path) && namesDeclaration(string(text), declaredIn, search.Name)
+			names[place.path] = language.IsJVM(place.path) && namesDeclaration(string(text), declaredIn, search.Name)
 		}
 		if names[place.path] {
 			location := placeLocation(place, search.Name)
 			search.probable[placeKey(location)] = location
 		}
 	}
-}
-
-// isJavaOrKotlin tells whether a file is a Java or Kotlin source, whose imports are read.
-func isJavaOrKotlin(path string) bool {
-	extension := strings.ToLower(filepath.Ext(path))
-	return extension == ".java" || extension == ".kt" || extension == ".kts"
 }
 
 // placeLocation is a place of a file, as long as the name.

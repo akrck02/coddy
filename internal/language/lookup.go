@@ -11,7 +11,20 @@ var (
 	byExtension = indexBy(func(language Language) []string { return language.Extensions })
 	byFileName  = indexBy(func(language Language) []string { return language.FileNames })
 	byFence     = indexBy(func(language Language) []string { return language.Fences })
+	// classExtensions are the extensions of the languages whose files are each a class.
+	classExtensions = extensionsOfClasses()
 )
+
+// extensionsOfClasses lists the extensions of every language whose files are each a class.
+func extensionsOfClasses() []string {
+	var extensions []string
+	for _, language := range Languages {
+		if language.Classes {
+			extensions = append(extensions, language.Extensions...)
+		}
+	}
+	return extensions
+}
 
 // indexBy maps each key of the table's languages, as the function gives them, to its language.
 func indexBy(keys func(Language) []string) map[string]*Language {
@@ -75,4 +88,58 @@ func NameOfServerLanguage(serverLanguage string) string {
 		}
 	}
 	return ""
+}
+
+// Named is the language of the table with a name ("Kotlin").
+func Named(name string) (Language, bool) {
+	for _, language := range Languages {
+		if language.Name == name {
+			return language, true
+		}
+	}
+	return Language{}, false
+}
+
+// ServerLanguages are what the language server protocol calls the languages of some names,
+// for a server that reads them: ServerLanguages(Kotlin) is ["kotlin"].
+func ServerLanguages(names ...string) []string {
+	languages := make([]string, 0, len(names))
+	for _, name := range names {
+		if language, found := Named(name); found && language.ServerLanguage != "" {
+			languages = append(languages, language.ServerLanguage)
+		}
+	}
+	return languages
+}
+
+// IsJVM tells whether a file is of a language of the Java virtual machine, whose imports name
+// packages.
+func IsJVM(path string) bool {
+	language, _ := Of(path) // a file of no language is not one
+	return language.JVM
+}
+
+// ClassExtensions are the extensions of the files that are each a class (".java", ".kt").
+func ClassExtensions() []string { return classExtensions }
+
+// IsClassFile tells whether a file is one class, named as the file, by its extension as written.
+func IsClassFile(path string) bool {
+	_, found := classExtensionOf(path)
+	return found
+}
+
+// ClassName is the name of the class a class file declares: its name without the extension.
+func ClassName(fileName string) string {
+	extension, _ := classExtensionOf(fileName) // a file that is no class keeps its whole name
+	return strings.TrimSuffix(fileName, extension)
+}
+
+// classExtensionOf is the extension that makes a file a class, if one does.
+func classExtensionOf(path string) (string, bool) {
+	for _, extension := range classExtensions {
+		if strings.HasSuffix(path, extension) {
+			return extension, true
+		}
+	}
+	return "", false
 }
