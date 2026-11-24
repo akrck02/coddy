@@ -24,8 +24,8 @@ into what to fix, in what order, and what stays as it is.
 |---|---|---|
 | R1 | An idle frame allocates nothing that depends only on data: no copy of the open file, no command table, no labels, counts or badges rebuilt | test: `an idle frame allocates no more than the interface itself` (`testing.AllocsPerRun` on a window with a big file open, in each mode) |
 | R2 | No data race and no write outside a project: the server's folders are read under their lock, and a new file under a linked folder is refused when the link leads out | `go test -race ./...`; test: `a new file under a link that leads out of the project is refused` |
-| R3 | `window` is the shell only: composition, focus, overlays, keys, the bars. The servers, finding names and uses, and the projects with their documents are each a package of their own, behind small interfaces declared where they are used | `rules_test`: none of them imports `window`; `window` has at most 25 files |
-| R4 | Each package and each file is one concept; no file above about 400 lines | `rules_test`: a package has at most 25 files; a list of files above 400 lines that only shrinks |
+| R3 | `window` is the shell only: composition, focus, overlays, keys, the bars. The servers, finding names and uses, and the projects with their documents are each a package of their own, behind small interfaces declared where they are used | `rules_test`: none of them imports `window`; review: `window` has about 25 files at most |
+| R4 | Each package and each file is one concept; no file above about 400 lines | review: a package of more than about 25 files, or a file above about 400 lines, is split by concept |
 | R5 | A contract asks only what every implementation does: `Mode` without empty methods, the sidebar's and viewer's windows without features of a single caller; a capability is checked once, not each call | review of `mode`, `sidebar`, `viewer`; the Files mode has no method that does nothing |
 | R6 | One seam for each thing that will have several kinds: how the viewer shows a file, where the finder looks, how a project's tree is laid out, how a build file is read | tests per kind; adding a kind touches one file and the table that lists it |
 | R7 | What Coddy knows of each language is in one table: names, extensions, file names, the server's language id, icon, fence names | test: `every language of the table is highlighted, iconed and served the same way`; no language name outside the table and its kinds |
@@ -198,9 +198,9 @@ Built on 24 November 2026, one commit per task, pending the author's review. `go
 
 - R1, R8: the idle-frame and cache tests pass; R2: `-race` and the link test pass; R3, R5, R6, R7,
   R9, R10: each has its rule or test in `cmd/code-review/rules_test.go` or beside its package.
-- R3, R4: no file of the program is above 400 lines (`TestNoFileIsLongerThanFourHundredLines`, from
-  `bac0193`) and no package holds more than 25 (`TestNoPackageHoldsMoreThanTwentyFiveFiles`): the
-  window's small files joined the file of their concept (`805e751`).
+- R3, R4: no file of the program is above 400 lines and no package holds more than 25: the
+  window's small files joined the file of their concept (`805e751`). The author chose to keep
+  these sizes as rules of review, not tests: they are how the code is written, not what it does.
 
 **After the review.** A reviewer with a clean context read the whole change. What it found is
 fixed, each with its test or rule:

@@ -217,36 +217,6 @@ func TestNoFunctionIsLongerThanFortyLines(test *testing.T) {
 	}
 }
 
-// longestFile is how many lines a file of the program may take: a longer one is usually two concepts.
-const longestFile = 400
-
-// Each file is one concept a reader can hold in mind, so none of the program's is longer than
-// four hundred lines. Tests are left out: their length is their cases.
-func TestNoFileIsLongerThanFourHundredLines(test *testing.T) {
-	for path, content := range goSources(test) {
-		if lines := strings.Count(content, "\n"); lines > longestFile {
-			test.Errorf("%s is %d lines long; split it by part into files of %d at most", path, lines, longestFile)
-		}
-	}
-}
-
-// mostFilesInAPackage is how many files, tests left out, a package may hold: a bigger one is
-// usually several concepts, each worth a package of its own.
-const mostFilesInAPackage = 25
-
-// A package is one concept a reader can name, so none holds more than twenty-five files.
-func TestNoPackageHoldsMoreThanTwentyFiveFiles(test *testing.T) {
-	files := map[string]int{}
-	for path := range goSources(test) {
-		files[filepath.Dir(path)]++
-	}
-	for folder, count := range files {
-		if count > mostFilesInAPackage {
-			test.Errorf("%s holds %d files; split it into packages of %d at most", folder, count, mostFilesInAPackage)
-		}
-	}
-}
-
 // The imports come in groups, as goimports leaves them: the standard library first, then the
 // modules, a blank line between. A module in the first group hides where the code reaches.
 func TestTheStandardLibraryIsImportedApartFromTheModules(test *testing.T) {
