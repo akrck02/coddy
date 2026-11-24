@@ -42,13 +42,6 @@ type Window interface {
 	OpenFolder()
 	// ShowFolder shows what a folder of a project holds in the viewer's place, "" its top.
 	ShowFolder(project int, folder string)
-	// FileButton is the button the mode that is on puts in the header, such as Viewed;
-	// PressFileButton presses it.
-	FileButton(file workspace.FileReference) (Button, bool)
-	PressFileButton(file workspace.FileReference)
-	// BuildInsteadOfAFile builds what the window shows while no file is open, and tells whether it
-	// had anything; if not, the view shows how to start.
-	BuildInsteadOfAFile(context *ui.Context) bool
 	// Editing tells whether the keyboard is in the file being edited; ReadOnly whether editing is
 	// off for every file.
 	Editing() bool
@@ -58,11 +51,30 @@ type Window interface {
 	ShowsStatus() bool
 	// Run starts background work under a key, replacing the work under that key still running.
 	Run(key string, do func(stop context.Context) func())
+}
+
+// Marker is a window that puts a button of its own in the header for a file, such as Viewed.
+type Marker interface {
+	// FileButton is the button for a file, if it has one; PressFileButton presses it.
+	FileButton(file workspace.FileReference) (button Button, shown bool)
+	PressFileButton(file workspace.FileReference)
+}
+
+// Navigator is a window that knows where names are declared and what they are, as language
+// servers do.
+type Navigator interface {
 	// GoToDefinition opens where the name at a place of the file open is declared.
 	GoToDefinition(place Place)
 	// Hover shows what the server says of the name at a place while the pointer rests on it
 	// (resting), and stops showing it when the pointer leaves (not resting).
 	Hover(place Place, resting bool)
+}
+
+// Page is a window with something of its own to show while no file is open.
+type Page interface {
+	// BuildInsteadOfAFile builds it and tells whether it had anything; if not, the view shows
+	// how to start.
+	BuildInsteadOfAFile(context *ui.Context) bool
 }
 
 // Button is a button of the header a mode adds, such as Viewed: its icon, its tooltip, and
@@ -464,7 +476,7 @@ func (view *Viewer) Build(context *ui.Context, window Window) {
 	look := window.Look()
 	context.Frame(ui.Layout{Direction: ui.Vertical, Width: ui.Grow(), Height: ui.Grow()}, ui.Look{Fill: look.Editor}, func() {
 		if !view.showing {
-			if window.BuildInsteadOfAFile(context) {
+			if page, hasPage := window.(Page); hasPage && page.BuildInsteadOfAFile(context) {
 				return
 			}
 			view.buildEmpty(context, window)
@@ -508,8 +520,8 @@ func (view *Viewer) followInput(context *ui.Context, window Window) {
 	}
 	if place, found := view.PlaceAt(x, y); clicked && found {
 		view.clicked, view.clickedSome = place, true
-		if keys.Command() {
-			window.GoToDefinition(place)
+		if navigator, navigates := window.(Navigator); navigates && keys.Command() {
+			navigator.GoToDefinition(place)
 			return
 		}
 	}
@@ -581,9 +593,13 @@ func (view *Viewer) buildViewButtons(context *ui.Context, window Window, compact
 		}
 	}
 	view.buildViewSwitch(context)
-	if button, shown := window.FileButton(view.Reference); shown {
+	marker, marks := window.(Marker)
+	if !marks {
+		return
+	}
+	if button, shown := marker.FileButton(view.Reference); shown {
 		if theme.ToolButton(context, button.Tip, button.Icon, button.On) {
-			window.PressFileButton(view.Reference)
+			marker.PressFileButton(view.Reference)
 		}
 	}
 }

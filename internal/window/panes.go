@@ -5,13 +5,23 @@ import (
 
 	"github.com/akrck02/code-review/internal/finder"
 	"github.com/akrck02/code-review/internal/java"
-	"github.com/akrck02/code-review/internal/mode"
 	"github.com/akrck02/code-review/internal/pane"
 	"github.com/akrck02/code-review/internal/sidebar"
 	"github.com/akrck02/code-review/internal/theme"
 	"github.com/akrck02/code-review/internal/viewer"
 	"github.com/akrck02/code-review/internal/workspace"
 	ui "github.com/akrck02/go-ui"
+)
+
+// The window has every power the panes may look for: a name changed on either side would
+// otherwise leave the power out without a word.
+var (
+	_ viewer.Marker       = (*Window)(nil)
+	_ viewer.Navigator    = (*Window)(nil)
+	_ viewer.Page         = (*Window)(nil)
+	_ sidebar.ClassReader = (*Window)(nil)
+	_ sidebar.ServerFiles = (*Window)(nil)
+	_ sidebar.LeftOuter   = (*Window)(nil)
 )
 
 // What the panes ask of the window they sit in. Each pane declares, as an interface, the little it
@@ -34,7 +44,8 @@ func (application *Window) FocusViewer() { application.focus = viewerPane }
 
 // BuildInsteadOfAFile shows what the mode that is on shows while no file is open, if anything.
 func (application *Window) BuildInsteadOfAFile(context *ui.Context) bool {
-	return application.mode.BuildInsteadOfAFile(context)
+	page := application.powers.page
+	return page != nil && page.BuildInsteadOfAFile(context)
 }
 
 // Projects are the repositories open, in the order the sidebar lists them.
@@ -119,7 +130,7 @@ func (application *Window) ReadingKinds() bool { return len(application.kindsWan
 // FileButton is the viewer header's button for a file: the one of the mode that is on, else the
 // first mode that has one, so a file can be marked as viewed whatever the mode, as v can.
 func (application *Window) FileButton(file workspace.FileReference) (viewer.Button, bool) {
-	if owner := application.buttonOwner(file); owner != nil {
+	if owner := application.powers.button; owner != nil {
 		return owner.FileButton(file)
 	}
 	return viewer.Button{}, false
@@ -127,17 +138,13 @@ func (application *Window) FileButton(file workspace.FileReference) (viewer.Butt
 
 // PressFileButton presses the header's button for the file open, moving on as a reviewer would.
 func (application *Window) PressFileButton(file workspace.FileReference) {
-	if owner := application.buttonOwner(file); owner != nil {
+	owner := application.powers.button
+	if owner == nil {
+		return
+	}
+	if _, shown := owner.FileButton(file); shown {
 		owner.Press(file, true)
 	}
-}
-
-// buttonOwner is the mode whose button the viewer's header shows for a file, if any.
-func (application *Window) buttonOwner(file workspace.FileReference) mode.Mode {
-	if _, shown := application.mode.FileButton(file); shown {
-		return application.mode
-	}
-	return nil
 }
 
 // ListEveryFile turns to the first mode that lists every file. It is asked by the sidebar while
@@ -145,8 +152,7 @@ func (application *Window) buttonOwner(file workspace.FileReference) mode.Mode {
 func (application *Window) ListEveryFile() {
 	for _, each := range application.modes {
 		if !each.ChangesOnly() {
-			application.mode = each
-			application.sidebar.Listing = each
+			application.turnOn(each)
 			application.sidebar.Stale = true
 			return
 		}

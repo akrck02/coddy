@@ -67,17 +67,28 @@ needs, such as `Projects()` or `OpenFile(file)`, and `window.Window` implements 
 `internal/window/panes.go`. A new need is a new method on the pane's interface and its answer in
 `panes.go`.
 
+What only some windows can do, such as going to a definition (`viewer.Navigator`) or reading Java
+classes (`sidebar.ClassReader`), is an interface of its own beside `Window`. The pane checks for it
+and does without it when it is missing, so a test's window only has to answer what every window
+answers. `panes.go` checks at build time that the reader's window has every such power.
+
 ## Adding a mode
 
 A mode is one package and one line in `main`.
 
 1. Make a package, say `internal/usages`, with a type that implements `mode.Mode`. The
    files mode, `internal/files/files.go`, is the smallest example.
-2. Answer what the panes ask. `ChangesOnly` and `ShowsChanges` decide what is listed and how a file
-   opens. `Decorate(row)` says what a row shows beside its name. `Commands` declares the mode's
-   keys, with `pane.Key`.
-3. Reach the window through the `mode.Window` it is given in `Start`, never by importing `window`.
-4. Register it in `cmd/code-review/main.go`, after the others: `window.New(settings, files.New(),
+2. Answer what every mode answers (`mode.Mode`). `ChangesOnly` and `ShowsChanges` decide what is
+   listed and how a file opens. `Decorate(row)` says what a row shows beside its name.
+3. Add only the powers your mode has, each an interface of `mode` or `sidebar`: `WithCommands`
+   declares its keys, with `pane.Key`; `WithFileButton` puts a button in the viewer's header;
+   `WithProgress` counts its work in the status bar; `WithPage` shows a page while no file is
+   open; `Cover` draws over the viewer; `UsesHolder` shows the uses of a name; `sidebar.Headed`
+   puts words beside the sidebar's title. The window looks for each once, when the mode is turned
+   on. A method that does nothing to fill a contract is refused by
+   `TestNoModeHasAMethodThatDoesNothing`.
+4. Reach the window through the `mode.Window` it is given in `Start`, never by importing `window`.
+5. Register it in `cmd/code-review/main.go`, after the others: `window.New(settings, files.New(),
    review.New(path), usages.New())`. It takes the next place on the rail and the next number key.
 
 `TestNoTwoCommandsShareAKeyInOneMode` fails if a new key clashes with one already taken.

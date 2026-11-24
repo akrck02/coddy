@@ -53,13 +53,22 @@ type Window interface {
 	// ListEveryFile turns to a mode that lists every file, to show one the development did not
 	// change.
 	ListEveryFile()
-	// ClassKind is what a Java or Kotlin file declares, once read; asking for one not read yet
-	// has it read in the background.
-	ClassKind(file workspace.FileReference) java.ClassKind
-	// Loading tells whether projects are being read, and ReadingKinds whether class kinds are.
+	// Loading tells whether projects are being read.
 	Loading() bool
+}
+
+// ClassReader is a window that reads what Java and Kotlin files declare, so their rows are drawn
+// by their kind of class, as IntelliJ draws them.
+type ClassReader interface {
+	// ClassKind is what a file declares, once read; asking for one not read yet has it read in
+	// the background. ReadingKinds tells whether some are being read.
+	ClassKind(file workspace.FileReference) java.ClassKind
 	ReadingKinds() bool
-	// ShowServerFiles lists the files language servers wrote in a project, to open any of them.
+}
+
+// ServerFiles is a window whose language servers wrote files of their own in projects.
+type ServerFiles interface {
+	// ShowServerFiles lists the files the servers wrote in a project, to open any of them.
 	ShowServerFiles(project int)
 }
 
@@ -78,8 +87,10 @@ type Row struct {
 }
 
 type Sidebar struct {
-	// Listing is the mode that is on, which says what the sidebar lists and how; the window sets it.
-	Listing Listing
+	// listing is the mode that is on, which says what the sidebar lists and how: the window sets
+	// it with SetListing, which finds once what else it can do (powers)
+	listing Listing
+	powers  listingPowers
 	// expanded keeps the folders and projects opened or closed by hand, by key; the others follow
 	// the default (everything open when only the changes are listed, closed otherwise).
 	expanded map[expansionKey]bool
@@ -147,7 +158,7 @@ func (sidebar *Sidebar) Invalidate() {
 }
 
 func (sidebar *Sidebar) expandedKey(project int, path string) expansionKey {
-	return expansionKey{sidebar.Listing.Name(), sidebar.Listing.ChangesOnly(), project, path}
+	return expansionKey{sidebar.listing.Name(), sidebar.listing.ChangesOnly(), project, path}
 }
 
 func (sidebar *Sidebar) isExpanded(window Window, project int, path string, isProject bool) bool {
@@ -157,14 +168,14 @@ func (sidebar *Sidebar) isExpanded(window Window, project int, path string, isPr
 	if open, chosen := sidebar.expanded[sidebar.expandedKey(project, path)]; chosen {
 		return open
 	}
-	if _, chooses := sidebar.Listing.(Chooser); chooses || sidebar.Listing.ChangesOnly() {
+	if sidebar.powers.chooser != nil || sidebar.listing.ChangesOnly() {
 		return true // a few files, chosen: all in sight
 	}
 	return isProject && len(window.Projects()) == 1
 }
 
 func (sidebar *Sidebar) tree(window Window, project int) *workspace.Folder {
-	key := treeKey{project, sidebar.Listing.Name(), sidebar.listsChangesOnly(), ""}
+	key := treeKey{project, sidebar.listing.Name(), sidebar.listsChangesOnly(), ""}
 	if sidebar.filtersFiles(window, project) {
 		key.filter = sidebar.Filter
 	}
@@ -177,7 +188,7 @@ func (sidebar *Sidebar) tree(window Window, project int) *workspace.Folder {
 	if sidebar.listsChangesOnly() {
 		paths = model.ChangedPaths()
 	}
-	if chooser, chooses := sidebar.Listing.(Chooser); chooses {
+	if chooser := sidebar.powers.chooser; chooser != nil {
 		if chosen, own := chooser.ListedFiles(project); own {
 			paths = chosen
 		}
@@ -219,7 +230,10 @@ func (sidebar *Sidebar) Rebuild(window Window) {
 	sidebar.decorateRows()
 	sidebar.badgeRows(window)
 	sidebar.anyOpen = anyExpanded(sidebar.Rows)
-	sidebar.header = sidebar.Listing.Header()
+	sidebar.header = ""
+	if headed := sidebar.powers.headed; headed != nil {
+		sidebar.header = headed.Header()
+	}
 	sidebar.rebuilds++
 	if hadSelection {
 		for index, row := range sidebar.Rows {
@@ -275,7 +289,7 @@ func (sidebar *Sidebar) addEveryProject(window Window) {
 
 // projectOrder is the order the projects are listed in: the listing's, when it chooses its files.
 func (sidebar *Sidebar) projectOrder(window Window) []int {
-	if chooser, chooses := sidebar.Listing.(Chooser); chooses {
+	if chooser := sidebar.powers.chooser; chooser != nil {
 		if order := chooser.ProjectOrder(); order != nil {
 			return order
 		}
@@ -289,8 +303,8 @@ func (sidebar *Sidebar) projectOrder(window Window) []int {
 
 // chosenCount is how many files of a project the listing chooses, when it chooses them.
 func (sidebar *Sidebar) chosenCount(project int) (int, bool) {
-	chooser, chooses := sidebar.Listing.(Chooser)
-	if !chooses {
+	chooser := sidebar.powers.chooser
+	if chooser == nil {
 		return 0, false
 	}
 	paths, own := chooser.ListedFiles(project)
@@ -373,7 +387,7 @@ func (sidebar *Sidebar) RevealFile(window Window, reference workspace.FileRefere
 	if !changed && sidebar.onlyChanged {
 		window.ShowEveryProject()
 	}
-	if sidebar.Listing.ChangesOnly() && !changed {
+	if sidebar.listing.ChangesOnly() && !changed {
 		window.ListEveryFile()
 	}
 	sidebar.expandTo(window, reference.Project, reference.Path)
@@ -402,7 +416,7 @@ func (sidebar *Sidebar) RevealFolder(window Window, project int, folder string) 
 	if sidebar.onlyChanged { // a folder with no change, hidden by the filters
 		window.ShowEveryProject()
 	}
-	if sidebar.Listing.ChangesOnly() {
+	if sidebar.listing.ChangesOnly() {
 		window.ListEveryFile()
 	}
 	sidebar.Rebuild(window)
@@ -601,7 +615,7 @@ func (sidebar *Sidebar) Build(context *ui.Context, window Window) {
 // buildHeader names the mode, says how far it has gone if it can, and offers its buttons.
 func (sidebar *Sidebar) buildHeader(context *ui.Context, window Window) {
 	palette := context.Theme
-	title := sidebar.Listing.Name()
+	title := sidebar.listing.Name()
 	titleStyle := ui.TextStyle{Weight: draw2d.Medium, Color: palette.InkSoft}
 	context.Text(title, titleStyle)
 	room := sidebar.headerRoom() - theme.TextWidth(context, title, titleStyle) - toolButtonWidth*2 - headerGap*3
@@ -644,7 +658,9 @@ func (sidebar *Sidebar) followPointer(context *ui.Context, window Window) {
 	row := sidebar.Rows[index]
 	switch {
 	case sidebar.onBadge(index, x):
-		window.ShowServerFiles(row.Project)
+		if shower, shows := window.(ServerFiles); shows {
+			shower.ShowServerFiles(row.Project)
+		}
 	case sidebar.onLeftOutMark(index, x):
 		if outer, leavesOut := window.(LeftOuter); leavesOut {
 			outer.ShowServers()
@@ -652,7 +668,9 @@ func (sidebar *Sidebar) followPointer(context *ui.Context, window Window) {
 	case sidebar.onEnter(index, x):
 		sidebar.Enter(window, row.Project)
 	case sidebar.onCheck(index, x):
-		sidebar.Listing.Press(workspace.FileReference{Project: row.Project, Path: row.Path}, false)
+		if presser := sidebar.powers.presser; presser != nil {
+			presser.Press(workspace.FileReference{Project: row.Project, Path: row.Path}, false)
+		}
 	default:
 		sidebar.activate(window, index)
 	}
@@ -676,7 +694,7 @@ func (sidebar *Sidebar) buildEnteredHeader(context *ui.Context, window Window) {
 	if count != "" {
 		room -= theme.TextWidth(context, count, countStyle) + headerGap
 	}
-	if !sidebar.Listing.ChangesOnly() {
+	if !sidebar.listing.ChangesOnly() {
 		room -= toolButtonWidth + headerGap
 	}
 	nameStyle := ui.TextStyle{Weight: draw2d.Medium}
@@ -725,8 +743,8 @@ func (sidebar *Sidebar) headerRoom() float32 {
 }
 
 func (sidebar *Sidebar) hidesDeleted() bool {
-	hider, hides := sidebar.Listing.(DeletedHider)
-	return hides && hider.HidesDeleted()
+	hider := sidebar.powers.hider
+	return hider != nil && hider.HidesDeleted()
 }
 
 // LeavesOut tells whether a changed file is left out of the list whatever the filters: a file the
@@ -754,7 +772,7 @@ func withoutDeleted(project *workspace.Project, paths []string) []string {
 // listsChangesOnly tells whether the tree lists only the changed files: always in a mode of changes
 // only, and in the others when asked.
 func (sidebar *Sidebar) listsChangesOnly() bool {
-	return sidebar.Listing.ChangesOnly() || sidebar.onlyChanged
+	return sidebar.listing.ChangesOnly() || sidebar.onlyChanged
 }
 
 // SetChangedFilter lists only the changed files, or every file again, in a mode that lists every
@@ -789,7 +807,7 @@ func (sidebar *Sidebar) onEnter(index int, x float32) bool {
 // onCheck tells whether a click at x on a row fell on its mark, when the mode marks files.
 func (sidebar *Sidebar) onCheck(index int, x float32) bool {
 	row := sidebar.Rows[index]
-	if row.Kind != FileRow || sidebar.Listing.Decorate(row).Mark == NoMark {
+	if row.Kind != FileRow || sidebar.listing.Decorate(row).Mark == NoMark {
 		return false
 	}
 	left := sidebar.rowLeft(row)

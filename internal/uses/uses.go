@@ -90,9 +90,6 @@ func (uses *Mode) probableCount() int {
 	return count
 }
 
-// Progress is none: the status bar counts the review's files, not uses.
-func (uses *Mode) Progress() (done, total int) { return 0, 0 }
-
 // FileButton ticks every use of the file as seen.
 func (uses *Mode) FileButton(file workspace.FileReference) (viewer.Button, bool) {
 	indexes := uses.byFile[file]

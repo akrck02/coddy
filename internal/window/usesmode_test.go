@@ -93,7 +93,7 @@ func TestNGoesThroughTheUsesAndVTicksThem(test *testing.T) {
 	}
 	press(window, input.KeyV)
 	window.Frames(1)
-	if header := application.mode.Header(); !strings.HasPrefix(header, "1 of ") {
+	if header := application.powers.header.Header(); !strings.HasPrefix(header, "1 of ") {
 		test.Errorf("after v the header says %q", header)
 	}
 }
@@ -173,13 +173,13 @@ func TestAUseNoServerConfirmsIsShownAsProbable(test *testing.T) {
 	application, _ := readerOfUses(test)
 	holder, _ := application.usesHolder()
 	pier, found := lastUseIn(application, "Pier.kt")
-	if !found || !strings.Contains(application.mode.Header(), "probable") {
-		test.Fatalf("Pier.kt's use is not listed as probable; the header says %q", application.mode.Header())
+	if !found || !strings.Contains(application.powers.header.Header(), "probable") {
+		test.Fatalf("Pier.kt's use is not listed as probable; the header says %q", application.powers.header.Header())
 	}
 	if spans := holder.UsesIn(pier.File); len(spans[5]) != 1 {
 		test.Errorf("Pier.kt marks %v, want Lamp() on line 5", spans)
 	}
-	if header := application.mode.Header(); !strings.HasSuffix(header, "· 2 probable") {
+	if header := application.powers.header.Header(); !strings.HasSuffix(header, "· 2 probable") {
 		test.Errorf("the header says %q: the uses a server confirmed are still probable", header)
 	}
 }

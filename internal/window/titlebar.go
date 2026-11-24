@@ -2,7 +2,6 @@ package window
 
 import (
 	"github.com/akrck02/code-review/internal/finder"
-	"github.com/akrck02/code-review/internal/mode"
 	"github.com/akrck02/code-review/internal/settings"
 	"github.com/akrck02/code-review/internal/theme"
 	"github.com/akrck02/go-renderer/draw2d"
@@ -65,14 +64,14 @@ func (application *Window) showsFile() bool {
 	if !application.viewer.IsOpen() || application.explorer.Open {
 		return false
 	}
-	cover, covers := application.mode.(mode.Cover)
-	return !covers || !cover.Covers()
+	cover := application.powers.cover
+	return cover == nil || !cover.Covers()
 }
 
 // showsFolder tells whether a folder is in front: shown, and not covered by what the mode shows.
 func (application *Window) showsFolder() bool {
-	cover, covers := application.mode.(mode.Cover)
-	return application.explorer.Open && (!covers || !cover.Covers())
+	cover := application.powers.cover
+	return application.explorer.Open && (cover == nil || !cover.Covers())
 }
 
 // buildWorkspaceTitle names the workspace, and what it is compared against when that was chosen.

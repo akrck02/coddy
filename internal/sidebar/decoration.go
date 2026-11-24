@@ -11,9 +11,17 @@ import (
 type Listing interface {
 	Name() string      // the sidebar's title
 	ChangesOnly() bool // lists only the files the development changed
-	Header() string    // words beside the title, such as "3 of 7 viewed"
 	Decorate(row Row) Decoration
-	// Press acts on a file's mark, such as marking it as viewed; moveOn goes on to the next file.
+}
+
+// Headed is a listing with words beside the title, such as "3 of 7 viewed".
+type Headed interface {
+	Header() string
+}
+
+// Presser is a listing whose file rows have a mark to press, such as marking a file as viewed.
+type Presser interface {
+	// Press acts on a file's mark; moveOn goes on to the next file.
 	Press(file workspace.FileReference, moveOn bool)
 }
 
@@ -30,6 +38,25 @@ type Chooser interface {
 	ListedFiles(project int) (paths []string, own bool)
 	// ProjectOrder is the order of the projects, by index; nil keeps the window's.
 	ProjectOrder() []int
+}
+
+// listingPowers are what a listing can do besides listing, each nil when it cannot: found once,
+// when the listing is set, not at each row.
+type listingPowers struct {
+	headed  Headed
+	presser Presser
+	hider   DeletedHider
+	chooser Chooser
+}
+
+// SetListing makes a listing the one the sidebar lists by, such as the mode turned on.
+func (sidebar *Sidebar) SetListing(listing Listing) {
+	sidebar.listing = listing
+	sidebar.powers = listingPowers{}
+	sidebar.powers.headed, _ = listing.(Headed)
+	sidebar.powers.presser, _ = listing.(Presser)
+	sidebar.powers.hider, _ = listing.(DeletedHider)
+	sidebar.powers.chooser, _ = listing.(Chooser)
 }
 
 // Mark is what a file row shows before its icon.

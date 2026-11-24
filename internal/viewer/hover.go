@@ -21,12 +21,16 @@ type resting struct {
 // hoverAt follows the pointer resting on the code: after the pause the window is asked what the
 // server says of the name under it, and told when the pointer leaves it.
 func (view *Viewer) hoverAt(context *ui.Context, window Window, x, y float32) {
+	navigator, navigates := window.(Navigator)
+	if !navigates {
+		return
+	}
 	place, found := view.PlaceAt(x, y)
 	found = found && view.List.Area.Contains(x, y) && !window.Keys().Holding()
 	rest := &view.rest
 	if !found || !rest.on || place != rest.place {
 		if rest.asked {
-			window.Hover(rest.place, false)
+			navigator.Hover(rest.place, false)
 		}
 		*rest = resting{place: place, since: time.Now(), on: found}
 	}
@@ -38,5 +42,5 @@ func (view *Viewer) hoverAt(context *ui.Context, window Window, x, y float32) {
 		return
 	}
 	rest.asked = true
-	window.Hover(place, true)
+	navigator.Hover(place, true)
 }

@@ -185,3 +185,71 @@ func TestNoFunctionIsLongerThanFortyLines(test *testing.T) {
 		test.Fatal(err)
 	}
 }
+
+// modePackages are the modes, whose methods are checked by TestNoModeHasAMethodThatDoesNothing.
+var modePackages = []string{"internal/files", "internal/review", "internal/uses"}
+
+// A power only some modes have is an interface of its own (mode.WithFileButton…), so no mode
+// implements one with a method that does nothing to satisfy a contract it does not need.
+func TestNoModeHasAMethodThatDoesNothing(test *testing.T) {
+	files := token.NewFileSet()
+	for _, folder := range modePackages {
+		packages, err := parser.ParseDir(files, filepath.Join(moduleRoot, folder), func(info fs.FileInfo) bool {
+			return !strings.HasSuffix(info.Name(), "_test.go")
+		}, 0)
+		if err != nil {
+			test.Fatal(err)
+		}
+		for _, found := range packages {
+			for _, file := range found.Files {
+				for _, declaration := range file.Decls {
+					if method, isMethod := declaration.(*ast.FuncDecl); isMethod && method.Recv != nil && doesNothing(method) {
+						test.Errorf("%s: %s does nothing; make it an optional interface the mode leaves out",
+							files.Position(method.Pos()), method.Name.Name)
+					}
+				}
+			}
+		}
+	}
+}
+
+// doesNothing tells whether a function's body is empty, or only gives back zero values (0, "",
+// nil, an empty literal). A lone boolean is an answer to a question, so false is not nothing.
+func doesNothing(function *ast.FuncDecl) bool {
+	body := function.Body
+	if body == nil || len(body.List) == 0 {
+		return true
+	}
+	returned, isReturn := body.List[0].(*ast.ReturnStmt)
+	if len(body.List) != 1 || !isReturn || len(returned.Results) == 0 {
+		return false
+	}
+	if len(returned.Results) == 1 && isBoolean(returned.Results[0]) {
+		return false
+	}
+	for _, result := range returned.Results {
+		if !isZero(result) {
+			return false
+		}
+	}
+	return true
+}
+
+// isBoolean tells whether an expression is the word true or false.
+func isBoolean(expression ast.Expr) bool {
+	name, isName := expression.(*ast.Ident)
+	return isName && (name.Name == "true" || name.Name == "false")
+}
+
+// isZero tells whether an expression is a zero value written out: 0, "", false, nil or T{}.
+func isZero(expression ast.Expr) bool {
+	switch value := expression.(type) {
+	case *ast.BasicLit:
+		return value.Value == "0" || value.Value == `""`
+	case *ast.Ident:
+		return value.Name == "nil" || value.Name == "false"
+	case *ast.CompositeLit:
+		return len(value.Elts) == 0
+	}
+	return false
+}

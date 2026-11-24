@@ -21,6 +21,8 @@ type painting struct {
 	metrics  draw2d.TextMetrics
 	pointerX float32
 	hovered  int
+	// classes reads what Java and Kotlin files declare, nil when the window does not
+	classes ClassReader
 }
 
 // rowText is what a row's name is drawn with: where it starts, its words, its weight and its ink.
@@ -49,7 +51,7 @@ func (sidebar *Sidebar) paint(context *ui.Context, window Window, drawing *draw2
 	}
 	sidebar.list.PaintBar(drawing, painter.look.ScrollThumb)
 	drawing.PopClip()
-	if window.ReadingKinds() {
+	if classes, reads := window.(ClassReader); reads && classes.ReadingKinds() {
 		context.RequestFrame(0) // the next frame starts reading the classes that came into sight
 	}
 }
@@ -70,10 +72,11 @@ func (sidebar *Sidebar) startPainting(context *ui.Context, window Window, drawin
 	if !window.ModalOpen() {
 		hovered = sidebar.list.RowAt(pointerX, pointerY)
 	}
+	classes, _ := window.(ClassReader)
 	return painting{
 		context: context, window: window, drawing: drawing, look: window.Look(),
 		metrics:  context.Measurer().MeasureText("Ag", context.Theme.TextSize, draw2d.Regular, 1),
-		pointerX: pointerX, hovered: hovered,
+		pointerX: pointerX, hovered: hovered, classes: classes,
 	}
 }
 
@@ -178,13 +181,21 @@ func paintFileIcons(painter painting, row Row, decoration Decoration, text rowTe
 	return text
 }
 
+// classKind is what a file declares, UnknownKind when the window reads no classes.
+func (painter painting) classKind(file workspace.FileReference) java.ClassKind {
+	if painter.classes == nil {
+		return java.UnknownKind
+	}
+	return painter.classes.ClassKind(file)
+}
+
 // paintFileIcon draws a file's icon and returns the name it is listed by. A Java or Kotlin class
 // is named without its extension and drawn by its kind, as IntelliJ draws it, once the file has
 // been read.
 func paintFileIcon(painter painting, row Row, text rowText, iconTop float32) string {
 	quiet := text.ink == painter.context.Theme.InkQuiet
 	reference := workspace.FileReference{Project: row.Project, Path: row.Path}
-	if kind := painter.window.ClassKind(reference); kind != java.UnknownKind && kind != java.NoClass {
+	if kind := painter.classKind(reference); kind != java.UnknownKind && kind != java.NoClass {
 		paintClassBadge(painter.drawing, painter.look, kind, text.x, iconTop, treeIconSize, quiet)
 		return strings.TrimSuffix(strings.TrimSuffix(row.Label, ".java"), ".kt")
 	}
@@ -271,7 +282,7 @@ func (sidebar *Sidebar) paintRight(painter painting, row Row, index int, right, 
 
 // decorate is what the mode adds to a row, without git's status where it is hidden.
 func (sidebar *Sidebar) decorate(row Row) Decoration {
-	decoration := sidebar.Listing.Decorate(row)
+	decoration := sidebar.listing.Decorate(row)
 	if sidebar.ShowsStatus() {
 		return decoration
 	}
@@ -281,7 +292,7 @@ func (sidebar *Sidebar) decorate(row Row) Decoration {
 // ShowsStatus tells whether rows say how their files changed: unless it is hidden, and always in
 // a mode that lists only the changes, where they are what is read.
 func (sidebar *Sidebar) ShowsStatus() bool {
-	return !sidebar.HidesStatus || sidebar.Listing.ChangesOnly()
+	return !sidebar.HidesStatus || sidebar.listing.ChangesOnly()
 }
 
 // paintDecoration paints what the mode adds on a row's right: words, a bar of progress and a dot.

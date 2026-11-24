@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/akrck02/code-review/internal/mode"
 	"github.com/akrck02/code-review/internal/pane"
 	"github.com/akrck02/code-review/internal/session"
 	"github.com/akrck02/code-review/internal/viewer"
@@ -72,9 +71,9 @@ func (application *Window) buildPanes(context *ui.Context) {
 	context.Box(ui.Layout{Direction: ui.Vertical, Width: ui.Grow(), Height: ui.Grow()}, func() {
 		application.buildTitleBar(context)
 		context.Frame(ui.Layout{Width: ui.Grow(), Height: ui.Fixed(1)}, ui.Look{Fill: context.Theme.Line}, nil)
-		cover, covers := application.mode.(mode.Cover)
+		cover := application.powers.cover
 		switch {
-		case covers && cover.BuildOverViewer(context):
+		case cover != nil && cover.BuildOverViewer(context):
 		case application.explorer.Open:
 			application.explorer.Build(context, application)
 		default:

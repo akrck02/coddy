@@ -11,12 +11,7 @@ import (
 // usesHolder is the mode that shows the uses of a name, when the reader has one; otherwise the
 // finder lists them.
 func (application *Window) usesHolder() (mode.UsesHolder, bool) {
-	for _, each := range application.modes {
-		if holder, holds := each.(mode.UsesHolder); holds {
-			return holder, true
-		}
-	}
-	return nil, false
+	return application.usesMode, application.usesMode != nil
 }
 
 // The window is the Host of navigation's searches of uses: what follows is what they ask of it.
@@ -72,7 +67,7 @@ func (application *Window) markUses() {
 
 // usesOfFile are the uses to mark in a file: those of the uses mode, while it is on.
 func (application *Window) usesOfFile(file workspace.FileReference) map[int][]workspace.Span {
-	if holder, holds := application.mode.(mode.UsesHolder); holds {
+	if holder := application.powers.uses; holder != nil {
 		return holder.UsesIn(file)
 	}
 	return nil

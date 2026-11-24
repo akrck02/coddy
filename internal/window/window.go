@@ -139,7 +139,11 @@ type Window struct {
 	// modes are the ways of looking at the workspace, in the rail's order; mode is the one on
 	modes []mode.Mode
 	mode  mode.Mode
-	look  theme.Look
+	// powers are what the mode on can do besides what every mode does (turnOn); usesMode is the
+	// mode that shows the uses of a name, if any, found once when the modes start
+	powers   modePowers
+	usesMode mode.UsesHolder
+	look     theme.Look
 	// classKinds are what the Java and Kotlin files declare, read as they come into sight;
 	// kindsWanted are those asked for since the last frame
 	classKinds  map[workspace.FileReference]java.ClassKind

@@ -6,6 +6,7 @@ import (
 
 	"github.com/akrck02/code-review/internal/mode"
 	"github.com/akrck02/code-review/internal/pane"
+	"github.com/akrck02/code-review/internal/sidebar"
 	"github.com/akrck02/code-review/internal/viewer"
 	"github.com/akrck02/go-renderer/input"
 	ui "github.com/akrck02/go-ui"
@@ -14,14 +15,17 @@ import (
 // startModes gives each mode its window and turns on the one named, or the first.
 func (application *Window) startModes(modes []mode.Mode, name string) {
 	application.modes = modes
-	application.mode = modes[0]
+	chosen := modes[0]
 	for _, each := range modes {
 		each.Start(application)
 		if strings.EqualFold(each.Name(), name) {
-			application.mode = each
+			chosen = each
+		}
+		if holder, holds := each.(mode.UsesHolder); holds && application.usesMode == nil {
+			application.usesMode = holder
 		}
 	}
-	application.sidebar.Listing = application.mode
+	application.turnOn(chosen)
 	application.commandTable = append(append(application.declaredCommands(true), commands...), application.modeCommands()...)
 }
 
@@ -31,8 +35,7 @@ func (application *Window) setMode(chosen mode.Mode) {
 	if application.mode == chosen {
 		return
 	}
-	application.mode = chosen
-	application.sidebar.Listing = chosen
+	application.turnOn(chosen)
 	application.sidebar.Stale = true
 	application.viewer.SetUses(application.usesOfFile(application.viewer.Reference))
 	switch {
@@ -46,6 +49,30 @@ func (application *Window) setMode(chosen mode.Mode) {
 	if application.viewer.IsOpen() {
 		application.sidebar.RevealFile(application, application.viewer.Reference)
 	}
+}
+
+// modePowers are what the mode that is on can do besides what every mode does, each nil when it
+// cannot: found once, when the mode is turned on, not at each call or frame.
+type modePowers struct {
+	button   mode.WithFileButton
+	progress mode.WithProgress
+	header   sidebar.Headed
+	page     mode.WithPage
+	cover    mode.Cover
+	uses     mode.UsesHolder
+}
+
+// turnOn makes a mode the one on, for the window and its sidebar, and finds what it can do.
+func (application *Window) turnOn(chosen mode.Mode) {
+	application.mode = chosen
+	application.sidebar.SetListing(chosen)
+	application.powers = modePowers{}
+	application.powers.button, _ = chosen.(mode.WithFileButton)
+	application.powers.progress, _ = chosen.(mode.WithProgress)
+	application.powers.header, _ = chosen.(sidebar.Headed)
+	application.powers.page, _ = chosen.(mode.WithPage)
+	application.powers.cover, _ = chosen.(mode.Cover)
+	application.powers.uses, _ = chosen.(mode.UsesHolder)
 }
 
 // nextMode turns on the next mode on the rail, going round.
@@ -88,7 +115,11 @@ func (application *Window) declaredCommands(own bool) []command {
 	var result []command
 	for _, each := range application.modes {
 		owner := each
-		for _, declared := range each.Commands() {
+		keyed, hasKeys := each.(mode.WithCommands)
+		if !hasKeys {
+			continue // checked once: the commands are listed when the modes start
+		}
+		for _, declared := range keyed.Commands() {
 			if declared.OnlyWhenOn != own {
 				continue
 			}
@@ -126,10 +157,12 @@ func (application *Window) progress() (done, total int, words string) {
 	counted := &application.counted
 	rebuilds := application.sidebar.Rebuilds()
 	if counted.rebuilds != rebuilds || counted.mode != application.mode || !counted.made {
-		counted.done, counted.total = application.mode.Progress()
-		counted.words = ""
-		if counted.total > 0 {
-			counted.words = application.mode.Header()
+		counted.done, counted.total, counted.words = 0, 0, ""
+		if application.powers.progress != nil {
+			counted.done, counted.total = application.powers.progress.Progress()
+		}
+		if header := application.powers.header; header != nil && counted.total > 0 {
+			counted.words = header.Header()
 		}
 		counted.rebuilds, counted.mode, counted.made = rebuilds, application.mode, true
 	}

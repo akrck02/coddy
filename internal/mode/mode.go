@@ -15,9 +15,11 @@ import (
 	ui "github.com/akrck02/go-ui"
 )
 
-// Mode is one way of looking at the workspace. Both modes list the same tree and open the same
+// Mode is one way of looking at the workspace. Every mode lists the same tree and opens the same
 // files; a mode answers which files are listed, how a changed file opens, and what each row
-// shows beside its name.
+// shows beside its name. What only some modes do is an interface of its own below (WithFileButton,
+// WithProgress, WithPage, WithCommands, Cover, UsesHolder): the window checks for each once, when
+// the mode is turned on, and does without it when it is missing.
 type Mode interface {
 	sidebar.Listing
 	Icon() string
@@ -26,13 +28,32 @@ type Mode interface {
 	// Start gives the mode the window it works in, once, before the first frame.
 	Start(window Window)
 	ShowsChanges() bool // opens a changed file on its changes, not whole
-	// FileButton is the mode's button in the viewer's header, such as Viewed.
-	FileButton(file workspace.FileReference) (viewer.Button, bool)
-	// Progress is how far the mode's work has gone, for the status bar whatever mode is on;
-	// a total of 0 shows nothing.
+}
+
+// WithFileButton is a mode that puts a button in the viewer's header, such as Viewed; pressing it
+// is pressing the file's mark (sidebar.Presser).
+type WithFileButton interface {
+	sidebar.Presser
+	// FileButton is the mode's button for a file; shown is false when the file has none.
+	FileButton(file workspace.FileReference) (button viewer.Button, shown bool)
+}
+
+// WithProgress is a mode with work to count, shown in the status bar whatever mode is on.
+type WithProgress interface {
+	// Progress is how far the mode's work has gone; a total of 0 shows nothing.
 	Progress() (done, total int)
-	BuildInsteadOfAFile(context *ui.Context) bool // what shows while no file is open
-	Commands() []Command                          // the mode's own keys, such as v
+}
+
+// WithPage is a mode that shows a page of its own while no file is open.
+type WithPage interface {
+	// BuildInsteadOfAFile builds the page and tells whether it had anything to show; if not, the
+	// viewer shows how to start.
+	BuildInsteadOfAFile(context *ui.Context) bool
+}
+
+// WithCommands is a mode with keys of its own, such as v.
+type WithCommands interface {
+	Commands() []Command
 }
 
 // Command is a key of a mode and what it does; step tells which way to go when several keys
