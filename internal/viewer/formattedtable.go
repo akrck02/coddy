@@ -1,6 +1,8 @@
 package viewer
 
 import (
+	"strings"
+
 	"github.com/akrck02/code-review/internal/markdown"
 	"github.com/akrck02/go-renderer/draw2d"
 )
@@ -47,30 +49,71 @@ func (layout *formatter) tableRow(row [][]markdown.Span, widths []float32, style
 	return max(bottom, layout.y+layout.lineHeight(style)+tablePadding)
 }
 
-// columnWidths are each column's width: its widest cell's, shrunk in proportion when the table is
-// wider than the text.
+// columnWidths are each column's width: its widest cell's, shrunk when the table is wider than
+// the text. What a column loses is taken from the room beyond its longest word first, so a word is
+// cut only when the words alone do not fit.
 func (layout *formatter) columnWidths(block markdown.Block, base wordStyle) []float32 {
-	var widths []float32
+	var widths, least []float32
 	for _, row := range block.Rows {
 		for column, cell := range row {
 			for len(widths) <= column {
-				widths = append(widths, 2*tablePadding)
+				widths, least = append(widths, 2*tablePadding), append(least, 2*tablePadding)
 			}
-			width := float32(2 * tablePadding)
-			for _, span := range cell {
-				width += layout.measure(span.Text, layout.styleOf(span, base))
-			}
-			widths[column] = max(widths[column], width+8)
+			widths[column] = max(widths[column], layout.cellWidth(cell, base)+2*tablePadding)
+			least[column] = max(least[column], layout.longestWord(cell, base)+2*tablePadding)
 		}
 	}
-	total := float32(0)
-	for _, width := range widths {
-		total += width
+	return shrunk(widths, least, layout.width)
+}
+
+// cellWidth is how wide a cell's words are on one line.
+func (layout *formatter) cellWidth(cell []markdown.Span, base wordStyle) float32 {
+	width := float32(0)
+	for _, span := range cell {
+		style := layout.styleOf(span, base)
+		for _, word := range layout.words(span, style, layout.width) {
+			width += layout.measure(word, style)
+			if style.code && strings.TrimSpace(word) != "" {
+				width += 2 * codePadding
+			}
+		}
 	}
-	if total > layout.width {
+	return width
+}
+
+// longestWord is how wide a cell's widest word is: the least its column can be without cutting it.
+// Code counts by its words too, since it goes on to the next line at its spaces when its column is
+// narrower than it.
+func (layout *formatter) longestWord(cell []markdown.Span, base wordStyle) float32 {
+	longest := float32(0)
+	for _, span := range cell {
+		style := layout.styleOf(span, base)
+		for _, word := range strings.SplitAfter(span.Text, " ") {
+			longest = max(longest, layout.wordWidth(word, style))
+		}
+	}
+	return longest
+}
+
+// shrunk fits widths in room: each loses a share of what it has beyond its least, or, when the
+// leasts alone do not fit, each is shrunk in proportion.
+func shrunk(widths, least []float32, room float32) []float32 {
+	total, leastTotal := float32(0), float32(0)
+	for column := range widths {
+		total, leastTotal = total+widths[column], leastTotal+least[column]
+	}
+	if total <= room {
+		return widths
+	}
+	if leastTotal > room {
 		for column := range widths {
-			widths[column] *= layout.width / total
+			widths[column] *= room / total
 		}
+		return widths
+	}
+	share := (room - leastTotal) / (total - leastTotal)
+	for column := range widths {
+		widths[column] = least[column] + (widths[column]-least[column])*share
 	}
 	return widths
 }

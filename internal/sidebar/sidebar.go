@@ -40,6 +40,8 @@ type Window interface {
 	// ToggleChangedFilter shows only the changes, projects and files, or everything again.
 	ToggleChangedFilter()
 	OpenFile(file workspace.FileReference)
+	// ExploreFolder shows what a folder of a project holds in the file's place, "" its top.
+	ExploreFolder(project int, folder string)
 	// OpenedFile is the file the viewer shows, if any.
 	OpenedFile() (workspace.FileReference, bool)
 	IsOpened(file workspace.FileReference) bool
@@ -98,6 +100,9 @@ type Sidebar struct {
 	// with the folders opened and closed as that mode has them: the window's filter of changes,
 	// which also leaves out the projects with none.
 	onlyChanged bool
+	// HidesStatus leaves out how files changed (tints, letters, dots and counts) in the modes
+	// that list every file, so git does not draw the eye while reading
+	HidesStatus bool
 	// Filter lists only the files whose path holds each of its words, and the projects named by
 	// them, whatever their case; FilterAsked gives its field the keyboard on the next frame.
 	Filter      string
@@ -413,7 +418,8 @@ func (sidebar *Sidebar) selectRow(kind RowKind, project int, path string) bool {
 	return false
 }
 
-// activate does what Enter or a click does on a row: open a file, open or close a folder.
+// activate does what Enter or a click does on a row: open a file, open or close a folder and show
+// what it holds.
 func (sidebar *Sidebar) activate(window Window, index int) {
 	if index < 0 || index >= len(sidebar.Rows) {
 		return
@@ -424,6 +430,7 @@ func (sidebar *Sidebar) activate(window Window, index int) {
 		window.OpenFile(workspace.FileReference{Project: row.Project, Path: row.Path})
 	case ProjectRow, FolderRow:
 		sidebar.SetExpanded(row, !row.Expanded)
+		window.ExploreFolder(row.Project, folderPath(row))
 	case NoteRow:
 		if row.Project < 0 {
 			window.ShowEveryProject()
@@ -482,12 +489,23 @@ func (sidebar *Sidebar) selectionMoved(window Window) {
 	}
 }
 
-// previewSelected opens the selected file as the selection moves, as a preview.
+// previewSelected shows the selected file or folder as the selection moves, as a preview.
 func (sidebar *Sidebar) previewSelected(window Window) {
 	row := sidebar.Rows[sidebar.Selected]
-	if row.Kind == FileRow {
+	switch row.Kind {
+	case FileRow:
 		window.OpenFile(workspace.FileReference{Project: row.Project, Path: row.Path})
+	case ProjectRow, FolderRow:
+		window.ExploreFolder(row.Project, folderPath(row))
 	}
+}
+
+// folderPath is the path of a project's or a folder's row in its project, "" for a project.
+func folderPath(row Row) string {
+	if row.Kind == ProjectRow {
+		return ""
+	}
+	return row.Path
 }
 
 func (sidebar *Sidebar) expandOrEnter() {
@@ -569,8 +587,20 @@ func (sidebar *Sidebar) buildHeader(context *ui.Context, window Window) {
 	}
 	context.Spacer()
 	sidebar.buildChangedFilter(context, window)
-	if theme.ToolButton(context, "Collapse all", "chevrons-down-up", false) {
-		sidebar.collapseAll(window)
+	sidebar.buildFoldButton(context, window)
+}
+
+// buildFoldButton folds everything listed while something is open, and opens it all once nothing
+// is: the projects, or inside a project its folders.
+func (sidebar *Sidebar) buildFoldButton(context *ui.Context, window Window) {
+	if sidebar.anyOpen(window) {
+		if theme.ToolButton(context, "Collapse all", "chevrons-down-up", false) {
+			sidebar.setAllOpen(window, false)
+		}
+		return
+	}
+	if theme.ToolButton(context, "Expand all", "chevrons-up-down", false) {
+		sidebar.setAllOpen(window, true)
 	}
 }
 
@@ -614,7 +644,7 @@ func (sidebar *Sidebar) buildEnteredHeader(context *ui.Context, window Window) {
 	}
 	count, countStyle := sidebar.enteredCount(context, index, project)
 	// what is left for the name and the branch once the buttons and the count have their room
-	room := sidebar.headerRoom() - toolButtonWidth - headerGap
+	room := sidebar.headerRoom() - 2*(toolButtonWidth+headerGap) // going back, and folding
 	if count != "" {
 		room -= theme.TextWidth(context, count, countStyle) + headerGap
 	}
@@ -634,6 +664,7 @@ func (sidebar *Sidebar) buildEnteredHeader(context *ui.Context, window Window) {
 		context.Text(count, countStyle)
 	}
 	sidebar.buildChangedFilter(context, window)
+	sidebar.buildFoldButton(context, window)
 }
 
 // enteredCount is what the mode counts in the project entered, and the style it is written in.
@@ -643,7 +674,7 @@ func (sidebar *Sidebar) enteredCount(context *ui.Context, index int, project *wo
 	if len(project.Changes) == 0 {
 		return count, countStyle
 	}
-	decoration := sidebar.Listing.Decorate(Row{Kind: ProjectRow, Project: index, Changed: len(project.Changes)})
+	decoration := sidebar.decorate(Row{Kind: ProjectRow, Project: index, Changed: len(project.Changes)})
 	if len(decoration.Words) > 0 {
 		count, countStyle.Color = decoration.Words[0].Text, decoration.Words[0].Ink.colour(palette)
 	}
@@ -742,11 +773,35 @@ func (sidebar *Sidebar) rowLeft(row Row) float32 {
 	return sidebar.list.Area.X + sidebarMargin + float32(row.Depth)*indentWidth
 }
 
-func (sidebar *Sidebar) collapseAll(window Window) {
-	for index := range window.Projects() {
-		sidebar.expanded[sidebar.expandedKey(index, "")] = false
+// anyOpen tells whether a project or a folder listed is open.
+func (sidebar *Sidebar) anyOpen(window Window) bool {
+	for _, row := range sidebar.Rows {
+		isProject := row.Kind == ProjectRow
+		if (isProject || row.Kind == FolderRow) && sidebar.isExpanded(window, row.Project, row.Path, isProject) {
+			return true
+		}
 	}
+	return false
+}
+
+// setAllOpen opens or folds every project, or, inside a project, every folder of its tree.
+func (sidebar *Sidebar) setAllOpen(window Window, open bool) {
 	sidebar.Stale = true
+	if project := window.ProjectIndex(sidebar.Entered); sidebar.Entered != "" && project >= 0 {
+		sidebar.setFoldersOpen(project, sidebar.tree(window, project).Folders, open)
+		return
+	}
+	for index := range window.Projects() {
+		sidebar.expanded[sidebar.expandedKey(index, "")] = open
+	}
+}
+
+// setFoldersOpen opens or folds folders and every folder inside them.
+func (sidebar *Sidebar) setFoldersOpen(project int, folders []*workspace.Folder, open bool) {
+	for _, folder := range folders {
+		sidebar.expanded[sidebar.expandedKey(project, folder.Path)] = open
+		sidebar.setFoldersOpen(project, folder.Folders, open)
+	}
 }
 
 // SelectedRow is the row selected, if any.

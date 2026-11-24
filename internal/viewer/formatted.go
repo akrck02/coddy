@@ -116,6 +116,7 @@ func (view *Viewer) layOutFormatted(context *ui.Context, window Window, area dra
 // buildFormatted shows the text formatted, scrolling as the code does.
 func (view *Viewer) buildFormatted(context *ui.Context, window Window) {
 	view.List.RowHeight = view.rowHeight
+	view.List.Margin = 0 // the formatted text keeps its own margin
 	if formatted := view.formatting; formatted != nil {
 		view.List.Count = int(math.Ceil(float64((formatted.height + 2*formattedMargin) / view.rowHeight)))
 	}

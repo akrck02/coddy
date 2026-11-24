@@ -63,9 +63,9 @@ type Client struct {
 // Start runs a server in a root (or, with folders, for those workspace folders) and initializes
 // it. dataFolder is where it may keep its index, for a server that asks for one.
 func Start(ctx context.Context, server Server, root string, folders []string, dataFolder string) (*Client, error) {
-	path, err := exec.LookPath(server.Command)
+	path, err := Find(server)
 	if err != nil {
-		return nil, failure.Wrap(ServerNotFound, server.Name, err)
+		return nil, err
 	}
 	command := commandOf(path, server, dataFolder)
 	command.Dir = firstOf(root, folders)

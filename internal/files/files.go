@@ -55,7 +55,7 @@ func (files *Mode) Decorate(row sidebar.Row) sidebar.Decoration {
 		return sidebar.Decoration{Tinted: true}
 	case sidebar.ProjectRow:
 		if row.Changed > 0 {
-			return sidebar.Decoration{Words: []sidebar.Word{{Text: fmt.Sprint(row.Changed), Ink: sidebar.WarningInk}}}
+			return sidebar.Decoration{Words: []sidebar.Word{{Text: fmt.Sprint(row.Changed), Ink: sidebar.WarningInk, Status: true}}}
 		}
 	case sidebar.FolderRow:
 		return sidebar.Decoration{Dot: row.Changed > 0}

@@ -32,10 +32,12 @@ import (
 
 const (
 	foldersPreference     = "folders"
+	iconThemePreference   = "icon-theme"
 	onlyChangedPreference = "only-changed"
 	readOnlyPreference    = "read-only"
 	serverDataPreference  = "server-data"
 	sidebarPreference     = "sidebar-folded"
+	statusPreference      = "hides-status"
 	themePreference       = "theme"
 )
 
@@ -44,7 +46,7 @@ func main() {
 	options.RegisterFlags(flag.CommandLine)
 	asked := registerFlags()
 	flag.Parse()
-	options.Fonts = overlay.Fonts{Mono: monospaced(*asked.codeFont)}
+	options.Fonts = systemFonts(*asked.codeFont)
 	reader, err := window.New(settingsOf(asked, options),
 		files.New(),
 		// the files marked as viewed are kept in the reader's own folder, never in the repositories
@@ -76,8 +78,8 @@ func registerFlags() commandLine {
 		open:        flag.String("open", "", "open this file at the start, as project/path/in/it"),
 		find:        flag.String("find", "", "open the finder at the start, searching the files' content for this text"),
 		reviewing:   flag.Bool("review", false, "start in the review mode: the changed files, as diffs"),
-		codeFont:    flag.String("code-font", "", "a TrueType file to read the code in (default: SF Mono, else Go Mono)"),
-		allProjects: flag.Bool("all", false, "show every project, not only those with changes (the choice is remembered otherwise)"),
+		codeFont:    flag.String("code-font", "", "a TrueType file to read the code in (default: the system's, else Go Mono)"),
+		allProjects: flag.Bool("all", false, "show every project, even if only the changes were shown last time"),
 		readOnly:    flag.Bool("read-only", false, "start read-only: files are only read, not edited (the choice is remembered otherwise)"),
 		serverData: flag.String("server-data", "", "keep the language servers' indexes in this folder, another disk say "+
 			"(default: the reader's own folder; the choice is remembered)"),
@@ -101,21 +103,27 @@ func settingsOf(asked commandLine, options platform.Options) window.Settings {
 		}
 	}
 	return window.Settings{
-		Folders:      folders,
-		Base:         *asked.base,
-		WorkingTree:  !*asked.committed,
-		Theme:        themeName(*asked.light),
-		Dark:         options.Dark || !*asked.light,
-		Themes:       themes(),
-		ThemesFolder: theme.Folder(),
-		OnlyChanged:  onlyChanged(*asked.allProjects),
-		Open:         *asked.open,
-		Find:         *asked.find,
-		Mode:         startMode(*asked.reviewing),
-		Synchronous:  options.CapturePath != "",
-		ReadOnly:     readOnly(*asked.readOnly),
+		Folders:          folders,
+		Base:             *asked.base,
+		WorkingTree:      !*asked.committed,
+		Theme:            themeName(*asked.light),
+		Dark:             options.Dark || !*asked.light,
+		Themes:           themes(),
+		ThemesFolder:     theme.Folder(),
+		IconTheme:        rememberedText(iconThemePreference),
+		IconThemes:       iconThemes(),
+		IconThemesFolder: theme.IconThemesFolder(),
+		// an icon that cannot be drawn is told once, and drawn as Lucide's
+		Tell:        func(problem error) { log.Printf("icon theme %v", problem) },
+		OnlyChanged: onlyChanged(*asked.allProjects),
+		Open:        *asked.open,
+		Find:        *asked.find,
+		Mode:        startMode(*asked.reviewing),
+		Synchronous: options.CapturePath != "",
+		ReadOnly:    readOnly(*asked.readOnly),
 		// a capture shows the sidebar, whatever was left last time
 		SidebarFolded: options.CapturePath == "" && remembered(sidebarPreference),
+		HidesStatus:   remembered(statusPreference),
 		Servers:       serversFor(options.CapturePath, *asked.serverMemory, *asked.keepIndexes),
 		// what language servers wrote stays theirs after a restart
 		ServersWrote: workspace.DefaultWrittenPath(),
@@ -151,7 +159,9 @@ func run(options platform.Options, reader *window.Window) {
 		_ = platform.KeepPreference(onlyChangedPreference, fmt.Sprint(reader.OnlyChanged()))
 		_ = platform.KeepPreference(readOnlyPreference, fmt.Sprint(reader.ReadOnly()))
 		_ = platform.KeepPreference(sidebarPreference, fmt.Sprint(reader.SidebarFolded()))
+		_ = platform.KeepPreference(statusPreference, fmt.Sprint(reader.HidesStatus()))
 		_ = platform.KeepPreference(themePreference, reader.ThemeName())
+		_ = platform.KeepPreference(iconThemePreference, reader.IconThemeName())
 		_ = platform.KeepPreference(foldersPreference, strings.Join(reader.Folders(), "\n"))
 	}
 	if err := platform.Run(options, func(context *ui.Context) { reader.Build(context) }); err != nil {
@@ -159,18 +169,22 @@ func run(options platform.Options, reader *window.Window) {
 	}
 }
 
-// onlyChanged tells whether to start showing only the projects with changes: yes, unless -all asks
-// for every project or the person chose that last time.
+// onlyChanged tells whether to start showing only the projects with changes: only if the person
+// chose that last time, and -all does not ask for every project.
 func onlyChanged(allProjects bool) bool {
 	if allProjects {
 		return false
 	}
-	remembered, found := platform.Preference(onlyChangedPreference)
-	return !found || remembered != "false"
+	remembered, _ := platform.Preference(onlyChangedPreference)
+	return rememberedOnlyChanged(remembered)
 }
 
+// rememberedOnlyChanged reads the kept choice: every project unless "true" was kept, so a first
+// start shows the whole workspace.
+func rememberedOnlyChanged(remembered string) bool { return remembered == "true" }
+
 // themeName is the theme to start in: One Light when -light asks, else the one chosen last time;
-// "" leaves it to the reader (One Dark).
+// "" leaves it to the reader (IntelliJ Dark in the dark).
 func themeName(light bool) string {
 	if light {
 		return theme.DefaultLight
@@ -187,6 +201,22 @@ func themes() []theme.Theme {
 		log.Printf("theme %v", problem)
 	}
 	return found
+}
+
+// iconThemes are the person's icon themes: those in the reader's icon themes folder and those
+// installed in Zed; a file that cannot be read is told, and left out.
+func iconThemes() []theme.IconTheme {
+	found, problems := theme.LoadIconThemes(theme.IconThemesFolder(), theme.ZedExtensionsFolder())
+	for _, problem := range problems {
+		log.Printf("icon theme %v", problem)
+	}
+	return found
+}
+
+// rememberedText is a preference kept as text, "" when none was kept.
+func rememberedText(name string) string {
+	remembered, _ := platform.Preference(name)
+	return remembered
 }
 
 // serverData is the folder the servers keep their indexes in: the one -server-data names, kept
@@ -216,23 +246,28 @@ func readOnly(asked bool) bool {
 	return asked || (found && remembered == "true")
 }
 
-// systemMono is the monospaced face macOS reads code in (Xcode's, Terminal's): clean, without the
-// serifs of Go Mono, and on every Mac.
-const systemMono = "/System/Library/Fonts/SFNSMono.ttf"
+// systemFonts are the fonts the system reads its interface and its code in (Adwaita Sans and
+// Adwaita Mono on GNOME, SF and SF Mono on a Mac), with the code in the face asked for instead,
+// if any.
+func systemFonts(codeFont string) overlay.Fonts {
+	// without a system font the Go fonts stay, so the reader works anywhere
+	fonts, _ := overlay.SystemFonts()
+	fonts.Mono = monospaced(codeFont, fonts.Mono)
+	return fonts
+}
 
-// monospaced is the face the code is drawn in: the one asked for, else SF Mono, else Go Mono
-// (built in, so the reader works anywhere). go-renderer's own monospaced face is bold.
-func monospaced(asked string) []byte {
-	for _, path := range []string{asked, systemMono} {
-		if path == "" {
-			continue
-		}
-		if content, err := os.ReadFile(path); err == nil {
+// monospaced is the face the code is drawn in: the one asked for, else the system's, else Go
+// Mono, built in. go-renderer's own monospaced face is bold.
+func monospaced(asked string, system []byte) []byte {
+	if asked != "" {
+		content, err := os.ReadFile(asked)
+		if err == nil {
 			return content
 		}
-		if path == asked {
-			log.Printf("cannot read %s: the code is drawn in the default face", asked)
-		}
+		log.Printf("cannot read %s: the code is drawn in the system's face", asked)
+	}
+	if system != nil {
+		return system
 	}
 	return gomono.TTF
 }

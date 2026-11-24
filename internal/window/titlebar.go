@@ -3,6 +3,7 @@ package window
 import (
 	"github.com/akrck02/code-review/internal/finder"
 	"github.com/akrck02/code-review/internal/mode"
+	"github.com/akrck02/code-review/internal/settings"
 	"github.com/akrck02/code-review/internal/theme"
 	"github.com/akrck02/go-renderer/draw2d"
 	ui "github.com/akrck02/go-ui"
@@ -13,47 +14,44 @@ const (
 	compactBar = 760
 	// toolWidth is a tool button's width and the gap after it
 	toolWidth = 34
-	// titleBarHeight is the bar's height, and searchHeight its search field's
-	titleBarHeight = 36
-	searchHeight   = 26
+	// barGap is the room between the bar's title and its buttons
+	barGap = 8
+	// searchName names the search button, its tooltip and its place in the tests
+	searchName = "Search files (⌘P)"
 )
 
 // buildTitleBar is the top of the viewer's side, right of the rail and the sidebar, and follows
-// what is in front: the file open, named by its path, or else the workspace; the search; the
-// file's buttons; the mode's own buttons and the menu.
+// what is in front: the file open, named by its path, or else the workspace; then the search, the
+// file's buttons, the mode's own buttons and the menu.
 func (application *Window) buildTitleBar(context *ui.Context) {
 	windowWidth, _ := context.Size()
 	barWidth := application.viewerWidth(windowWidth)
 	compact := barWidth < compactBar
-	search := float32(360)
-	if compact {
-		search = 220
-	}
 	file := application.showsFile()
-	buttons := application.modeButtonsWidth() + toolWidth // the menu
+	buttons := toolWidth + application.modeButtonsWidth() + toolWidth // the search and the menu
 	if file {
 		buttons += application.viewer.ButtonsWidth(context, compact, application.mode.ShowsChanges()) + 13
 	}
-	// the search stays in the middle while the buttons fit in their half; it moves aside otherwise
-	half := (barWidth - 24 - 16 - search) / 2
-	room, left := half, ui.Fixed(half)
-	if buttons > half {
-		room, left = 2*half-buttons, ui.Grow()
-	}
-	context.Box(ui.Layout{Width: ui.Grow(), Height: ui.Fixed(titleBarHeight), Padding: ui.PadXY(12, 0), Gap: 8, AlignY: ui.Center}, func() {
-		context.Box(ui.Layout{Width: left, Gap: 6, AlignY: ui.Center}, func() {
+	room := barWidth - 2*theme.BarPadding - barGap - buttons
+	context.Box(ui.Layout{Width: ui.Grow(), Height: ui.Fixed(theme.BarHeight), Padding: ui.PadXY(theme.BarPadding, 0), Gap: barGap, AlignY: ui.Center}, func() {
+		context.Box(ui.Layout{Width: ui.Grow(), Gap: 6, AlignY: ui.Center}, func() {
+			if application.showsFolder() {
+				application.explorer.BuildTitle(context, application)
+				return
+			}
 			if file {
 				application.viewer.BuildTitle(context, application, room, compact)
 				return
 			}
 			application.buildWorkspaceTitle(context)
 		})
-		application.buildSearchField(context, search)
-		context.Box(ui.Layout{Width: ui.Grow(), Gap: 4, AlignY: ui.Center}, func() {
-			context.Spacer()
+		context.Box(ui.Layout{Gap: 4, AlignY: ui.Center}, func() {
 			if file {
 				application.viewer.BuildButtons(context, application, compact, application.mode.ShowsChanges())
 				context.Frame(ui.Layout{Width: ui.Fixed(1), Height: ui.Fixed(20)}, ui.Look{Fill: context.Theme.Line}, nil)
+			}
+			if theme.ToolButton(context, searchName, "search", false) {
+				application.finder.Show(finder.NamesScope)
 			}
 			application.buildModeButtons(context)
 			application.buildMenu(context)
@@ -61,13 +59,20 @@ func (application *Window) buildTitleBar(context *ui.Context) {
 	})
 }
 
-// showsFile tells whether a file is in front: open, and not covered by what the mode shows.
+// showsFile tells whether a file is in front: open, and not covered by a folder or by what the
+// mode shows.
 func (application *Window) showsFile() bool {
-	if !application.viewer.IsOpen() {
+	if !application.viewer.IsOpen() || application.explorer.Open {
 		return false
 	}
 	cover, covers := application.mode.(mode.Cover)
 	return !covers || !cover.Covers()
+}
+
+// showsFolder tells whether a folder is in front: shown, and not covered by what the mode shows.
+func (application *Window) showsFolder() bool {
+	cover, covers := application.mode.(mode.Cover)
+	return application.explorer.Open && (!covers || !cover.Covers())
 }
 
 // buildWorkspaceTitle names the workspace, and what it is compared against when that was chosen.
@@ -78,30 +83,8 @@ func (application *Window) buildWorkspaceTitle(context *ui.Context) {
 	}
 }
 
-// buildSearchField is a pill, a shade off the bar with a hairline edge, lit towards the accent under
-// the pointer, that opens the finder; the shortcut sits in a key cap of its own.
-func (application *Window) buildSearchField(context *ui.Context, width float32) {
-	palette := context.Theme
-	look := application.look
-	normal := ui.Look{Fill: look.Hover.WithAlpha(0.7), Radius: searchHeight / 2, Border: look.Chosen.WithAlpha(0.6), BorderWidth: 1}
-	hovered := normal
-	hovered.Fill, hovered.Border = look.Hover, palette.Primary.WithAlpha(0.45)
-	search := ui.Layout{Width: ui.Fixed(width), Height: ui.Fixed(searchHeight), Padding: ui.Padding{Left: 12, Right: 4}, Gap: 8, AlignY: ui.Center}
-	if context.Clickable("search files", search, ui.Looks{Normal: normal, Hovered: hovered, Pressed: hovered}, func() {
-		context.IconSized("search", 14, palette.InkSoft)
-		context.Text("Search files", ui.TextStyle{Color: palette.InkQuiet})
-		context.Spacer()
-		keyCap := ui.Look{Fill: look.Chosen.WithAlpha(0.55), Radius: 9}
-		context.Frame(ui.Layout{Height: ui.Fixed(18), Padding: ui.PadXY(7, 0), AlignY: ui.Center}, keyCap, func() {
-			context.Text("⌘P", ui.TextStyle{Size: palette.SmallTextSize, Color: palette.InkSoft, Weight: draw2d.Medium})
-		})
-	}) {
-		application.finder.Show(finder.NamesScope)
-	}
-}
-
 // buildModeButtons are the settings the mode on uses: in a mode of changes, the changes counted and
-// the base; in the others, whether files are edited. Reading again is in every mode.
+// the base; in the others, whether files are edited. The settings themselves are in every mode.
 func (application *Window) buildModeButtons(context *ui.Context) {
 	if application.mode.ShowsChanges() {
 		if theme.ToolButton(context, "Count the changes not committed yet (w)", "file-pen-line", application.settings.WorkingTree) {
@@ -119,8 +102,8 @@ func (application *Window) buildModeButtons(context *ui.Context) {
 			application.setReadOnly(!application.settings.ReadOnly)
 		}
 	}
-	if theme.ToolButton(context, "Read the projects again (r)", "refresh-cw", false) {
-		application.reloadAll()
+	if theme.ToolButton(context, "Settings (⌘,)", "settings", application.settingsScreen.Open) {
+		application.settingsScreen.Toggle(settings.Appearance)
 	}
 }
 

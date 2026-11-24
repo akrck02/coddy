@@ -267,7 +267,7 @@ func (view *Viewer) revealCaret() {
 
 // positionAt is the place in the buffer under a point of the code.
 func (view *Viewer) positionAt(x, y float32) text.Position {
-	line := int((y - view.List.Area.Y + view.List.Offset) / view.List.RowHeight)
+	line := view.List.RowOf(y)
 	line = max(min(line, view.Edit.LineCount()-1), 0)
 	place := (x - view.codeLeft + view.List.OffsetX) / max(view.charWidth, 1)
 	return text.Position{Line: line, Column: highlight.CharacterAt(view.Edit.Line(line), place)}

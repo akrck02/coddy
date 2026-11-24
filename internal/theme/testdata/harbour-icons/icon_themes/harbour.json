@@ -1,0 +1,26 @@
+{
+  "$schema": "https://zed.dev/schema/icon_themes/v0.3.0.json",
+  "name": "Harbour Icons",
+  "author": "A made-up set for the reader's tests",
+  "themes": [
+    {
+      "name": "Harbour",
+      "appearance": "dark",
+      "directory_icons": { "collapsed": "./icons/folder.svg", "expanded": "./icons/folder-open.svg" },
+      "named_directory_icons": {
+        "docs": { "collapsed": "./icons/folder-docs.svg", "expanded": "./icons/folder-docs-open.svg" }
+      },
+      "chevron_icons": { "collapsed": "./icons/chevron-right.svg", "expanded": "./icons/chevron-down.svg" },
+      "file_stems": { "Makefile": "make", "Dockerfile": "docker" },
+      "file_suffixes": { "go": "go", "ts": "typescript", "spec.ts": "spec" },
+      "file_icons": {
+        "default": { "path": "./icons/file.svg" },
+        "go": { "path": "./icons/go.svg" },
+        "typescript": { "path": "./icons/typescript.svg" },
+        "spec": { "path": "./icons/spec.svg" },
+        "docker": { "path": "./icons/docker.svg" },
+        "make": { "path": "./icons/make.svg" }
+      }
+    }
+  ]
+}

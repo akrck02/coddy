@@ -149,6 +149,12 @@ func hoverLines(markdown string) []string {
 const (
 	hoverLineLimit = 14
 	hoverWidth     = 520
+	// hoverPaddingX and hoverPaddingY are the room around the card's text, in pixels: more above
+	// and below than a line's own air, so the first and last lines do not touch the edge
+	hoverPaddingX = 12
+	hoverPaddingY = 14
+	// hoverLineHeight is how tall each line of the card is, its gap included
+	hoverLineHeight = 20
 )
 
 // buildHover shows the hover card under the pointer, kept inside the window, its long lines
@@ -163,11 +169,11 @@ func (application *Window) buildHover(context *ui.Context) {
 	palette := context.Theme
 	size := palette.SmallTextSize + 1
 	measure := func(text string) float32 { return context.Measurer().MeasureText(text, size, draw2d.Regular, 1).Width }
-	lines := limitLines(wrapLines(hoverLines(card.text), cardWidth-24, measure))
+	lines := limitLines(wrapLines(hoverLines(card.text), cardWidth-2*hoverPaddingX, measure))
 	if len(lines) == 0 {
 		return
 	}
-	tall := float32(len(lines))*20 + 20
+	tall := float32(len(lines))*hoverLineHeight + 2*hoverPaddingY
 	left := max(min(card.x+8, width-cardWidth-8), 8)
 	top := card.y + 20
 	if top+tall > height-8 {
@@ -176,7 +182,7 @@ func (application *Window) buildHover(context *ui.Context) {
 	options := ui.LayerOptions{AlignX: ui.Start, AlignY: ui.Start, Padding: ui.Padding{Left: left, Top: top}, Width: ui.Fixed(cardWidth)}
 	look := ui.Look{Fill: palette.Surface, Border: application.look.Chosen, BorderWidth: 1, Radius: 8, Shadow: true}
 	context.Overlay("hover", options, func() {
-		context.Frame(ui.Layout{Direction: ui.Vertical, Width: ui.Grow(), Padding: ui.PadXY(12, 10), Gap: 2}, look, func() {
+		context.Frame(ui.Layout{Direction: ui.Vertical, Width: ui.Grow(), Padding: ui.PadXY(hoverPaddingX, hoverPaddingY), Gap: 2}, look, func() {
 			for _, line := range lines {
 				context.Text(line, ui.TextStyle{Size: size, Color: palette.Ink})
 			}

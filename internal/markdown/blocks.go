@@ -39,6 +39,8 @@ var (
 	fenceLine   = regexp.MustCompile("^ {0,3}(```+|~~~+)\\s*([^`\\s]*)")
 	tableRule   = regexp.MustCompile(`^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)*\|?\s*$`)
 	taskMark    = regexp.MustCompile(`^\[([ xX])\]\s+`)
+	// htmlLine starts a block of HTML: a tag or a comment at the start of a line
+	htmlLine = regexp.MustCompile(`^ {0,3}<(?:[A-Za-z]|/[A-Za-z]|!--)`)
 )
 
 // Parse reads a Markdown text into its blocks.
@@ -76,6 +78,8 @@ func (reader *blocks) next() {
 		reader.at++
 	case strings.HasPrefix(strings.TrimSpace(line), ">"):
 		reader.quote()
+	case htmlLine.MatchString(line):
+		reader.html()
 	case itemLine.MatchString(line):
 		reader.item(line)
 	case strings.Contains(line, "|") && reader.at+1 < len(reader.lines) && tableRule.MatchString(reader.lines[reader.at+1]):
@@ -159,6 +163,28 @@ func (reader *blocks) paragraph() {
 		words = append(words, strings.TrimSpace(reader.lines[reader.at]))
 	}
 	reader.add(Block{Kind: Paragraph, Spans: Inline(strings.Join(words, " ")), Line: start})
+}
+
+// html reads a block of HTML, up to a blank line. Its tags are left out, as GitHub hides them;
+// each of its lines with words left (a table's cell, an image's alt words) is a paragraph, since
+// HTML lays out its own lines.
+func (reader *blocks) html() {
+	for ; reader.at < len(reader.lines) && strings.TrimSpace(reader.lines[reader.at]) != ""; reader.at++ {
+		spans := Inline(strings.TrimSpace(reader.lines[reader.at]))
+		if hasWords(spans) {
+			reader.add(Block{Kind: Paragraph, Spans: spans, Line: reader.at})
+		}
+	}
+}
+
+// hasWords tells whether spans hold more than spaces.
+func hasWords(spans []Span) bool {
+	for _, span := range spans {
+		if strings.TrimSpace(span.Text) != "" {
+			return true
+		}
+	}
+	return false
 }
 
 // goesOn tells whether a line carries on the paragraph or item before it.

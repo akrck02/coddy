@@ -51,13 +51,51 @@ var namedKinds = map[string]fileKind{
 	"pom.xml": {"package", highlight.Property}, ".editorconfig": {"file-cog", highlight.Comment},
 }
 
-// FileIcon is the icon a file is drawn with, and its tint.
-func FileIcon(name string, look Look) (string, draw2d.Color) {
-	kind, found := kindOf(name)
-	if !found {
-		return "file", look.Theme.InkQuiet
+// Icon is what a file or a folder is drawn with: a picture of the icon theme chosen, or Lucide's
+// icon in a tint, which also stands in for a picture that cannot be drawn.
+type Icon struct {
+	// Name is Lucide's icon, and Ink its tint.
+	Name string
+	Ink  draw2d.Color
+	// Picture is the SVG file of the icon theme's picture; "" without an icon theme.
+	Picture string
+	// Opacity fades the picture, as the ink's own opacity fades Lucide's icon.
+	Opacity float32
+}
+
+// Faded is the icon drawn fainter, for a file that matters less (one git ignores).
+func (icon Icon) Faded() Icon {
+	icon.Ink, icon.Opacity = icon.Ink.WithAlpha(0.5), icon.Opacity*0.5
+	return icon
+}
+
+// FileIcon is the icon a file, by its name or its path, is drawn with: the icon theme's picture,
+// when the look has one, and Lucide's icon tinted by the code's colours, by the kind of file.
+func FileIcon(name string, look Look) Icon {
+	icon := Icon{Name: "file", Ink: look.Theme.InkQuiet, Opacity: 1}
+	if kind, found := kindOf(name); found {
+		icon.Name, icon.Ink = kind.icon, look.Syntax.RoleColour(kind.role).WithAlpha(0.85)
 	}
-	return kind.icon, look.Syntax.RoleColour(kind.role).WithAlpha(0.85)
+	if look.Icons != nil {
+		icon.Picture = look.Icons.FilePicture(path.Base(name)) // Zed matches the file's name, not its folders
+	}
+	return icon
+}
+
+// pictureDensity is how many pixels of an icon's picture a layout pixel holds: two, so that it
+// stays sharp on a screen of twice the density, as Go Renderer draws its strokes.
+const pictureDensity = 2
+
+// DrawIcon draws an icon in a square of a size, at x and y: its picture, or Lucide's icon when it
+// has none or it cannot be drawn.
+func DrawIcon(list *draw2d.List, look Look, icon Icon, x, y, size float32) {
+	if icon.Picture != "" && look.Pictures != nil {
+		if picture := look.Pictures.Picture(icon.Picture, int(size)*pictureDensity); picture != nil {
+			list.Image(picture, draw2d.Rectangle{X: x, Y: y, Width: size, Height: size}, 0, draw2d.Color{1, 1, 1, icon.Opacity})
+			return
+		}
+	}
+	list.Icon(icon.Name, x, y, size, icon.Ink)
 }
 
 func kindOf(name string) (fileKind, bool) {

@@ -39,6 +39,11 @@ type Look struct {
 	CreatedWord, DeletedWord draw2d.Color
 
 	Syntax *highlight.Palette
+
+	// Icons is the icon theme files and folders are drawn with, and Pictures its pictures, drawn
+	// once; nil for Lucide's icons, tinted by the code's colours.
+	Icons    *IconTheme
+	Pictures *IconPictures
 }
 
 // deepenInks takes every ink of a light theme a step deeper. Dark letters on a light ground are

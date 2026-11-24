@@ -33,7 +33,9 @@ type serverView struct {
 	fraction  float32 // how far, from 0 to 1; -1 when it cannot be told
 	progress  lsp.Progress
 	why       string // why it does not run, for one that does not
-	leftOut   []leftOutProject
+	// installable tells that the panel can install it: it is missing and its installer is here
+	installable bool
+	leftOut     []leftOutProject
 }
 
 // serverViews are every server the window knows of, running first, each once, by name.
@@ -73,12 +75,27 @@ func (application *Window) addStoppedViews(add func(serverView)) {
 			why: "Stopped while nobody asks it anything: following a name or asking its uses starts it again."})
 	}
 	for name := range servers.missing {
-		add(serverView{name: name, state: serverBroken, headline: "Not installed", fraction: -1,
-			why: "Install it with: " + application.installOf(name)})
+		add(application.missingView(name))
 	}
 	for name, why := range servers.failed {
 		add(serverView{name: name, state: serverBroken, headline: "Did not start", fraction: -1, why: why})
 	}
+}
+
+// missingView is a server not installed: being installed, or how to install it, and why the last
+// install did not work.
+func (application *Window) missingView(name string) serverView {
+	servers := &application.servers
+	if servers.installing[name] {
+		return serverView{name: name, state: serverStarting, headline: "Installing", fraction: -1,
+			why: "Running " + application.installOf(name) + "…"}
+	}
+	view := serverView{name: name, state: serverBroken, headline: "Not installed", fraction: -1,
+		why: "Install it with: " + application.installOf(name), installable: servers.installable[name]}
+	if why := servers.installFailed[name]; why != "" {
+		view.headline, view.why = "Install failed", why
+	}
+	return view
 }
 
 // runningView is a running server: ready, or what it works on and how far it is.

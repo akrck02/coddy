@@ -135,35 +135,92 @@ func (layout *formatter) code(block markdown.Block) {
 	layout.y += height
 }
 
+// codePadding is the room on each side of a code span's words, inside its shade
+const codePadding = 4
+
 // flow lays words out from left to right between two edges, going on to the next line where they
-// do not fit, and tells where the last line ends.
+// do not fit, and tells where the last line ends. A word wider than the room between the edges is
+// cut, so nothing reaches past them.
 func (layout *formatter) flow(spans []markdown.Span, left, right, top float32, base wordStyle) float32 {
 	lineHeight := layout.lineHeight(base)
 	x, y := left, top
 	for _, span := range spans {
 		style := layout.styleOf(span, base)
-		words := strings.SplitAfter(span.Text, " ")
-		if style.code && layout.measure(span.Text, style) < right-left {
-			words = []string{span.Text} // code is cut only when it is longer than a line
-		}
-		for _, word := range words {
+		shade := noShade
+		for _, word := range layout.fitted(layout.words(span, style, right-left), style, right-left) {
 			width := layout.measure(word, style)
-			if x+layout.measure(strings.TrimRight(word, " "), style) > right && x > left {
-				x, y = left, y+lineHeight
+			if x+layout.wordWidth(word, style) > right && x > left {
+				x, y, shade = left, y+lineHeight, noShade
 				if word == " " {
 					continue
 				}
 			}
 			if style.code && strings.TrimSpace(word) != "" {
-				trimmed := layout.measure(strings.TrimRight(word, " "), style)
-				layout.box(draw2d.Rectangle{X: x + 1, Y: y + 3, Width: trimmed + 6, Height: lineHeight - 6}, layout.look.Hover, 4)
-				x, width = x+4, width+4 // room on both sides of its shade
+				x, shade = layout.codeShade(word, style, x, y, lineHeight, shade)
+				width += codePadding // room after it, inside its shade
 			}
 			layout.text(word, x, y, lineHeight, width, style)
 			x += width
 		}
 	}
 	return y + lineHeight
+}
+
+// noShade is a code span with no shade drawn yet on the line.
+const noShade = -1
+
+// codeShade shades a word of code at x: a shade of its own for the first word of a span on a
+// line, the shade before it stretched for the next ones, so code cut at its spaces reads as one
+// run, not as a chip a word. It returns where the word is written, and the shade's place.
+func (layout *formatter) codeShade(word string, style wordStyle, x, y, lineHeight float32, shade int) (float32, int) {
+	trimmed := layout.measure(strings.TrimRight(word, " "), style)
+	if shade == noShade {
+		layout.box(draw2d.Rectangle{X: x + 1, Y: y + 3, Width: trimmed + 2*codePadding - 2, Height: lineHeight - 6}, layout.look.Hover, 4)
+		return x + codePadding, len(layout.shapes) - 1
+	}
+	x -= codePadding // the word before left room for the shade's end: this word takes it
+	area := &layout.shapes[shade].area
+	area.Width = x + trimmed + codePadding - 1 - area.X
+	return x, shade
+}
+
+// words are the pieces a span may go on to the next line between: its words, or a code span
+// whole while it fits in the room.
+func (layout *formatter) words(span markdown.Span, style wordStyle, room float32) []string {
+	if style.code && layout.wordWidth(span.Text, style) <= room {
+		return []string{span.Text} // code is cut only when it is longer than a line
+	}
+	return strings.SplitAfter(span.Text, " ")
+}
+
+// wordWidth is how wide a word is drawn, without the space after it, its shade's room included.
+func (layout *formatter) wordWidth(word string, style wordStyle) float32 {
+	width := layout.measure(strings.TrimRight(word, " "), style)
+	if style.code {
+		width += 2 * codePadding
+	}
+	return width
+}
+
+// fitted cuts the words wider than the room into pieces that fit, a character at least each.
+func (layout *formatter) fitted(words []string, style wordStyle, room float32) []string {
+	var pieces []string
+	for _, word := range words {
+		for layout.wordWidth(word, style) > room {
+			characters := []rune(word)
+			cut := 1
+			for cut < len(characters) && layout.wordWidth(string(characters[:cut+1]), style) <= room {
+				cut++
+			}
+			if cut == len(characters) {
+				break // only its space was too wide: it fits once at the end of a line
+			}
+			pieces = append(pieces, string(characters[:cut]))
+			word = string(characters[cut:])
+		}
+		pieces = append(pieces, word)
+	}
+	return pieces
 }
 
 // styleOf is how a span's words look, from the style of the block around them.

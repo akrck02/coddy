@@ -29,16 +29,25 @@ It has two modes, chosen on the rail at the far left (or with `1`, `2`, `c`):
   (`f` or the *Fold* button folds the unchanged lines away, Enter or a click opens one fold), with
   arrows to the previous and next change (`F7` and `⇧F7`, or `]` and `[`), and a map of the changes along the scroll bar. Inside a replaced line the words that changed are washed stronger. `d`
   switches to the whole file.
-- **Only the changes**, by default: the projects a development did not touch are left out of the
-  sidebar, the finder and the language servers, and the *Files* mode lists only the changed files,
-  with its folders left as you opened them. `g` (or `h`), the button over the sidebar or `-all`
-  show every project and file; the choice is remembered.
+- **Only the changes**, when you ask: `g` (or `h`) or the button over the sidebar leaves the
+  projects a development did not touch out of the sidebar, the finder and the language servers,
+  and the *Files* mode lists only the changed files, with its folders left as you opened them.
+  Every project and file is shown at first; the choice is remembered, and `-all` shows everything
+  whatever was chosen.
+- **Git's status can be hidden** (`…` → *Hide git status*, remembered): the names in the colour of
+  how they changed, the `A` and `M` letters, the folders' dots and the counts of changed files
+  leave the sidebar while you only read, and so do the file's status and lines changed in its
+  title, and the marks in its gutter and along its scroll bar, formatted or not. The Review mode
+  and every diff keep them: there they are what you read.
 - **A filter over the sidebar** (`⌘F`) lists only the files whose path holds each of its words,
   folders open, and the projects it names, whole; Enter takes the keyboard to the first file found.
 - **One bar at the top, for what is in front**: the file open, named by its path with how it
-  changed, or the workspace while none is open; the search in the middle; and the buttons of the
-  mode on. The review's (the changes' arrows, folding, the diff or the whole file, viewed, the
+  changed, or the workspace while none is open; then, on the right, the search (`⌘P`) and the
+  buttons of the mode on. The review's (the changes' arrows, folding, the diff or the whole file, viewed, the
   changes counted and the base) are there only in the Review mode; the others have the lock.
+- **A folder opens like a file manager**: choosing one in the sidebar, or one of the bar's folders, shows
+  what it holds in the file's place, folders and then files, each a tile with its icon. A folder
+  opens the same way, the bar's own folders go back up, and a file chosen there opens in its place.
 - **What is the review's stays in the review**: the Viewed button, `v` and how much was viewed
   in the status bar exist only in the Review mode.
 - **The sidebar folds away** (`s`, or the panel button at the foot of the rail), and the file takes
@@ -47,12 +56,20 @@ It has two modes, chosen on the rail at the far left (or with `1`, `2`, `c`):
 - **Every other file stays readable**: the *Files* mode lists them all, and the finder finds them.
 - **Enter a project** to see only its tree, from its top (Enter on its row, `e`, or the → that
   shows on its row under the pointer); `Esc` goes back to every project.
+- **One button folds or opens everything** at the top of the sidebar: *Collapse all* while
+  something is open, *Expand all* once nothing is. Outside, it folds or opens the projects;
+  inside one, every folder of its tree.
 - **Java and Kotlin projects shown as IntelliJ shows them**: Gradle and Maven modules marked,
   source roots blue (`src/main/java`, `kotlin`…), test roots green, resources apart, the packages
   inside a root joined with dots (`com.example.lighthouse.lamp`), and classes named without their
   extension with a badge for their kind (C class, I interface, E enum, @ annotation, R record, O
   Kotlin object), read from the files as they come into sight.
-- **Icons by file type** in the tree and the finder, tinted with the code's own colours.
+- **Icons by file type** in the tree and the finder, tinted with the code's own colours: Lucide's,
+  built in, or any of [Zed's icon themes](https://zed.dev/docs/extensions/icon-themes), drawn in
+  their own colours. Those installed in Zed are listed by themselves; others go in the reader's
+  `icon-themes/` folder (see [Get started](2-get-started.md)). A file takes the icon of its whole
+  name, then of its longest extension (`a.spec.ts`: `spec.ts`, then `ts`), as Zed matches it; with
+  an icon theme, folders go by name, and Java and Kotlin classes keep their badges.
 - **Syntax colouring** for Java, Kotlin, Vue, SQL, Gradle, Groovy, XML, YAML, Markdown and the
   rest of chroma's languages; text that is not UTF-8 is read as Latin-1.
 - **Edits a file opened whole**: a caret, a selection (Shift, a drag, a double click), undo by
@@ -63,11 +80,14 @@ It has two modes, chosen on the rail at the far left (or with `1`, `2`, `c`):
   stays for reading.
 - **Follows names with language servers**: `gopls` for Go, `jdtls` for Java and `kotlin-lsp` for
   Kotlin (JetBrains' preview, `brew install JetBrains/utils/kotlin-lsp`), found on
-  the `PATH` and started the first time a file of their language opens. `⌘B` or `⌘`-click goes
+  the `PATH`, or where `go install` and Homebrew put commands (`~/go/bin`, `/opt/homebrew/bin`),
+  and started the first time a file of their language opens. `⌘B` or `⌘`-click goes
   to where a name is declared, even in another project, and `⌘[` comes back; on the declaration
   itself `⌘B` shows its uses instead, as IntelliJ does, and `⌥F7` opens the uses mode on every
   use of a name (below); resting the pointer on a name shows its
-  type and documentation. A server not installed is named, with the command that installs it.
+  type and documentation. A server not installed is named, with the command that installs it, and
+  its card in the servers panel has an *Install* button when that command's program (`go`,
+  `brew`) is on the computer: it installs in the background, and the server starts once it is done.
   One `jdtls` reads every Java project of the window, and one `kotlin-lsp` every Kotlin one, so
   names cross repositories; a name another repository gives as a jar opens in that repository's
   source when it is open. While a server reads the projects (`kotlin-lsp` imports each Gradle
@@ -153,12 +173,21 @@ It has two modes, chosen on the rail at the far left (or with `1`, `2`, `c`):
 
 The interface follows what review tools have settled on, and keeps colour for meaning:
 
-- **Colours are Zed's One Dark and One Light** ([one.json](https://github.com/zed-industries/zed/blob/main/assets/themes/one/one.json)),
-  for the window and the code alike: neutral greys, the editor a step apart from the panels around
+- **Colours are IntelliJ's Dark in the dark, and Zed's One Light in the light**
+  ([one.json](https://github.com/zed-industries/zed/blob/main/assets/themes/one/one.json)), for
+  the window and the code alike: neutral greys, the editor a step apart from the panels around
   it, green, amber and red only for added, changed and removed, blue only for where you are.
   Bubble 4 gives the shapes, spacing and type.
-- **Themes**, chosen in the settings (`…` → Settings) and remembered: Zed's One Dark and One Light,
-  and IntelliJ's Dark, Light and Darcula, come with it. Your own are Zed's theme files: drop any
+- **The settings are a screen of their own**, in place of the sidebar and the file, opened from
+  the gear in the bar over the file (`⌘,`; `?` opens them on the keys) and closed with Esc. Their
+  sections are listed on the left: *Appearance*, each theme as a small window painted in it and
+  each icon theme as a card of a few of its icons, and
+  *Keys*, every command with its keys drawn as caps.
+- **Themes**, chosen in the settings (the gear in the bar, or `⌘,`) and remembered: Zed's One Dark and One Light,
+  IntelliJ's Dark and Light, Visual Studio Code's Dark Modern (its colours, from
+  [microsoft/vscode](https://github.com/microsoft/vscode), MIT), and [Dracula](https://draculatheme.com/)'s Dracula Solid
+  (from [dracula/zed](https://github.com/dracula/zed), MIT), and juanmnl's
+  [Mr Pink](https://github.com/juanmnl/vs-mr-pink) (MIT) come with it. Your own are Zed's theme files: drop any
   of them (a theme family, `.json`) in `~/Library/Application Support/code-review/themes/` and it
   is listed the next time the reader starts; one with the name of a theme of the reader takes its
   place. The reader takes the colours it paints with from the file's `style` (`text`,
@@ -179,7 +208,7 @@ The interface follows what review tools have settled on, and keeps colour for me
 - No search inside a file.
 - No side-by-side diff; the sides are interleaved.
 - Long lines are not wrapped: scroll sideways (Shift+wheel, ←/→ in the editor).
-- One typeface for code at a time: SF Mono by default, or the one `-code-font` names (a `.ttf`;
+- One typeface for code at a time: the system's by default, or the one `-code-font` names (a `.ttf`;
   collections such as `Menlo.ttc` are not read).
 - Language servers only follow names: no rename, formatting, completion or diagnostics yet, and
   not on the old side of a diff, which is not on disk.

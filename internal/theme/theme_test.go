@@ -20,15 +20,15 @@ func TestAFileIsKnownByItsNameBeforeItsExtension(test *testing.T) {
 		"notes/without-a-kind.q": "file",
 	}
 	for name, want := range cases {
-		if icon, _ := FileIcon(name, look); icon != want {
-			test.Errorf("FileIcon(%q) = %q, want %q", name, icon, want)
+		if icon := FileIcon(name, look); icon.Name != want {
+			test.Errorf("FileIcon(%q) = %q, want %q", name, icon.Name, want)
 		}
 	}
 }
 
-func TestTheReaderComesWithZedsOneAndIntelliJsThemes(test *testing.T) {
+func TestTheReaderComesWithTheThemesOfZedIntelliJVisualStudioCodeDraculaAndMrPink(test *testing.T) {
 	themes := BuiltIn()
-	want := []string{"Darcula", "IntelliJ Dark", "One Dark", "IntelliJ Light", "One Light"}
+	want := []string{"Dark Modern", "Dracula Solid", "IntelliJ Dark", "Mr Pink", "One Dark", "IntelliJ Light", "One Light"}
 	if len(themes) != len(want) {
 		test.Fatalf("the reader comes with %d themes, want %v", len(themes), want)
 	}
@@ -37,9 +37,9 @@ func TestTheReaderComesWithZedsOneAndIntelliJsThemes(test *testing.T) {
 			test.Errorf("theme %d is %q, want %q (the dark ones first, each by name)", index, themes[index].Name, name)
 		}
 	}
-	darcula := Find(themes, "Darcula", true)
-	if darcula.Look.Editor != draw2d.MustHex("#2b2b2b") || !darcula.Dark {
-		test.Errorf("Darcula's editor is %v, want #2b2b2b", darcula.Look.Editor)
+	modern := Find(themes, "Dark Modern", true)
+	if modern.Look.Editor != draw2d.MustHex("#1f1f1f") || !modern.Dark {
+		test.Errorf("Dark Modern's editor is %v, want #1f1f1f", modern.Look.Editor)
 	}
 }
 
@@ -65,6 +65,20 @@ func TestAThemeWithOnlyItsTextAndEditorIsMadeWhole(test *testing.T) {
 	}
 }
 
+// A theme for an editor that blurs the desktop behind its window gives its window's ground
+// see-through; the reader lays it over the editor's ground, so the window is not painted in it bare.
+func TestASeeThroughGroundIsLaidOverTheEditor(test *testing.T) {
+	themes, err := Read([]byte(`{"name": "Glass", "themes": [{"name": "Glass", "appearance": "dark",
+		"style": {"text": "#e0e0e0ff", "editor.background": "#000000ff", "background": "#ffffff33"}}]}`))
+	if err != nil {
+		test.Fatal(err)
+	}
+	ground := themes[0].Look.Theme.Background
+	if ground[3] != 1 || ground[0] > 0.25 {
+		test.Errorf("a white ground a fifth opaque over a black editor is painted %v, not a dark grey", ground)
+	}
+}
+
 func TestAFileThatIsNotAThemeIsToldAndLeftOut(test *testing.T) {
 	folder := test.TempDir()
 	write := func(name, content string) {
@@ -74,7 +88,7 @@ func TestAFileThatIsNotAThemeIsToldAndLeftOut(test *testing.T) {
 	}
 	write("broken.json", "{")
 	write("no-text.json", `{"themes": [{"name": "Empty", "style": {}}]}`)
-	write("mine.json", `{"themes": [{"name": "Darcula", "appearance": "dark", "style": {"text": "#ffffff", "editor.background": "#000000"}}]}`)
+	write("mine.json", `{"themes": [{"name": "Dark Modern", "appearance": "dark", "style": {"text": "#ffffff", "editor.background": "#000000"}}]}`)
 	themes, problems := Load(folder)
 	if len(problems) != 2 {
 		test.Errorf("reading the folder told %d problems, want 2: %v", len(problems), problems)
@@ -88,9 +102,9 @@ func TestAFileThatIsNotAThemeIsToldAndLeftOut(test *testing.T) {
 		test.Errorf("the theme without colours is told as %v, not as missing its colours", problems[1])
 	}
 	if len(themes) != len(BuiltIn()) {
-		test.Errorf("the folder gives %d themes, want the reader's %d with Darcula replaced", len(themes), len(BuiltIn()))
+		test.Errorf("the folder gives %d themes, want the reader's %d with Dark Modern replaced", len(themes), len(BuiltIn()))
 	}
-	if mine := Find(themes, "Darcula", true); mine.Look.Editor != draw2d.MustHex("#000000") || mine.File == "" {
+	if mine := Find(themes, "Dark Modern", true); mine.Look.Editor != draw2d.MustHex("#000000") || mine.File == "" {
 		test.Errorf("a theme of the folder does not take the place of the reader's one of its name: %+v", mine.File)
 	}
 }

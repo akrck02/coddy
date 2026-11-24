@@ -23,12 +23,17 @@ type languageServers struct {
 	table    []lsp.Server
 	running  map[string]*lsp.Client // by key: the server's name, and its root when it has one
 	starting map[string]bool
-	told     map[string]told   // what each server was told of each file, by key and path
-	version  int               // grows with each text told, for every file and server
-	missing  map[string]bool   // servers not installed, by name
-	failed   map[string]string // servers that did not start, or kept stopping, by name, with why
-	crashes  map[string]int    // how many times each server stopped on its own
-	stopped  bool              // the window closed: a server that starts now stops at once
+	told     map[string]told // what each server was told of each file, by key and path
+	version  int             // grows with each text told, for every file and server
+	missing  map[string]bool // servers not installed, by name
+	// installable are the missing servers whose install command can run here, by name;
+	// installing those being installed, and installFailed why an install did not work
+	installable   map[string]bool
+	installing    map[string]bool
+	installFailed map[string]string
+	failed        map[string]string // servers that did not start, or kept stopping, by name, with why
+	crashes       map[string]int    // how many times each server stopped on its own
+	stopped       bool              // the window closed: a server that starts now stops at once
 	// snapshots are what each project held when a server started in it, by the project's folder;
 	// written is what servers wrote, kept across starts of the reader
 	snapshots map[string]*workspace.Snapshot
@@ -67,7 +72,8 @@ func newLanguageServers(table []lsp.Server, writtenPath string) languageServers 
 		table = lsp.Servers
 	}
 	return languageServers{table: table, running: map[string]*lsp.Client{}, starting: map[string]bool{},
-		told: map[string]told{}, missing: map[string]bool{}, failed: map[string]string{}, crashes: map[string]int{}, snapshots: map[string]*workspace.Snapshot{},
+		told: map[string]told{}, missing: map[string]bool{}, installable: map[string]bool{}, installing: map[string]bool{}, installFailed: map[string]string{},
+		failed: map[string]string{}, crashes: map[string]int{}, snapshots: map[string]*workspace.Snapshot{},
 		written: workspace.OpenWritten(writtenPath), adding: map[string]bool{}, roots: map[string]string{},
 		inSight: map[string][]string{}, restarting: map[string]string{}, resting: map[string]string{}, rest: serverRest, usage: map[string]serverUsage{},
 		queued: map[string]string{}, stopping: map[string]bool{}, cannotImport: map[string]string{}}
@@ -281,6 +287,7 @@ func (application *Window) serverStarted(server lsp.Server, key string, client *
 	switch {
 	case errors.Is(err, lsp.ServerNotFound):
 		servers.missing[server.Name] = true
+		servers.installable[server.Name] = lsp.Installable(server)
 		application.toast = server.Name + " is not installed: " + server.Install
 	case err != nil:
 		servers.failed[server.Name] = err.Error() // not tried again until the reader starts again

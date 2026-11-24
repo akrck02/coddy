@@ -1,6 +1,7 @@
 package window
 
 import (
+	"github.com/akrck02/code-review/internal/theme"
 	"path/filepath"
 	"slices"
 	"testing"
@@ -47,18 +48,37 @@ func TestTheBarShowsTheButtonsOfTheModeOn(test *testing.T) {
 	if !hasButton(window, base) || hasButton(window, lock) {
 		test.Error("the review mode's bar does not offer the base alone, without the lock")
 	}
-	if !hasButton(window, "Read the projects again (r)") {
-		test.Error("the review mode's bar does not offer to read the projects again")
+	if !hasButton(window, "Settings (⌘,)") || hasButton(window, "Read the projects again (r)") {
+		test.Error("the bar does not offer the settings, or still offers to read the projects again")
+	}
+}
+
+// Reading every project again is done less often than the rest: it is in the menu, beside
+// opening a folder, not a button of its own.
+func TestTheMenuReadsTheProjectsAgain(test *testing.T) {
+	application := newReader(Settings{Folders: []string{makeRepository(test)}, Synchronous: true, ReadOnly: true, WorkingTree: true})
+	window := newWindow(test, application)
+	addAFileUnseen(test, application, window)
+	if err := window.Click(menuName); err != nil {
+		test.Fatal(err)
+	}
+	window.Frames(2)
+	if err := window.Click("Read the projects again r"); err != nil {
+		test.Fatal(err)
+	}
+	window.Frames(2)
+	if len(application.projects[0].Changes) != 4 {
+		test.Error("after the menu's item the file added since the start is not among the changes")
 	}
 }
 
 // The rail and the sidebar reach the top of the window; the bar sits over the viewer alone, and
-// its search keeps to the middle of it.
+// its search is the first of its buttons, on the right.
 func TestTheBarSitsOverTheViewerAlone(test *testing.T) {
 	application := newReader(Settings{Folders: []string{makeRepository(test)}, Synchronous: true, ReadOnly: true})
 	window := newWindow(test, application)
 	window.Frames(2)
-	search, err := window.Element("search files")
+	search, err := window.Element(searchName)
 	if err != nil {
 		test.Fatal(err)
 	}
@@ -70,19 +90,23 @@ func TestTheBarSitsOverTheViewerAlone(test *testing.T) {
 	if search.Rect.X < sidebarRight {
 		test.Errorf("the search begins at %v, over the sidebar ending at %v", search.Rect.X, sidebarRight)
 	}
-	if search.Rect.Y+search.Rect.Height > titleBarHeight || filter.Rect.Y > titleBarHeight+20 {
+	if search.Rect.Y+search.Rect.Height > theme.BarHeight || filter.Rect.Y > theme.BarHeight+20 {
 		test.Errorf("the search is at %v, the sidebar's filter at %v: the sidebar does not begin at the top", search.Rect, filter.Rect)
+	}
+	refresh, err := window.Element("Settings (⌘,)")
+	if err != nil {
+		test.Fatal(err)
 	}
 	width := float32(1200) // newWindow's
 	middle := sidebarRight + (width-sidebarRight)/2
-	if centre := search.Rect.X + search.Rect.Width/2; centre < middle-20 || centre > middle+20 {
-		test.Errorf("the search's middle is at %v, the viewer's at %v", centre, middle)
+	if search.Rect.X < middle || search.Rect.X > refresh.Rect.X {
+		test.Errorf("the search is at %v, not on the right before the other buttons (from %v)", search.Rect.X, refresh.Rect.X)
 	}
 }
 
-// A folder's crumb shows the folder in the sidebar, selected, with the keyboard; one in a chain of
+// A folder's crumb shows what the folder holds and selects it in the sidebar; one in a chain of
 // lone folders, as a Java package is (org.lamp), selects the chain's row.
-func TestACrumbShowsItsFolderInTheSidebar(test *testing.T) {
+func TestACrumbShowsItsFolderAndSelectsItInTheSidebar(test *testing.T) {
 	folder := test.TempDir()
 	javaRepository(test, filepath.Join(folder, "lighthouse"), map[string]string{
 		"app/build.gradle": "plugins {}\n", "app/src/main/java/org/lamp/Lamp.java": "package org.lamp;\n\nclass Lamp {}\n"})
@@ -92,9 +116,15 @@ func TestACrumbShowsItsFolderInTheSidebar(test *testing.T) {
 	if err != nil {
 		test.Fatal(err)
 	}
-	window.Frames(2)
-	application.focus = viewerPane
-	for crumb, row := range map[string]string{"main": "app/src/main", "org": "app/src/main/java/org/lamp", "app": "app"} {
+	crumbs := []struct{ crumb, folder, row string }{
+		{"main", "app/src/main", "app/src/main"},
+		{"org", "app/src/main/java/org", "app/src/main/java/org/lamp"},
+		{"app", "app", "app"},
+	}
+	for _, each := range crumbs {
+		crumb, row := each.crumb, each.row
+		application.openByLabel("lighthouse/app/src/main/java/org/lamp/Lamp.java")
+		window.Frames(2)
 		if err := window.Click(crumb); err != nil {
 			test.Fatal(err)
 		}
@@ -103,9 +133,28 @@ func TestACrumbShowsItsFolderInTheSidebar(test *testing.T) {
 		if !ok || selected.Kind != sidebar.FolderRow || selected.Path != row {
 			test.Errorf("the crumb %s selects %+v, not the folder %s", crumb, selected, row)
 		}
-		if application.focus != sidebarPane {
-			test.Errorf("the crumb %s leaves the keyboard out of the sidebar", crumb)
+		if !application.explorer.Open || application.explorer.Path != each.folder {
+			test.Errorf("the crumb %s shows the folder %q, not %s", crumb, application.explorer.Path, each.folder)
 		}
-		application.focus = viewerPane
+	}
+}
+
+// The search is a button like the mode's: with a file open, it stands with them, after the
+// file's own buttons and the line that ends them, not apart before the file's.
+func TestWithAFileOpenTheSearchStandsBesideTheModesButtons(test *testing.T) {
+	application := newReader(Settings{Folders: []string{makeRepository(test)}, Synchronous: true, ReadOnly: true})
+	window := newWindow(test, application)
+	application.openByLabel("lighthouse/src/lamp.go")
+	window.Frames(2)
+	search, err := window.Element(searchName)
+	if err != nil {
+		test.Fatal(err)
+	}
+	lock, err := window.Element("Read-only: on, files are only read (⌘⇧L)")
+	if err != nil {
+		test.Fatal(err)
+	}
+	if gap := lock.Rect.X - search.Rect.Right(); gap < 0 || gap > 8 {
+		test.Errorf("the search is not just before the lock: search %v, lock %v", search.Rect, lock.Rect)
 	}
 }

@@ -75,7 +75,7 @@ func (view *Viewer) LineInSight() int {
 	if view.List.RowHeight <= 0 {
 		return 1
 	}
-	return view.fileLineOfRow(int(view.List.Offset/view.List.RowHeight)) + 1
+	return view.fileLineOfRow(max(view.List.RowOf(view.List.Area.Y), 0)) + 1
 }
 
 // PlaceCaret puts the caret at a place of the file being edited, and keeps it in sight.
@@ -90,6 +90,6 @@ func (view *Viewer) PlaceCaret(place Place) {
 // at, and where a card about a name goes.
 func (view *Viewer) PointOf(place Place) (x, y float32) {
 	x = view.codeLeft + (float32(place.Column)+0.5)*view.charWidth - view.List.OffsetX
-	y = view.List.Area.Y + (float32(place.Line)+0.5)*view.List.RowHeight - view.List.Offset
+	y = view.List.RowTop(place.Line) + view.List.RowHeight/2
 	return x, y
 }

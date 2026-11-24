@@ -61,3 +61,29 @@ func TestATableKeepsItsCells(test *testing.T) {
 		test.Errorf("the escaped cell is %+v", cell)
 	}
 }
+
+// A badge is an image inside a link: its words must read as the link, not as broken brackets.
+func TestAnImageInsideALinkReadsAsTheLink(test *testing.T) {
+	spans := Inline("[![Licence](https://badge.example/licence.svg)](LICENSE) under it")
+	want := []Span{{Text: "Licence", Link: "LICENSE"}, {Text: " under it"}}
+	if !reflect.DeepEqual(spans, want) {
+		test.Errorf("the spans are %+v", spans)
+	}
+}
+
+// GitHub hides HTML tags: a README that centres its logo with them must not show them as text.
+func TestHTMLTagsAreLeftOutAndAnImageShowsItsWords(test *testing.T) {
+	text := "<p align=\"center\"><img alt=\"\" src=\"logo.svg\"></p>\n\n<div align=\"center\">\n\n# The harbour\n\n</div>\n\n<td>\n<img alt=\"The lighthouse at night\" src=\"night.png\">\n<!-- a note -->\n</td>\n\nSome <b>bold</b> words."
+	var shown []string
+	for _, block := range Parse(text) {
+		words := ""
+		for _, span := range block.Spans {
+			words += span.Text
+		}
+		shown = append(shown, words)
+	}
+	want := []string{"The harbour", "The lighthouse at night", "Some bold words."}
+	if !reflect.DeepEqual(shown, want) {
+		test.Errorf("the blocks show %q, want %q", shown, want)
+	}
+}

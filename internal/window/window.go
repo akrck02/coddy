@@ -3,6 +3,8 @@
 package window
 
 import (
+	"github.com/akrck02/code-review/internal/explorer"
+	"github.com/akrck02/code-review/internal/settings"
 	"sort"
 	"strings"
 	"time"
@@ -34,6 +36,16 @@ type Settings struct {
 	Themes []theme.Theme
 	// ThemesFolder is the folder the settings say a person's own themes are read from.
 	ThemesFolder string
+	// IconTheme names the icon theme files and folders are drawn with, among IconThemes; "" or
+	// one not there draws Lucide's icons, tinted by the theme.
+	IconTheme string
+	// IconThemes are the icon themes the settings offer, besides Lucide's.
+	IconThemes []theme.IconTheme
+	// IconThemesFolder is the folder the settings say a person's own icon themes are read from.
+	IconThemesFolder string
+	// Tell hears of problems a person may want to know about while the window runs, such as an
+	// icon's picture that cannot be read; nil leaves them untold.
+	Tell func(problem error)
 	// OnlyChanged hides the projects the development did not change, in the sidebar and the finder.
 	OnlyChanged bool
 	// Open names a file to open at the start, as "project/path/in/it".
@@ -49,6 +61,9 @@ type Settings struct {
 	ReadOnly bool
 	// SidebarFolded starts with the sidebar folded away, the file taking the window's width.
 	SidebarFolded bool
+	// HidesStatus starts with git's status (how files changed) left out of the sidebar, outside
+	// the review.
+	HidesStatus bool
 	// Servers are the language servers to run; nil runs lsp.Servers, found on the PATH.
 	Servers []lsp.Server
 	// ServersWrote is the file that keeps what servers wrote in the repositories, in the reader's
@@ -92,7 +107,6 @@ type Window struct {
 	sidebarFolded bool
 	focusBefore   focusedPane
 
-	helpOpen bool
 	// serversOpen shows the servers panel: what each language server does, project by project
 	serversOpen bool
 	// serversListed shows the status bar's popover of the servers and their states
@@ -103,8 +117,16 @@ type Window struct {
 	// themes are the themes the settings offer, and theme the one painting the window
 	themes []theme.Theme
 	theme  theme.Theme
-	// settingsOpen shows the settings
-	settingsOpen bool
+	// iconThemes are the icon themes the settings offer, and iconTheme the one drawing files and
+	// folders, nil for Lucide's; iconPictures keep each one's pictures, by its name
+	iconThemes   []theme.IconTheme
+	iconTheme    *theme.IconTheme
+	iconPictures map[string]*theme.IconPictures
+	tell         func(problem error)
+	// settingsScreen shows the settings in place of the sidebar and the viewer, when open
+	settingsScreen settings.Screen
+	// explorer shows a folder in the viewer's place, chosen in the breadcrumb
+	explorer explorer.Explorer
 	// onlyChanged hides the projects with no changes, in the sidebar and the finder
 	onlyChanged bool
 	// modes are the ways of looking at the workspace, in the rail's order; mode is the one on
@@ -153,14 +175,8 @@ func New(settings Settings, modes ...mode.Mode) (*Window, error) {
 		servers:       newLanguageServers(settings.Servers, settings.ServersWrote),
 		classKinds:    map[workspace.FileReference]java.ClassKind{},
 	}
-	application.sidebar = sidebar.New()
-	application.themes = settings.Themes
-	if len(application.themes) == 0 {
-		application.themes = theme.BuiltIn()
-	}
-	application.theme = theme.Find(application.themes, settings.Theme, settings.Dark)
-	application.setLook()
-	application.sidebar.SetChangedFilter(settings.OnlyChanged)
+	application.sidebar = newSidebar(settings)
+	application.startThemes(settings)
 	application.startModes(modes, settings.Mode)
 	application.viewer = viewer.New()
 	if settings.Synchronous {
@@ -184,8 +200,27 @@ func (application *Window) Driver() uidrive.Driver { return application.tap }
 // Folders are the folders opened, to remember them for the next time.
 func (application *Window) Folders() []string { return application.folders }
 
-// setLook paints the window in the theme chosen.
-func (application *Window) setLook() { application.look = application.theme.Look }
+// startThemes chooses the theme and the icon theme the window starts in, among those offered.
+func (application *Window) startThemes(settings Settings) {
+	application.themes = settings.Themes
+	if len(application.themes) == 0 {
+		application.themes = theme.BuiltIn()
+	}
+	application.theme = theme.Find(application.themes, settings.Theme, settings.Dark)
+	application.iconThemes, application.tell = settings.IconThemes, settings.Tell
+	application.iconPictures = map[string]*theme.IconPictures{}
+	application.iconTheme = findIconTheme(application.iconThemes, settings.IconTheme)
+	application.setLook()
+}
+
+// setLook paints the window in the theme chosen, its files and folders drawn with the icon theme
+// chosen, if any.
+func (application *Window) setLook() {
+	application.look = application.theme.Look
+	if application.iconTheme != nil {
+		application.look.Icons, application.look.Pictures = application.iconTheme, application.IconPictures(application.iconTheme)
+	}
+}
 
 // ThemeName is the name of the theme chosen, to start in it the next time.
 func (application *Window) ThemeName() string { return application.theme.Name }
@@ -323,6 +358,7 @@ func (application *Window) projectsChanged() {
 	}
 	application.finder.Stale = true
 	application.sidebar.Invalidate()
+	application.explorer.Relist(application)
 }
 
 // walkFiles visits a tree's files in the order the sidebar shows them: folders first.
@@ -346,6 +382,7 @@ func (application *Window) openFile(reference workspace.FileReference) {
 		return
 	}
 	project := application.projects[reference.Project]
+	application.explorer.Close()
 	application.viewer.Start(reference, project)
 	application.viewer.Uses = application.usesOfFile(reference)
 	if document, cached := application.documentCache[reference]; cached {
@@ -485,6 +522,21 @@ func (application *Window) setOnlyChanged(only bool) {
 		application.toast = "Every project and file"
 	}
 }
+
+// newSidebar is the sidebar as the settings start it: its filter of changes and git's status.
+func newSidebar(settings Settings) sidebar.Sidebar {
+	made := sidebar.New()
+	made.SetChangedFilter(settings.OnlyChanged)
+	made.HidesStatus = settings.HidesStatus
+	return made
+}
+
+// HidesStatus tells whether git's status is left out of the sidebar, to remember it.
+func (application *Window) HidesStatus() bool { return application.sidebar.HidesStatus }
+
+// ShowsStatus tells whether git's status is shown now, in the sidebar and the file open: unless
+// it is hidden, and always in a mode that lists only the changes.
+func (application *Window) ShowsStatus() bool { return application.sidebar.ShowsStatus() }
 
 // OnlyChanged tells whether only the projects with changes are shown, to remember it.
 func (application *Window) OnlyChanged() bool { return application.onlyChanged }

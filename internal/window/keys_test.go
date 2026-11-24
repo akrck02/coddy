@@ -2,6 +2,7 @@ package window
 
 import (
 	"fmt"
+	"github.com/akrck02/code-review/internal/settings"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -180,7 +181,9 @@ func TestEveryWindowShortcutDoesItsJob(test *testing.T) {
 // openingShortcuts open the window's dialogs and panels.
 func openingShortcuts() []shortcut {
 	pickerOpen := func(application *Window) string { return unless(application.pickerOpen, "the picker is closed") }
-	helpOpen := func(application *Window) string { return unless(application.helpOpen, "the help is closed") }
+	helpOpen := func(application *Window) string {
+		return unless(application.settingsScreen.Open && application.settingsScreen.Section == settings.Keys, "the settings are not open on the keys")
+	}
 	return []shortcut{
 		{name: "o opens the folder picker", press: pressing(input.KeyO), holds: pickerOpen},
 		{name: "⌘⌥O opens the folder picker", press: pressing(input.KeyO, input.KeySuper, input.KeyAlt), holds: pickerOpen},
@@ -190,12 +193,21 @@ func openingShortcuts() []shortcut {
 			holds: func(application *Window) string {
 				return unless(application.finder.Open && application.finder.Scope == finder.NamesScope, "the finder is not open on names")
 			}},
+		{name: "Shift twice finds a file by name, as IntelliJ's Search Everywhere",
+			press: func(window *uitest.Window) { window.PressKey(input.KeyShift); window.PressKey(input.KeyShift) },
+			holds: func(application *Window) string {
+				return unless(application.finder.Open && application.finder.Scope == finder.NamesScope, "the finder is not open on names")
+			}},
 		{name: "/ finds a text in the files", press: typing("/"),
 			holds: func(application *Window) string {
 				return unless(application.finder.Open && application.finder.Scope == finder.ContentScope, "the finder is not open on content")
 			}},
 		{name: "? opens the help", press: typing("?"), holds: helpOpen},
 		{name: "F1 opens the help", press: pressing(input.KeyF1), holds: helpOpen},
+		{name: "⌘, opens the settings", press: pressing(input.KeyComma, input.KeySuper),
+			holds: func(application *Window) string {
+				return unless(application.settingsScreen.Open && application.settingsScreen.Section == settings.Appearance, "the settings are not open on the appearance")
+			}},
 	}
 }
 

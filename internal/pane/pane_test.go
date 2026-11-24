@@ -36,3 +36,30 @@ func TestKeysWithNoInputAnswerNo(test *testing.T) {
 		test.Error("keys with no input yet answered yes")
 	}
 }
+
+// A margin keeps room above the first row and below the last, so they do not touch the edges:
+// the rows start lower, the content is taller by both margins, and a point in the margin is on
+// no row.
+func TestAMarginKeepsRoomAboveTheFirstRowAndBelowTheLast(test *testing.T) {
+	list := Scroller{RowHeight: 20, Count: 10, Margin: 8}
+	list.Place(draw2d.Rectangle{X: 0, Y: 100, Width: 300, Height: 100})
+	if top := list.RowTop(0); top != 108 {
+		test.Errorf("the first row starts at %v, want 108, a margin below the top", top)
+	}
+	if height := list.ContentHeight(); height != 216 {
+		test.Errorf("the content is %v tall, want 216: ten rows and two margins", height)
+	}
+	if row := list.RowAt(10, 104); row != -1 {
+		test.Errorf("a point in the top margin is on row %d", row)
+	}
+	if row := list.RowAt(10, 109); row != 0 {
+		test.Errorf("a point just below the margin is on row %d, want 0", row)
+	}
+	list.Offset = list.ContentHeight() - list.Area.Height
+	if bottom := list.RowTop(9) + list.RowHeight; bottom != list.Area.Bottom()-8 {
+		test.Errorf("scrolled to the end, the last row ends at %v, want a margin above %v", bottom, list.Area.Bottom())
+	}
+	if first, last := list.Visible(); first != 5 || last != 10 {
+		test.Errorf("scrolled to the end, rows %d to %d are in sight, want 5 to 10", first, last)
+	}
+}

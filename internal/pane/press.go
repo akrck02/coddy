@@ -23,11 +23,16 @@ type Press struct {
 	// AnyModifiers runs the command whatever modifiers are held: for Esc, Tab, [ and ], which
 	// have always answered with Command or Alt down too
 	AnyModifiers bool
+	// Twice runs the command when the key is pressed twice in a row, quickly: IntelliJ's double
+	// Shift. It works while editing, as two Shifts type nothing.
+	Twice bool
 }
 
 // Matches tells which of a command's keys the frame's input pressed.
 func (press Press) Matches(keys Keys) bool {
 	switch {
+	case press.Twice:
+		return keys.PressedTwice(press.Key)
 	case press.AnyModifiers:
 		return keys.Pressed(press.Key)
 	case press.Text != "":
@@ -48,7 +53,7 @@ func (press Press) Matches(keys Keys) bool {
 // plain keys type: a key with Command, an F-key, or Esc.
 func (press Press) WorksWhileEditing() bool {
 	functionKey := press.Key >= input.KeyF1 && press.Key <= input.KeyF12
-	return press.Text == "" && (press.Command || press.Alt || functionKey || press.Key == input.KeyEscape)
+	return press.Text == "" && (press.Command || press.Alt || press.Twice || functionKey || press.Key == input.KeyEscape)
 }
 
 // Key is a plain key with its label.

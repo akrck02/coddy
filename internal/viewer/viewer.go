@@ -40,8 +40,8 @@ type Window interface {
 	FocusViewer()
 	HasProjects() bool
 	OpenFolder()
-	// RevealFolder shows a folder of a project in the sidebar, "" the project.
-	RevealFolder(project int, folder string)
+	// ShowFolder shows what a folder of a project holds in the viewer's place, "" its top.
+	ShowFolder(project int, folder string)
 	// FileButton is the button the mode that is on puts in the header, such as Viewed;
 	// PressFileButton presses it.
 	FileButton(file workspace.FileReference) (Button, bool)
@@ -53,6 +53,9 @@ type Window interface {
 	// off for every file.
 	Editing() bool
 	ReadOnly() bool
+	// ShowsStatus tells whether git's status is shown: when not, a file read whole says nothing of
+	// how it changed (a diff still shows its changes, being made of them).
+	ShowsStatus() bool
 	// Run starts background work under a key, replacing the work under that key still running.
 	Run(key string, do func(stop context.Context) func())
 	// GoToDefinition opens where the name at a place of the file open is declared.
@@ -72,6 +75,10 @@ type Button struct {
 // codeRowHeight is a line of code: 13 pixels of a monospaced face on lines 1.7 times as tall, as roomy as
 // Zed's buffer.
 const codeRowHeight float32 = 22
+
+// codeMargin is the room above the first line of code and below the last, in pixels, so the code
+// does not touch the bar above it or the window's edge below.
+const codeMargin float32 = 10
 
 type Viewer struct {
 	Reference workspace.FileReference
@@ -373,7 +380,7 @@ func (view *Viewer) StepHunk(step int) {
 	if len(view.Hunks) == 0 {
 		return
 	}
-	marker := int((view.List.Offset + view.List.Area.Height/3) / view.List.RowHeight)
+	marker := view.List.RowOf(view.List.Area.Y + view.List.Area.Height/3)
 	target := -1
 	if step > 0 {
 		for _, start := range view.Hunks {
@@ -458,6 +465,7 @@ func (view *Viewer) Build(context *ui.Context, window Window) {
 			return
 		}
 		view.List.RowHeight = view.rowHeight
+		view.List.Margin = codeMargin
 		view.List.Count = view.RowCount()
 		if !window.ModalOpen() {
 			view.followInput(context, window)
@@ -667,7 +675,9 @@ func (view *Viewer) paint(context *ui.Context, window Window, drawing *draw2d.Li
 		}
 	}
 	view.List.PaintBar(drawing, painter.look.ScrollThumb)
-	view.paintChangeMarks(drawing, painter.look)
+	if view.Mode == UsesView || view.showsStatus(painter.window) { // the uses' marks are not git's
+		view.paintChangeMarks(drawing, painter.look)
+	}
 	drawing.PopClip()
 }
 
@@ -715,7 +725,9 @@ func (view *Viewer) paintFileLine(painter painting, index int, top, baseline flo
 		numberInk = look.ActiveLineNumber
 	}
 	view.paintNumber(drawing, number, area.X, painter.numberWidth, baseline, numberInk)
-	view.paintMark(drawing, look, view.Marks[number], area.X+painter.numberWidth+4, top)
+	if view.showsStatus(painter.window) {
+		view.paintMark(drawing, look, view.Marks[number], area.X+painter.numberWidth+4, top)
+	}
 	if view.Edit != nil {
 		view.paintSelection(painter, index, top)
 	}

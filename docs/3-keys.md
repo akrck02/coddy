@@ -8,7 +8,7 @@ below, an F-key or `Esc`. `Esc` gives the keyboard back to the sidebar, where th
 | Key | |
 |---|---|
 | `⌘F` | Filter the projects and files the sidebar lists; Enter goes to them |
-| `⌘⇧O`, `⌘O`, `⌘P` (or `Shift+P`) | Find a file by its name, in any project; changed files first |
+| `⌘⇧O`, `⌘O`, `⌘P` (or `Shift+P`, or `⇧⇧`: Shift twice, as IntelliJ's Search Everywhere) | Find a file by its name, in any project; changed files first |
 | `⌘⇧F` (or `/`) | Find a text in the files of every project; `Tab` in the finder switches between names and content |
 | `n` / `m` (`⌘⇧N` / `⌘⇧M`) | Next / previous changed file, across every project |
 | `F7` / `⇧F7`, `]` / `[` | Next / previous change in the file (the diff, or the marked lines) |
@@ -27,8 +27,10 @@ below, an F-key or `Esc`. `Esc` gives the keyboard back to the sidebar, where th
 | `g`, `h` (`⌘⇧G`) | Only the changes, projects and files, or everything (sidebar, finder and servers) |
 | `b` (`⌘⇧B`) | Compare against another branch, tag or commit |
 | `w` (`⌘⇧W`) | Count the changes not committed yet, or the commits only |
-| `r` (`⌘R`) | Read every project again |
+| `r` (`⌘R`) | Read every project again (also in the `…` menu) |
 | `o` (`⌘⌥O`) | Open a repository or a folder of repositories |
+| `F11` | The whole screen, or a window again |
+| `⌘,` | The settings; `?` or `F1` opens them on the keys, Esc closes them |
 | `⌘+` / `⌘-`, `⌘0`, or `⌘` and the wheel over the code | Larger / smaller code, or its first size |
 | `y` (`⌘⇧C`) | Copy the open file's path |
 | `l` (`⌘⇧L`) | Read-only, or editing |

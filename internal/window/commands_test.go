@@ -1,6 +1,7 @@
 package window
 
 import (
+	"github.com/akrck02/code-review/internal/settings"
 	"strings"
 	"testing"
 
@@ -52,7 +53,7 @@ func TestNoTwoCommandsShareAKeyInOneMode(test *testing.T) {
 func TestTheHelpListsEveryCommand(test *testing.T) {
 	application := newReader(Settings{Folders: []string{makeRepository(test)}, WorkingTree: true, Synchronous: true})
 	// tall enough for the whole help, which scrolls in a shorter window
-	window, err := uitest.New(application.Build, uitest.Driver(application.Driver()), uitest.Size(1200, 1600))
+	window, err := uitest.New(application.Build, uitest.Driver(application.Driver()), uitest.Size(1200, 3200))
 	if err != nil {
 		test.Fatal(err)
 	}
@@ -66,7 +67,8 @@ func TestTheHelpListsEveryCommand(test *testing.T) {
 			test.Errorf("the help does not say %q", command.description)
 		}
 		for _, press := range command.keys {
-			if press.Label == "" || !strings.Contains(shown, press.Label) {
+			// a key is drawn as a cap for each key pressed together
+			if press.Label == "" || !strings.Contains(shown, settings.CapWords(press.Label)) {
 				test.Errorf("the help does not show the key %q of %q", press.Label, command.description)
 			}
 		}

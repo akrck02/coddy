@@ -16,6 +16,11 @@ func KeysOf(state *input.State) Keys { return Keys{state: state} }
 
 func (keys Keys) Pressed(key input.Key) bool { return keys.state != nil && keys.state.Pressed(key) }
 
+// PressedTwice is pressed a second time in a row, quickly, with no other key between.
+func (keys Keys) PressedTwice(key input.Key) bool {
+	return keys.state != nil && keys.state.PressedTwice(key)
+}
+
 // Typed is pressed, and again while the key is held down: for moving through rows.
 func (keys Keys) Typed(key input.Key) bool { return keys.state != nil && keys.state.Typed(key) }
 

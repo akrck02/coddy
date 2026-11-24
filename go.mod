@@ -3,8 +3,8 @@ module github.com/akrck02/code-review
 go 1.25.6
 
 require (
-	github.com/akrck02/go-renderer v0.2.1-0.20261027185720-34159a2d1bb3
-	github.com/akrck02/go-ui v0.1.2-0.20261027203033-ad66fbdd9eba
+	github.com/akrck02/go-renderer v0.4.1-0.20261124154650-f38b9fdcdf35
+	github.com/akrck02/go-ui v0.2.1-0.20261121222325-e723937b48d1
 	github.com/alecthomas/chroma/v2 v2.27.0
 	golang.org/x/image v0.45.0
 )
@@ -21,4 +21,4 @@ require (
 
 replace github.com/akrck02/bubble v0.0.0 => github.com/akrck02/bubble v0.0.0-20261026072519-58a38f47f25f
 
-replace github.com/akrck02/go-ui v0.0.0 => github.com/akrck02/go-ui v0.1.2-0.20261027203033-ad66fbdd9eba
+replace github.com/akrck02/go-ui v0.0.0 => github.com/akrck02/go-ui v0.2.1-0.20261121222325-e723937b48d1

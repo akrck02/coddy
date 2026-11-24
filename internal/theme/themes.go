@@ -27,14 +27,23 @@ type Theme struct {
 
 // The themes the reader starts in, when none was chosen.
 const (
-	DefaultDark  = "One Dark"
+	DefaultDark  = "IntelliJ Dark"
 	DefaultLight = "One Light"
 )
 
+// builtIn holds the reader's own theme files. dracula.json is Dracula Solid, one of the themes of
+// https://github.com/dracula/zed (themes/dracula.json, commit c419d71, the others left out), under
+// the MIT licence kept beside it in themes/dracula.LICENSE. vscode.json is Visual Studio Code's
+// Dark Modern, its colours taken from https://github.com/microsoft/vscode
+// (extensions/theme-defaults/themes, commit 3bdd3dd4191a; MIT) and written in Zed's format.
+// mrpink.json is juanmnl's Mr Pink, its colours taken from https://github.com/juanmnl/vs-mr-pink
+// (themes/mrpink.json, commit 133a656) and written in Zed's format, under the MIT licence kept
+// beside it in themes/mrpink.LICENSE.
+//
 //go:embed themes/*.json
 var builtIn embed.FS
 
-// BuiltIn are the reader's own themes: Zed's One and IntelliJ's, sorted by name.
+// BuiltIn are the reader's own themes: Zed's One, IntelliJ's and Dracula's, sorted by name.
 func BuiltIn() []Theme {
 	entries, err := builtIn.ReadDir("themes")
 	if err != nil {
@@ -216,7 +225,9 @@ func lookOf(given style, dark bool) (Look, bool) {
 // paletteOf are the colours of the interface a style gives, those it leaves out made from its ink
 // and its editor's ground; the shadows and washes are the look's darkness's.
 func paletteOf(given style, ink, editor draw2d.Color) palette {
-	surface := given.or(editor, "surface.background", "panel.background", "background")
+	// the grounds are painted opaque: one a theme gives see-through, for an editor that blurs
+	// the desktop behind its window (Dracula's, in Zed), is laid over the editor's ground instead
+	surface := over(given.or(editor, "surface.background", "panel.background", "background"), editor)
 	accent := given.or(draw2d.MustHex("#3574f0"), "text.accent", "icon.accent")
 	if cursor, found := given.player("cursor"); found && !has(given, "text.accent", "icon.accent") {
 		accent = cursor
@@ -226,7 +237,7 @@ func paletteOf(given style, ink, editor draw2d.Color) palette {
 		selection = accent.WithAlpha(0.24)
 	}
 	colours := palette{
-		background: given.or(surface, "background", "panel.background"), surface: surface, editor: editor,
+		background: over(given.or(surface, "background", "panel.background"), editor), surface: surface, editor: editor,
 		hover:  given.or(surface.Mix(ink, 0.06), "element.hover", "ghost_element.hover"),
 		chosen: given.or(surface.Mix(ink, 0.12), "element.selected", "ghost_element.selected"),
 		border: given.or(surface.Mix(ink, 0.14), "border"),
@@ -244,6 +255,14 @@ func paletteOf(given style, ink, editor draw2d.Color) palette {
 	colours.activeLineNumber = given.or(ink, "editor.active_line_number")
 	colours.scrollThumb = given.or(ink.WithAlpha(0.3), "scrollbar.thumb.background")
 	return colours
+}
+
+// over is a colour as it shows laid over an opaque ground: itself when it is opaque, else mixed
+// with the ground by how much it covers it.
+func over(colour, ground draw2d.Color) draw2d.Color {
+	covering := colour[3]
+	colour[3] = 1 // WithAlpha scales the opacity: set it whole instead
+	return ground.Mix(colour, covering)
 }
 
 // has tells whether the style names any of these colours.

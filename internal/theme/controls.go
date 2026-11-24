@@ -47,6 +47,13 @@ func IconSwitch(context *ui.Context, name string, selected *int, choices []IconC
 	return changed
 }
 
+// BarHeight is the height of a bar over a pane, as the title bar over the file, in pixels, and
+// BarPadding the room it keeps at each side.
+const (
+	BarHeight  = 36
+	BarPadding = 12
+)
+
 // ToolButton is an icon-only button of a toolbar; one that is on is drawn on the chosen fill and in
 // the accent, so a setting's state reads at a glance without words.
 func ToolButton(context *ui.Context, name, icon string, on bool) bool {

@@ -2,10 +2,10 @@ github.com/akrck02/bubble v0.0.0-20261026072519-58a38f47f25f h1:slB5Bc4o+eqklICC
 github.com/akrck02/bubble v0.0.0-20261026072519-58a38f47f25f/go.mod h1:XTXwCb/QeHziyNrsBeqnWlYyq+uMsmrnCDFY0BfHQbM=
 github.com/akrck02/bubble/goui v0.0.0-20261026072519-58a38f47f25f h1:qZDX3bljL98+q/WVK/2p+DgQCFUmFH9DsN5/9PdzBaE=
 github.com/akrck02/bubble/goui v0.0.0-20261026072519-58a38f47f25f/go.mod h1:F3KJhEtpIV0053XiqTRv0+2m8eD9+GJuQgpjX/q79OU=
-github.com/akrck02/go-renderer v0.2.1-0.20261027185720-34159a2d1bb3 h1:hIlwirKdWZG/nBMgozYdS0jbiYbv8m7ilu/bWbMdaJ4=
-github.com/akrck02/go-renderer v0.2.1-0.20261027185720-34159a2d1bb3/go.mod h1:Z835tJYTrI/B+rxk5BbIMsDFokk+P36R8kZ0CVbEZzA=
-github.com/akrck02/go-ui v0.1.2-0.20261027203033-ad66fbdd9eba h1:nSPAghlUMeRM4UA20Ffjdke4d6ktnWcJ9wq8zDD8T1I=
-github.com/akrck02/go-ui v0.1.2-0.20261027203033-ad66fbdd9eba/go.mod h1:sgvyU8swoircAjUHwqQ7iRQVrVmwgOPnuE1zvcUH0Fk=
+github.com/akrck02/go-renderer v0.4.1-0.20261124154650-f38b9fdcdf35 h1:4HNvmVdyVlwmp85c8SE0068rUrUeJXSkqKPgu3PEVIE=
+github.com/akrck02/go-renderer v0.4.1-0.20261124154650-f38b9fdcdf35/go.mod h1:Z835tJYTrI/B+rxk5BbIMsDFokk+P36R8kZ0CVbEZzA=
+github.com/akrck02/go-ui v0.2.1-0.20261121222325-e723937b48d1 h1:nxo4nZAQ0N5U9C12SNgtOAqoSS3ccYRKmCtrP/HlWv4=
+github.com/akrck02/go-ui v0.2.1-0.20261121222325-e723937b48d1/go.mod h1:2ZZMP1HPCB5dWI6NCD2oCXRKG0P+9+rZ0USHKnxSHtk=
 github.com/alecthomas/assert/v2 v2.11.0 h1:2Q9r3ki8+JYXvGsDyBXwH3LcJ+WK5D0gc5E8vS6K3D0=
 github.com/alecthomas/assert/v2 v2.11.0/go.mod h1:Bze95FyfUr7x34QZrjL+XP+0qgp/zg8yS+TtBj1WA3k=
 github.com/alecthomas/chroma/v2 v2.27.0 h1:FodwmyOBgJULFYmDqibcp9pvfDLWdtPRh9v/r5BXYZs=

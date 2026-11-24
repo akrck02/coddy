@@ -122,21 +122,28 @@ func (sidebar *Sidebar) paintRowBackground(painter painting, index int, rowArea 
 // paintFolderIcons draws a project's or a folder's chevron and icon, and returns where its name
 // starts and how heavy it is.
 func paintFolderIcons(painter painting, row Row, text rowText, iconTop float32) rowText {
-	palette := painter.context.Theme
-	chevron := "chevron-right"
+	palette, icons := painter.context.Theme, painter.look.Icons
+	chevron := theme.Icon{Name: "chevron-right", Ink: palette.InkQuiet, Opacity: 1}
 	if row.Expanded {
-		chevron = "chevron-down"
+		chevron.Name = "chevron-down"
 	}
-	painter.drawing.Icon(chevron, text.x, iconTop, treeIconSize, palette.InkQuiet)
+	if icons != nil {
+		chevron.Picture = icons.ChevronPicture(row.Expanded)
+	}
+	theme.DrawIcon(painter.drawing, painter.look, chevron, text.x, iconTop, treeIconSize)
 	text.x += treeIconSize + 4
-	icon, iconInk := folderIcon(row, painter.look)
-	if row.Kind == ProjectRow {
-		icon, iconInk, text.weight = "git-branch", palette.InkQuiet, draw2d.Medium
+	name, ink := folderIcon(row, painter.look)
+	folder := theme.Icon{Name: name, Ink: ink, Opacity: 1}
+	switch {
+	case row.Kind == ProjectRow:
+		folder, text.weight = theme.Icon{Name: "git-branch", Ink: palette.InkQuiet, Opacity: 1}, draw2d.Medium
+	case icons != nil: // an icon theme draws folders by their name, as Zed does: roles are Lucide's
+		folder.Picture = icons.FolderPicture(row.Label, row.Expanded)
 	}
 	if row.Role == workspace.ModuleFolder {
 		text.weight = draw2d.Medium
 	}
-	painter.drawing.Icon(icon, text.x, iconTop, treeIconSize, iconInk)
+	theme.DrawIcon(painter.drawing, painter.look, folder, text.x, iconTop, treeIconSize)
 	text.x += treeIconSize + 7
 	return text
 }
@@ -146,7 +153,7 @@ func paintFolderIcons(painter painting, row Row, text rowText, iconTop float32) 
 func (sidebar *Sidebar) paintFileIcons(painter painting, row Row, text rowText, iconTop float32) rowText {
 	palette := painter.context.Theme
 	// when the mode marks files, the room a folder gives its chevron holds the mark
-	decoration := sidebar.Listing.Decorate(row)
+	decoration := sidebar.decorate(row)
 	switch decoration.Mark {
 	case OpenMark:
 		painter.drawing.Icon("circle", text.x, iconTop, treeIconSize, palette.InkQuiet)
@@ -175,11 +182,11 @@ func paintFileIcon(painter painting, row Row, text rowText, iconTop float32) str
 		paintClassBadge(painter.drawing, painter.look, kind, text.x, iconTop, treeIconSize, quiet)
 		return strings.TrimSuffix(strings.TrimSuffix(row.Label, ".java"), ".kt")
 	}
-	icon, iconInk := theme.FileIcon(row.Label, painter.look)
+	icon := theme.FileIcon(row.Label, painter.look)
 	if quiet {
-		iconInk = iconInk.WithAlpha(0.5)
+		icon = icon.Faded()
 	}
-	painter.drawing.Icon(icon, text.x, iconTop, treeIconSize, iconInk)
+	theme.DrawIcon(painter.drawing, painter.look, icon, text.x, iconTop, treeIconSize)
 	return text.label
 }
 
@@ -234,7 +241,7 @@ func (sidebar *Sidebar) paintRight(painter painting, row Row, index int, right, 
 		if painter.window.Unsaved(workspace.FileReference{Project: row.Project, Path: row.Path}) {
 			side.text("●", palette.InkSoft)
 		}
-		if row.Status == git.Unchanged {
+		if row.Status == git.Unchanged || !sidebar.ShowsStatus() {
 			return side.right
 		}
 		side.text(row.Status.Letter(), theme.StatusColour(palette, row.Status))
@@ -256,11 +263,26 @@ func (sidebar *Sidebar) paintRight(painter painting, row Row, index int, right, 
 	return side.right
 }
 
+// decorate is what the mode adds to a row, without git's status where it is hidden.
+func (sidebar *Sidebar) decorate(row Row) Decoration {
+	decoration := sidebar.Listing.Decorate(row)
+	if sidebar.ShowsStatus() {
+		return decoration
+	}
+	return decoration.withoutStatus()
+}
+
+// ShowsStatus tells whether rows say how their files changed: unless it is hidden, and always in
+// a mode that lists only the changes, where they are what is read.
+func (sidebar *Sidebar) ShowsStatus() bool {
+	return !sidebar.HidesStatus || sidebar.Listing.ChangesOnly()
+}
+
 // paintDecoration paints what the mode adds on a row's right: words, a bar of progress and a dot.
 func (sidebar *Sidebar) paintDecoration(side *rightSide, row Row, top float32) {
 	palette := side.painter.context.Theme
 	drawing := side.painter.drawing
-	decoration := sidebar.Listing.Decorate(row)
+	decoration := sidebar.decorate(row)
 	for _, word := range decoration.Words {
 		side.text(word.Text, word.Ink.colour(palette))
 	}

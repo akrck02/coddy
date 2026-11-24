@@ -452,8 +452,7 @@ func (finder *Finder) paintName(context *ui.Context, window Window, drawing *dra
 	candidate := match.Candidate
 	project := window.Projects()[candidate.Project]
 	change, changed := project.ChangeOf(candidate.Path)
-	icon, iconInk := theme.FileIcon(candidate.Path, window.Look())
-	drawing.Icon(icon, row.X+12, row.Y+(row.Height-16)/2, 16, iconInk)
+	theme.DrawIcon(drawing, window.Look(), theme.FileIcon(candidate.Path, window.Look()), row.X+12, row.Y+(row.Height-16)/2, 16)
 	nameInk := palette.Ink
 	if changed {
 		nameInk = theme.StatusColour(palette, change.Status)
@@ -479,8 +478,7 @@ func (finder *Finder) paintHit(context *ui.Context, window Window, drawing *draw
 	const codeSize = 13
 	code := measurer.MeasureText("M", codeSize, draw2d.Mono, 1)
 	small := measurer.MeasureText("Ag", palette.SmallTextSize, draw2d.Regular, 1)
-	icon, iconInk := theme.FileIcon(hit.Path, window.Look())
-	drawing.Icon(icon, row.X+12, row.Y+9, 16, iconInk)
+	theme.DrawIcon(drawing, window.Look(), theme.FileIcon(hit.Path, window.Look()), row.X+12, row.Y+9, 16)
 	left := row.X + 40
 	drawing.PushClip(draw2d.Rectangle{X: row.X, Y: row.Y, Width: row.Width - 8, Height: row.Height})
 	// the line from its first letter, or from a little before what was found in a long line

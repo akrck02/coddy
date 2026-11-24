@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/akrck02/code-review/internal/pane"
-	"github.com/akrck02/code-review/internal/theme"
 	"github.com/akrck02/code-review/internal/viewer"
 	"github.com/akrck02/go-renderer/draw2d"
 	ui "github.com/akrck02/go-ui"
@@ -48,8 +47,6 @@ func (application *Window) Build(context *ui.Context) {
 
 	application.finder.Build(context, application)
 	application.buildBaseDialog(context)
-	application.buildSettings(context)
-	application.buildHelp(context)
 	application.buildServers(context)
 	application.buildPicker(context)
 	application.buildQuestions(context)
@@ -68,13 +65,22 @@ func (application *Window) Build(context *ui.Context) {
 func (application *Window) buildPanes(context *ui.Context) {
 	application.buildModeRail(context)
 	context.Frame(ui.Layout{Width: ui.Fixed(1), Height: ui.Grow()}, ui.Look{Fill: context.Theme.Line}, nil)
+	if application.settingsScreen.Open {
+		application.settingsScreen.Build(context, application)
+		return
+	}
 	if !application.sidebarFolded {
 		application.buildSidebar(context)
 	}
 	context.Box(ui.Layout{Direction: ui.Vertical, Width: ui.Grow(), Height: ui.Grow()}, func() {
 		application.buildTitleBar(context)
 		context.Frame(ui.Layout{Width: ui.Grow(), Height: ui.Fixed(1)}, ui.Look{Fill: context.Theme.Line}, nil)
-		if cover, covers := application.mode.(mode.Cover); !covers || !cover.BuildOverViewer(context) {
+		cover, covers := application.mode.(mode.Cover)
+		switch {
+		case covers && cover.BuildOverViewer(context):
+		case application.explorer.Open:
+			application.explorer.Build(context, application)
+		default:
 			application.viewer.Build(context, application)
 		}
 	})
@@ -114,7 +120,7 @@ func (application *Window) applyTheme(context *ui.Context) {
 
 func (application *Window) ModalOpen() bool {
 	asked := application.questions
-	return application.finder.Open || application.base.open || application.helpOpen || application.settingsOpen || application.pickerOpen || application.serversOpen ||
+	return application.finder.Open || application.base.open || application.settingsScreen.Open || application.pickerOpen || application.serversOpen ||
 		asked.unsavedOpen || asked.conflictOpen
 }
 
@@ -167,12 +173,13 @@ func (application *Window) copyPath(context *ui.Context) {
 }
 
 // buildModeRail is the strip on the far left that chooses what the reader is doing, such as reading
-// the files or reviewing the changes: one place per mode, always in sight, one key each.
+// the files or reviewing the changes: one place per mode, always in sight, one key each. The
+// settings are no mode: while they show, none is marked, and choosing one leaves them.
 func (application *Window) buildModeRail(context *ui.Context) {
 	palette := context.Theme
 	context.Box(ui.Layout{Direction: ui.Vertical, Width: ui.Fixed(modeRailWidth), Height: ui.Grow(), Padding: ui.PadXY(0, 10), Gap: 6, AlignX: ui.Center}, func() {
 		for _, place := range application.modes {
-			chosen := application.mode == place
+			chosen := application.mode == place && !application.settingsScreen.Open
 			ink, normal := palette.InkQuiet, ui.Look{Radius: 8}
 			if chosen {
 				ink, normal = palette.Ink, ui.Look{Fill: application.look.Chosen, Radius: 8}
@@ -185,29 +192,35 @@ func (application *Window) buildModeRail(context *ui.Context) {
 			if context.Clickable(place.Description(), layout, ui.Looks{Normal: normal, Hovered: hovered, Pressed: hovered}, func() {
 				context.IconSized(place.Icon(), 20, ink)
 			}) {
+				application.settingsScreen.Open = false
 				application.setMode(place)
 			}
 			context.Tooltip(place.Description())
 		}
 		context.Spacer()
 		application.buildFoldButton(context)
-		if theme.ToolButton(context, "Keys (?)", "keyboard", false) {
-			application.helpOpen = true
-		}
 	})
 }
 
-// buildMenu is the menu of what is done less often: opening a folder, the theme, the keys, closing.
+// menuName is what the menu's button, an icon alone, is called by a screen reader
+const menuName = "More"
+
+// buildMenu is the menu of what is done less often: opening a folder, reading the projects again,
+// git's status, closing.
 func (application *Window) buildMenu(context *ui.Context) {
-	context.MenuButton("ellipsis", "", func() {
+	context.MenuButton("ellipsis", "##"+menuName, func() {
 		if context.MenuItem("folder-open", "Open folder…", "o") {
 			application.pickerOpen = true
 		}
-		if context.MenuItem("settings", "Settings…", "") {
-			application.settingsOpen = true
+		if context.MenuItem("refresh-cw", "Read the projects again", "r") {
+			application.reloadAll()
 		}
-		if context.MenuItem("keyboard", "Keys", "?") {
-			application.helpOpen = true
+		status, statusIcon := "Hide git status", "eye-off"
+		if application.sidebar.HidesStatus {
+			status, statusIcon = "Show git status", "eye"
+		}
+		if context.MenuItem(statusIcon, status, "") {
+			application.sidebar.HidesStatus = !application.sidebar.HidesStatus
 		}
 		context.Separator()
 		if context.MenuItem("x", "Close all projects", "") {
@@ -254,7 +267,9 @@ func (application *Window) buildStatusBar(context *ui.Context) {
 // how far the mode's work has gone; their tooltips say it in words.
 func (application *Window) buildCounts(context *ui.Context, small ui.TextStyle) {
 	counted := func(icon, text, words string, more func()) {
-		context.Box(ui.Layout{Gap: 5, AlignY: ui.Center}, func() {
+		// a place the pointer can rest on, which a tooltip needs: one after a plain box would
+		// name the control before it, the menu's button
+		context.Clickable(words, ui.Layout{Gap: 5, AlignY: ui.Center}, ui.Looks{}, func() {
 			context.IconSized(icon, 13, context.Theme.InkQuiet)
 			if more != nil {
 				more()
@@ -391,76 +406,6 @@ func (application *Window) applyBase() {
 	}
 	application.projectsChanged()
 }
-
-func (application *Window) buildHelp(context *ui.Context) {
-	if !application.helpOpen {
-		return
-	}
-	dismissed := context.Sheet("Keys", ui.SheetOptions{Width: ui.Fixed(helpSheetWidth)}, func() {
-		context.Caption("The reader writes a file only when you save it, and git only reads: no commit, no push.")
-		// the help scrolls when the window is too short for it
-		_, windowHeight := context.Size()
-		context.ScrollArea("help", ui.Layout{Width: ui.Grow(), Height: ui.Fixed(max(windowHeight-helpRoomAround, 200))}, func() {
-			context.Box(ui.Layout{Width: ui.Grow(), Gap: helpColumnGap}, func() {
-				context.Box(ui.Layout{Direction: ui.Vertical, Gap: 16}, func() {
-					application.buildHelpColumn(context, "Anywhere", helpRows(commands, anywhere))
-					application.buildHelpColumn(context, "Modes", helpRows(application.modeCommands(), anywhere))
-					if own := application.ownCommands(); len(own) > 0 {
-						application.buildHelpColumn(context, "In the "+application.mode.Name()+" mode", helpRows(own, anywhere))
-					}
-				})
-				context.Box(ui.Layout{Direction: ui.Vertical, Gap: 16}, func() {
-					application.buildHelpColumn(context, "In the sidebar", helpRows(commands, inSidebar))
-					application.buildHelpColumn(context, "In the file", helpRows(commands, inViewer))
-					application.buildHelpColumn(context, "While editing", append(helpRows(commands, editing), editingKeyRows()...))
-				})
-			})
-		})
-		context.Row(func() {
-			context.Spacer()
-			if context.PrimaryButton("Close") {
-				application.helpOpen = false
-			}
-		})
-	})
-	if dismissed {
-		application.helpOpen = false
-	}
-}
-
-// buildHelpColumn lists the keys of one place, under its name.
-func (application *Window) buildHelpColumn(context *ui.Context, title string, rows []helpRow) {
-	context.Box(ui.Layout{Direction: ui.Vertical, Gap: 4}, func() {
-		context.Text(title, ui.TextStyle{Weight: draw2d.Bold})
-		for _, row := range rows {
-			context.Box(ui.Layout{Gap: 12}, func() {
-				keyStyle := ui.TextStyle{Weight: draw2d.Mono, Color: context.Theme.Primary}
-				context.Box(ui.Layout{Width: ui.Fixed(helpKeysWidth), Gap: 10, Wrap: true}, func() {
-					for _, key := range row.keys {
-						context.Text(key, keyStyle)
-					}
-				})
-				// go-ui draws a text on one line, so the words wrap as pieces of a box
-				context.Box(ui.Layout{Width: ui.Fixed(helpTextWidth), Gap: 4, Wrap: true}, func() {
-					for _, word := range strings.Fields(row.description) {
-						context.Label(word)
-					}
-				})
-			})
-		}
-	})
-}
-
-// helpKeysWidth and helpTextWidth are the help's columns of keys and of what they do, in points;
-// the help shows two of each side by side.
-const (
-	helpKeysWidth = 130
-	helpTextWidth = 290
-	helpColumnGap = 32
-	// helpRoomAround is the window's height the help leaves to its title, caption, button and margins
-	helpRoomAround = 200
-	helpSheetWidth = 2*(helpKeysWidth+12+helpTextWidth) + helpColumnGap + 48
-)
 
 func (application *Window) buildPicker(context *ui.Context) {
 	if !application.pickerOpen {

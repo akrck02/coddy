@@ -1,6 +1,8 @@
 package pane
 
 import (
+	"math"
+
 	"github.com/akrck02/go-renderer/draw2d"
 	ui "github.com/akrck02/go-ui"
 )
@@ -14,6 +16,9 @@ type Scroller struct {
 	RowHeight float32
 	Count     int
 	Width     float32 // the content's width, for scrolling sideways; 0 = no sideways scroll
+	// Margin is the room above the first row and below the last, in pixels, so they do not touch
+	// the list's edges
+	Margin float32
 
 	Area draw2d.Rectangle // where it was painted last
 
@@ -28,7 +33,9 @@ type Scroller struct {
 
 const ScrollBarWidth float32 = 8
 
-func (list *Scroller) ContentHeight() float32 { return float32(list.Count) * list.RowHeight }
+func (list *Scroller) ContentHeight() float32 {
+	return float32(list.Count)*list.RowHeight + 2*list.Margin
+}
 
 // Clamp keeps the offsets inside the content.
 func (list *Scroller) Clamp() {
@@ -43,14 +50,20 @@ func (list *Scroller) Visible() (first, last int) {
 	if list.RowHeight <= 0 {
 		return 0, 0
 	}
-	first = max(int(list.Offset/list.RowHeight), 0)
-	last = min(int((list.Offset+list.Area.Height)/list.RowHeight)+1, list.Count)
+	first = max(list.RowOf(list.Area.Y), 0)
+	last = min(list.RowOf(list.Area.Bottom())+1, list.Count)
 	return first, max(first, last)
 }
 
 // RowTop is where a row is painted.
 func (list *Scroller) RowTop(index int) float32 {
-	return list.Area.Y + float32(index)*list.RowHeight - list.Offset
+	return list.Area.Y + list.Margin + float32(index)*list.RowHeight - list.Offset
+}
+
+// RowOf is the row at a height of the window, counted as if rows went on above the first and
+// below the last: negative in the top margin, Count or more below the last row.
+func (list *Scroller) RowOf(y float32) int {
+	return int(math.Floor(float64((y - list.Area.Y - list.Margin + list.Offset) / list.RowHeight)))
 }
 
 // RowAt is the row under a point, or -1.
@@ -58,7 +71,7 @@ func (list *Scroller) RowAt(x, y float32) int {
 	if !list.Area.Contains(x, y) || x >= list.Area.Right()-ScrollBarWidth {
 		return -1
 	}
-	index := int((y - list.Area.Y + list.Offset) / list.RowHeight)
+	index := list.RowOf(y)
 	if index < 0 || index >= list.Count {
 		return -1
 	}
@@ -99,12 +112,12 @@ func (list *Scroller) Reveal(index int) {
 	if list.unplaced(index, false) {
 		return
 	}
-	top := float32(index) * list.RowHeight
-	if top < list.Offset {
-		list.Offset = top
+	top := list.Margin + float32(index)*list.RowHeight
+	if top-list.Margin < list.Offset {
+		list.Offset = top - list.Margin // the margin comes into sight with the first row
 	}
-	if bottom := top + list.RowHeight; bottom > list.Offset+list.Area.Height {
-		list.Offset = bottom - list.Area.Height
+	if bottom := top + list.RowHeight; bottom+list.Margin > list.Offset+list.Area.Height {
+		list.Offset = bottom + list.Margin - list.Area.Height
 	}
 	list.Clamp()
 }
@@ -115,7 +128,7 @@ func (list *Scroller) RevealNearTop(index int) {
 	if list.unplaced(index, true) {
 		return
 	}
-	list.Offset = float32(index)*list.RowHeight - list.Area.Height/3
+	list.Offset = list.Margin + float32(index)*list.RowHeight - list.Area.Height/3
 	list.Clamp()
 }
 

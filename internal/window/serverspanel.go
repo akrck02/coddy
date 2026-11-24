@@ -98,7 +98,10 @@ func (application *Window) buildServerCard(context *ui.Context, view serverView)
 		}
 		quiet := ui.TextStyle{Size: palette.SmallTextSize, Color: palette.InkSoft}
 		if view.client == nil {
-			context.Text(view.why, quiet)
+			measure := func(text string) float32 { return theme.TextWidth(context, text, quiet) }
+			for _, line := range wrapLines([]string{view.why}, serversPanelWidth-60, measure) {
+				context.Text(line, quiet)
+			}
 			return
 		}
 		context.Text(application.cardFacts(view), quiet)
@@ -129,6 +132,9 @@ func (application *Window) buildCardHead(context *ui.Context, view serverView) {
 				elapsed += " · " + last
 			}
 			context.Text(elapsed, ui.TextStyle{Size: palette.SmallTextSize, Color: palette.InkQuiet, Weight: draw2d.Mono})
+		}
+		if view.installable && context.PrimaryButton("Install##"+view.name) {
+			application.installServer(view.name)
 		}
 		if view.client != nil && context.Button("Stop##"+view.key) {
 			application.restServer(view.key, view.client) // the next question starts it again

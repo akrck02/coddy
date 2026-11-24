@@ -319,6 +319,33 @@ func TestEnteringAProjectListsOnlyItsTree(test *testing.T) {
 	}
 }
 
+// Inside a project, Collapse all folds its folders, as it folds the projects outside; then the
+// same button, Expand all, opens them again.
+func TestInsideAProjectTheFoldButtonFoldsAndOpensItsFolders(test *testing.T) {
+	application := newReader(Settings{Folders: []string{makeRepository(test)}, WorkingTree: true, Synchronous: true})
+	window := newWindow(test, application)
+	application.sidebar.Enter(application, 0)
+	application.sidebar.SetExpanded(sidebar.Row{Kind: sidebar.FolderRow, Project: 0, Path: "src"}, true)
+	window.Frames(2)
+	if !sidebarShows(application, "lamp.go") {
+		test.Fatal("the open src folder does not list lamp.go")
+	}
+	if err := window.Click("Collapse all"); err != nil {
+		test.Fatal(err)
+	}
+	window.Frames(2)
+	if sidebarShows(application, "lamp.go") || !sidebarShows(application, "src") {
+		test.Error("Collapse all inside the project does not fold src, or hides it")
+	}
+	if err := window.Click("Expand all"); err != nil {
+		test.Fatal(err)
+	}
+	window.Frames(2)
+	if !sidebarShows(application, "lamp.go") {
+		test.Error("Expand all inside the project does not open src again")
+	}
+}
+
 func TestTheFilterOfChangesLeavesOutProjectsAndFilesWithout(test *testing.T) {
 	folder := makeRepository(test)
 	addHarbour(test, folder) // a project with no changes

@@ -165,6 +165,18 @@ func (application *Window) Reveal(file workspace.FileReference) {
 	application.sidebar.RevealFile(application, file)
 }
 
+// ShowFolder shows what a folder of a project holds in the viewer's place, and the folder in the
+// sidebar.
+func (application *Window) ShowFolder(project int, folder string) {
+	application.explorer.Show(application, project, folder)
+	application.sidebar.RevealFolder(application, project, folder)
+}
+
+// ExploreFolder shows what a folder of a project holds in the viewer's place, "" its top.
+func (application *Window) ExploreFolder(project int, folder string) {
+	application.explorer.Show(application, project, folder)
+}
+
 // RevealFolder shows a folder of a project in the sidebar, with the keyboard, and brings the
 // sidebar back if it was folded away.
 func (application *Window) RevealFolder(project int, folder string) {

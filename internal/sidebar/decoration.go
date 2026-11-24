@@ -67,6 +67,9 @@ func (ink Ink) colour(palette ui.Theme) draw2d.Color {
 type Word struct {
 	Text string
 	Ink  Ink
+	// Status tells that the word says how files changed, as a count of changed files does: it is
+	// hidden with the rest of git's status
+	Status bool
 }
 
 // Progress is a small bar of how much of a project is done.
@@ -82,4 +85,18 @@ type Decoration struct {
 	Words    []Word    // on the right, from the right edge leftwards
 	Progress *Progress // left of the words
 	Dot      bool      // a folder holding changes
+}
+
+// withoutStatus is a decoration with what tells how files changed left out: the tint, the dot and
+// the words of status.
+func (decoration Decoration) withoutStatus() Decoration {
+	decoration.Tinted, decoration.Dot = false, false
+	var words []Word
+	for _, word := range decoration.Words {
+		if !word.Status {
+			words = append(words, word)
+		}
+	}
+	decoration.Words = words
+	return decoration
 }

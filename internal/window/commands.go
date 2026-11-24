@@ -3,6 +3,7 @@ package window
 import (
 	"github.com/akrck02/code-review/internal/finder"
 	"github.com/akrck02/code-review/internal/pane"
+	"github.com/akrck02/code-review/internal/settings"
 	"github.com/akrck02/code-review/internal/text"
 	"github.com/akrck02/code-review/internal/viewer"
 	"github.com/akrck02/go-renderer/input"
@@ -82,6 +83,8 @@ func (application *Window) editing() bool {
 var commands = []command{
 	{description: "Quit", inDialogs: true, keys: []pane.Press{pane.CommandKey(input.KeyQ, "⌘Q")},
 		do: func(application *Window, _ *ui.Context, _ int) { application.quit() }},
+	{description: "The whole screen, or a window again", inDialogs: true, keys: []pane.Press{pane.Key(input.KeyF11, "F11")},
+		do: func(_ *Window, context *ui.Context, _ int) { context.SetFullscreen(!context.Fullscreen()) }},
 	{description: "Find a text in the files of every project (Tab switches in the finder)",
 		keys: []pane.Press{pane.CommandShiftKey(input.KeyF, "⌘⇧F"), {Text: "/", Label: "/"}},
 		do:   func(application *Window, _ *ui.Context, _ int) { application.finder.Show(finder.ContentScope) }},
@@ -92,7 +95,7 @@ var commands = []command{
 		}},
 	{description: "Find a file by its name, in any project",
 		keys: []pane.Press{pane.CommandShiftKey(input.KeyO, "⌘⇧O"), pane.CommandKey(input.KeyO, "⌘O"), pane.CommandKey(input.KeyP, "⌘P"),
-			{Key: input.KeyP, Shift: true, Label: "Shift+P"}},
+			{Key: input.KeyP, Shift: true, Label: "Shift+P"}, {Key: input.KeyShift, Twice: true, Label: "⇧⇧"}},
 		do: func(application *Window, _ *ui.Context, _ int) { application.finder.Show(finder.NamesScope) }},
 	{description: "Open a repository or a folder of repositories",
 		keys: []pane.Press{pane.Key(input.KeyO, "o"), {Key: input.KeyO, Command: true, Alt: true, Label: "⌘⌥O"}},
@@ -195,7 +198,11 @@ var commands = []command{
 	{description: "Copy the open file's path", keys: []pane.Press{pane.Key(input.KeyY, "y"), pane.CommandShiftKey(input.KeyC, "⌘⇧C")},
 		do: func(application *Window, context *ui.Context, _ int) { application.copyPath(context) }},
 	{description: "These keys", keys: []pane.Press{{Text: "?", Label: "?"}, pane.Key(input.KeyF1, "F1")},
-		do: func(application *Window, _ *ui.Context, _ int) { application.helpOpen = true }},
+		do: func(application *Window, _ *ui.Context, _ int) { application.settingsScreen.Toggle(settings.Keys) }},
+	{description: "The settings", keys: []pane.Press{pane.CommandKey(input.KeyComma, "⌘,")},
+		do: func(application *Window, _ *ui.Context, _ int) {
+			application.settingsScreen.Toggle(settings.Appearance)
+		}},
 
 	{description: "Select the next / previous row, a page, the first / last", place: inSidebar,
 		keys: []pane.Press{pane.StepKey(input.KeyDown, "↓", 1), pane.StepKey(input.KeyUp, "↑", -1),
@@ -236,15 +243,9 @@ var commands = []command{
 		do: func(application *Window, _ *ui.Context, _ int) { application.viewer.OpenFoldInSight() }},
 }
 
-// helpRow is a command as the help shows it: its keys and what it does.
-type helpRow struct {
-	keys        []string
-	description string
-}
-
 // helpRows lists the commands of a place, of those given, for the help.
-func helpRows(given []command, where place) []helpRow {
-	var rows []helpRow
+func helpRows(given []command, where place) []settings.KeyRow {
+	var rows []settings.KeyRow
 	for _, command := range given {
 		if command.place != where {
 			continue
@@ -253,16 +254,16 @@ func helpRows(given []command, where place) []helpRow {
 		for index, press := range command.keys {
 			labels[index] = press.Label
 		}
-		rows = append(rows, helpRow{labels, command.description})
+		rows = append(rows, settings.KeyRow{Keys: labels, Description: command.description})
 	}
 	return rows
 }
 
 // editingKeyRows are the keys the file view answers itself while it is edited, for the help.
-func editingKeyRows() []helpRow {
-	rows := make([]helpRow, len(viewer.EditingKeys))
+func editingKeyRows() []settings.KeyRow {
+	rows := make([]settings.KeyRow, len(viewer.EditingKeys))
 	for index, key := range viewer.EditingKeys {
-		rows[index] = helpRow{key.Keys, key.Description}
+		rows[index] = settings.KeyRow{Keys: key.Keys, Description: key.Description}
 	}
 	return rows
 }

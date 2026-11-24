@@ -11,14 +11,14 @@ import (
 // BuildTitle names the file open as a breadcrumb to it, the folders quiet and the name plain, and
 // says how it changed, in room pixels at most: a compact title drops the project and the status's
 // word, and the folders take what is left, those nearest the file first. A folder's crumb shows
-// that folder in the sidebar.
+// what that folder holds.
 func (view *Viewer) BuildTitle(context *ui.Context, window Window, room float32, compact bool) {
 	view.buildPath(context, window, room, compact)
 	if view.Document == nil {
 		context.Caption("Reading…")
 		return
 	}
-	if view.Document.Changed {
+	if view.Document.Changed && view.showsStatus(window) {
 		view.buildChange(context, compact)
 	}
 }
@@ -93,7 +93,7 @@ func (view *Viewer) buildPath(context *ui.Context, window Window, room float32, 
 		context.IconSized("chevron-right", 12, palette.InkQuiet.WithAlpha(0.6))
 	}
 	nameInk := palette.Ink
-	if document != nil && document.Changed {
+	if document != nil && document.Changed && view.showsStatus(window) {
 		nameInk = theme.StatusColour(palette, document.Change.Status)
 	}
 	context.Text(name, ui.TextStyle{Weight: draw2d.Medium, Color: nameInk})
@@ -102,16 +102,17 @@ func (view *Viewer) buildPath(context *ui.Context, window Window, room float32, 
 	}
 }
 
-// buildCrumb is a folder of the path, a button that shows the folder in the sidebar.
+// buildCrumb is a folder of the path, a button that shows what the folder holds in the viewer's
+// place.
 func (view *Viewer) buildCrumb(context *ui.Context, window Window, crumb crumb) {
 	palette := context.Theme
 	hovered := ui.Look{Fill: palette.Sunken, Radius: 4}
 	layout := ui.Layout{Padding: ui.PadXY(crumbPadding, 1), AlignY: ui.Center}
-	name := "Show " + crumb.path + " in the sidebar"
+	name := "Show the folder " + crumb.path
 	if context.Clickable(name, layout, ui.Looks{Hovered: hovered, Pressed: hovered}, func() {
 		context.Text(crumb.label, ui.TextStyle{Color: palette.InkQuiet})
 	}) {
-		window.RevealFolder(view.Reference.Project, crumb.path)
+		window.ShowFolder(view.Reference.Project, crumb.path)
 	}
 	context.Tooltip(name)
 }
@@ -157,4 +158,10 @@ func crumbs(folder string, width func(string) float32, room float32) []crumb {
 		shown = append(shown, crumb{folders[index], strings.Join(folders[:index+1], "/")})
 	}
 	return shown
+}
+
+// showsStatus tells whether the file says how it changed: always as a diff, which is its changes,
+// and as a whole file unless the window hides git's status.
+func (view *Viewer) showsStatus(window Window) bool {
+	return view.Mode == DiffView || window.ShowsStatus()
 }

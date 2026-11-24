@@ -21,6 +21,8 @@ type Server struct {
 	RootMarkers  []string
 	Install      string   // what to run to install it, said when it is missing
 	Environment  []string // added to the reader's own, as "NAME=value"
+	// InstallEnvironment is added to the reader's own environment while Install runs
+	InstallEnvironment []string
 	// ReadyStatus, when set, is the language/status type the server sends once it has read the
 	// projects (jdtls's ServiceReady); until then requests wait. Without it, a server is ready
 	// once initialized.
@@ -80,7 +82,10 @@ type Server struct {
 // Servers are the language servers the reader runs, found on the PATH.
 var Servers = []Server{
 	{Name: "gopls", Command: "gopls", Languages: []string{"go"}, RootMarkers: []string{"go.mod"},
-		Install: "go install golang.org/x/tools/gopls@latest"},
+		Install: "go install golang.org/x/tools/gopls@latest",
+		// the latest gopls may need a newer Go than the one installed, which a Linux's own Go
+		// (GOTOOLCHAIN=local) would not download
+		InstallEnvironment: []string{"GOTOOLCHAIN=auto"}},
 	// jdtls reads Java only: Kotlin has kotlin-lsp, below. It writes nothing in the repositories: .project, .classpath and .settings go in its data
 	// folder (a JVM property, read before the setting is), and no build fills bin/ or target/; a
 	// build file changed is not imported again on its own.
