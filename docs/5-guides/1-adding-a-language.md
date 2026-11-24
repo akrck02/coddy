@@ -38,8 +38,8 @@ go test ./internal/language ./internal/highlight ./internal/theme
 
 `TestEveryLanguageOfTheTableIsHighlightedIconedAndServedTheSameWay` checks each entry is coloured,
 iconed and served as the table says. `TestEachExtensionAndNameBelongsToOneLanguage` fails if your
-extension is already another language's. `TestNoLanguageIsNamedOutsideItsTable`, in the rules
-test, fails if code elsewhere writes the extension of a served, JVM or class language by hand.
+extension is already another language's. Code elsewhere asks the table (`language.Of`, `IsJVM`,
+`ClassName`) instead of writing an extension by hand; a review checks it.
 
 An icon theme chosen in the settings (Catppuccin's, say) draws its own icons over `Icon`; the
 table's icon is the built-in one.

@@ -30,8 +30,8 @@ into what to fix, in what order, and what stays as it is.
 | R6 | One seam for each thing that will have several kinds: how the viewer shows a file, where the finder looks, how a project's tree is laid out, how a build file is read | tests per kind; adding a kind touches one file and the table that lists it |
 | R7 | What Coddy knows of each language is in one table: names, extensions, file names, the server's language id, icon, fence names | test: `every language of the table is highlighted, iconed and served the same way`; no language name outside the table and its kinds |
 | R8 | Caches have bounds and know when they are stale: documents by bytes, the server's open files, trees per filter | tests per cache |
-| R9 | Errors keep their codes up to the interface, none is dropped without a reason on its line; git and server commands stop when their work is cancelled | `rules_test`: no `_ =` on an error without a comment; test: `a cancelled search stops its git process` |
-| R10 | The technical docs are true and cover how a frame is built, the threads, the caches, the packages and how to add a language, a server, a theme or a mode | read by the author; `rules_test` checks the package list of `docs/8-contributing.md` against the tree |
+| R9 | Errors keep their codes up to the interface, none is dropped without a reason on its line; git and server commands stop when their work is cancelled | review: no `_ =` on an error without a comment; test: `a cancelled search stops its git process` |
+| R10 | The technical docs are true and cover how a frame is built, the threads, the caches, the packages and how to add a language, a server, a theme or a mode | read by the author |
 
 ## Out of scope
 
@@ -197,7 +197,10 @@ Built on 24 November 2026, one commit per task, pending the author's review. `go
 `window` has 24 files besides its tests, down from 32. The requirements' checks:
 
 - R1, R8: the idle-frame and cache tests pass; R2: `-race` and the link test pass; R3, R5, R6, R7,
-  R9, R10: each has its rule or test in `cmd/code-review/rules_test.go` or beside its package.
+  R9, R10: each has its test beside its package, or in `cmd/code-review/rules_test.go` for the
+  arrows. The author chose that tests check only what the program does: the checks of style
+  (function length, import groups, `_ =` reasons, names outside the language table, empty mode
+  methods, the contributing list) are rules of review.
 - R3, R4: no file of the program is above 400 lines and no package holds more than 25: the
   window's small files joined the file of their concept (`805e751`). The author chose to keep
   these sizes as rules of review, not tests: they are how the code is written, not what it does.

@@ -1,19 +1,12 @@
 package main
 
 import (
-	"go/ast"
-	"go/parser"
-	"go/token"
 	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
-	"strconv"
 	"strings"
 	"testing"
-
-	"github.com/akrck02/code-review/internal/language"
 )
 
 // moduleRoot is the folder of go.mod, seen from this package's folder.
@@ -55,20 +48,6 @@ func TestNoErrorIsMadeWithoutACode(test *testing.T) {
 		for _, maker := range []string{"errors.New(", "fmt.Errorf("} {
 			if strings.Contains(source, maker) {
 				test.Errorf("%s makes an error with %s; declare a code in its errors.go", path, maker)
-			}
-		}
-	}
-}
-
-// droppedError is a line that throws away what a call gives back: `_ = f()` or `_, _ = f()`.
-var droppedError = regexp.MustCompile(`^\s*_(, _)* = `)
-
-// An error thrown away says why on its line, so a reader sees it was meant.
-func TestNoErrorIsDroppedWithoutAReasonOnItsLine(test *testing.T) {
-	for path, source := range goSources(test) {
-		for number, line := range strings.Split(source, "\n") {
-			if droppedError.MatchString(line) && !strings.Contains(line, "//") {
-				test.Errorf("%s:%d drops what it is given without saying why: %s", path, number+1, strings.TrimSpace(line))
 			}
 		}
 	}
@@ -183,212 +162,5 @@ func TestTheWindowImportsNoMode(test *testing.T) {
 	modes := []string{"github.com/akrck02/code-review/internal/files", "github.com/akrck02/code-review/internal/review"}
 	if found := importsAny(test, "window", modes...); found != "" {
 		test.Errorf("window imports %s", found)
-	}
-}
-
-// longestFunction is how many lines a function may take, from func to its closing brace.
-const longestFunction = 40
-
-// A long function usually does two jobs, so none is longer than forty lines, tests included.
-func TestNoFunctionIsLongerThanFortyLines(test *testing.T) {
-	files := token.NewFileSet()
-	err := filepath.WalkDir(moduleRoot, func(path string, entry fs.DirEntry, err error) error {
-		if err != nil || !strings.HasSuffix(path, ".go") {
-			return err
-		}
-		file, err := parser.ParseFile(files, path, nil, 0)
-		if err != nil {
-			return err
-		}
-		for _, declaration := range file.Decls {
-			function, isFunction := declaration.(*ast.FuncDecl)
-			if !isFunction || function.Body == nil {
-				continue
-			}
-			start, end := files.Position(function.Pos()), files.Position(function.End())
-			if lines := end.Line - start.Line + 1; lines > longestFunction {
-				test.Errorf("%s:%d: %s is %d lines long; split it into functions of %d at most", path, start.Line, function.Name.Name, lines, longestFunction)
-			}
-		}
-		return nil
-	})
-	if err != nil {
-		test.Fatal(err)
-	}
-}
-
-// The imports come in groups, as goimports leaves them: the standard library first, then the
-// modules, a blank line between. A module in the first group hides where the code reaches.
-func TestTheStandardLibraryIsImportedApartFromTheModules(test *testing.T) {
-	files := token.NewFileSet()
-	for path, content := range goSources(test) {
-		file, err := parser.ParseFile(files, path, content, parser.ImportsOnly)
-		if err != nil {
-			test.Fatal(err)
-		}
-		for index := 1; index < len(file.Imports); index++ {
-			before, after := file.Imports[index-1], file.Imports[index]
-			together := files.Position(after.Pos()).Line == files.Position(before.Pos()).Line+1
-			if together && isStandard(before) != isStandard(after) {
-				test.Errorf("%s: %s and %s share a group; the standard library goes apart", path, before.Path.Value, after.Path.Value)
-			}
-		}
-	}
-}
-
-// isStandard tells whether an import is of the standard library, whose paths have no dot first.
-func isStandard(imported *ast.ImportSpec) bool {
-	first, _, _ := strings.Cut(strings.Trim(imported.Path.Value, `"`), "/")
-	return !strings.Contains(first, ".")
-}
-
-// What Coddy knows of each language is in its table, so no other package names the files of a
-// language it treats in a way of its own (served, of the JVM, a class per file) by their extension:
-// it asks the table (language.Of, IsJVM, ClassName…). Other extensions may name a folder or a
-// fallback (".gradle", ".txt").
-func TestNoLanguageIsNamedOutsideItsTable(test *testing.T) {
-	extensions := map[string]bool{}
-	for _, known := range language.Languages {
-		if known.ServerLanguage == "" && !known.JVM && !known.Classes {
-			continue
-		}
-		for _, extension := range known.Extensions {
-			extensions[strconv.Quote(extension)] = true
-		}
-	}
-	files := token.NewFileSet()
-	for path, content := range goSources(test) {
-		if strings.Contains(filepath.ToSlash(path), "internal/language/") {
-			continue
-		}
-		file, err := parser.ParseFile(files, path, content, 0)
-		if err != nil {
-			test.Fatal(err)
-		}
-		ast.Inspect(file, func(node ast.Node) bool {
-			if literal, isLiteral := node.(*ast.BasicLit); isLiteral && extensions[literal.Value] {
-				test.Errorf("%s: %s names a language outside its table", files.Position(literal.Pos()), literal.Value)
-			}
-			return true
-		})
-	}
-}
-
-// modePackages are the modes, whose methods are checked by TestNoModeHasAMethodThatDoesNothing.
-var modePackages = []string{"internal/files", "internal/review", "internal/uses"}
-
-// A power only some modes have is an interface of its own (mode.WithFileButton…), so no mode
-// implements one with a method that does nothing to satisfy a contract it does not need.
-func TestNoModeHasAMethodThatDoesNothing(test *testing.T) {
-	files := token.NewFileSet()
-	for _, folder := range modePackages {
-		packages, err := parser.ParseDir(files, filepath.Join(moduleRoot, folder), func(info fs.FileInfo) bool {
-			return !strings.HasSuffix(info.Name(), "_test.go")
-		}, 0)
-		if err != nil {
-			test.Fatal(err)
-		}
-		for _, found := range packages {
-			for _, file := range found.Files {
-				for _, declaration := range file.Decls {
-					if method, isMethod := declaration.(*ast.FuncDecl); isMethod && method.Recv != nil && doesNothing(method) {
-						test.Errorf("%s: %s does nothing; make it an optional interface the mode leaves out",
-							files.Position(method.Pos()), method.Name.Name)
-					}
-				}
-			}
-		}
-	}
-}
-
-// doesNothing tells whether a function's body is empty, or only gives back zero values (0, "",
-// nil, an empty literal). A lone boolean is an answer to a question, so false is not nothing.
-func doesNothing(function *ast.FuncDecl) bool {
-	body := function.Body
-	if body == nil || len(body.List) == 0 {
-		return true
-	}
-	returned, isReturn := body.List[0].(*ast.ReturnStmt)
-	if len(body.List) != 1 || !isReturn || len(returned.Results) == 0 {
-		return false
-	}
-	if len(returned.Results) == 1 && isBoolean(returned.Results[0]) {
-		return false
-	}
-	for _, result := range returned.Results {
-		if !isZero(result) {
-			return false
-		}
-	}
-	return true
-}
-
-// isBoolean tells whether an expression is the word true or false.
-func isBoolean(expression ast.Expr) bool {
-	name, isName := expression.(*ast.Ident)
-	return isName && (name.Name == "true" || name.Name == "false")
-}
-
-// isZero tells whether an expression is a zero value written out: 0, "", false, nil or T{}.
-func isZero(expression ast.Expr) bool {
-	switch value := expression.(type) {
-	case *ast.BasicLit:
-		return value.Value == "0" || value.Value == `""`
-	case *ast.Ident:
-		return value.Name == "nil" || value.Name == "false"
-	case *ast.CompositeLit:
-		return len(value.Elts) == 0
-	}
-	return false
-}
-
-// contributingGuide is the page that lists the packages, seen from this package's folder.
-const contributingGuide = moduleRoot + "/docs/8-contributing.md"
-
-// listedPackages are the packages named in the contributing guide's map of the code: the first
-// word of each line of its code blocks that starts with "internal/".
-func listedPackages(test *testing.T) map[string]bool {
-	test.Helper()
-	content, err := os.ReadFile(contributingGuide)
-	if err != nil {
-		test.Fatal(err)
-	}
-	listed := map[string]bool{}
-	inCode := false
-	for _, line := range strings.Split(string(content), "\n") {
-		if strings.HasPrefix(line, "```") {
-			inCode = !inCode
-			continue
-		}
-		if inCode && strings.HasPrefix(line, "internal/") {
-			listed[strings.Fields(line)[0]] = true
-		}
-	}
-	return listed
-}
-
-// The contributing guide is where a newcomer finds each package, so it names every one of them
-// and none that is gone.
-func TestTheContributingGuideListsEveryPackage(test *testing.T) {
-	listed := listedPackages(test)
-	entries, err := os.ReadDir(moduleRoot + "/internal")
-	if err != nil {
-		test.Fatal(err)
-	}
-	present := map[string]bool{}
-	for _, entry := range entries {
-		if entry.IsDir() && !strings.HasPrefix(entry.Name(), ".") {
-			present["internal/"+entry.Name()] = true
-		}
-	}
-	for name := range present {
-		if !listed[name] {
-			test.Errorf("%s is not in %s", name, contributingGuide)
-		}
-	}
-	for name := range listed {
-		if !present[name] {
-			test.Errorf("%s names %s, which is not a package", contributingGuide, name)
-		}
 	}
 }

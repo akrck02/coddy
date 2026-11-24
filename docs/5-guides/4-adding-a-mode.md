@@ -29,8 +29,8 @@ window looks for each once, when the mode is turned on:
 | `UsesHolder` | the uses of a name |
 | `sidebar.Headed` | words beside the sidebar's title |
 
-A method that only fills a contract and does nothing is refused by
-`TestNoModeHasAMethodThatDoesNothing`: leave the power out instead.
+A method that only fills a contract and does nothing is a sign the power is not the mode's:
+leave it out instead.
 
 ## Checking it
 

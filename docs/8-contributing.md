@@ -58,7 +58,7 @@ internal/git          the read-only git commands
 ```
 
 How these lean on each other, floor by floor, is in [how it is made](4-how-it-is-made.md).
-`cmd/code-review/rules_test.go` keeps the arrows pointing down, and this list true:
+`cmd/code-review/rules_test.go` keeps the arrows pointing down:
 
 | Test | It checks |
 |---|---|
@@ -67,11 +67,11 @@ How these lean on each other, floor by floor, is in [how it is made](4-how-it-is
 | `TestTheWindowImportsNoMode` | `window` imports neither `files` nor `review` |
 | `TestTheLanguageTableImportsNothingOfTheReader` | `language` is data, and imports nothing of Coddy |
 | `TestGradleKnowsNothingOfTheLanguageServers` | `gradle` does not import `lsp` |
-| `TestTheContributingGuideListsEveryPackage` | the list above names every package of `internal/`, and only those |
-| `TestNoFunctionIsLongerThanFortyLines` | a function fits on a screen |
-| `TestTheStandardLibraryIsImportedApartFromTheModules` | imports come in two groups, the standard library first, as `goimports` leaves them |
-| `TestNoLanguageIsNamedOutsideItsTable` | the extensions of the languages Coddy serves or reads as classes are written only in `language` |
-| `TestNoErrorIsDroppedWithoutAReasonOnItsLine` | every `_ =` says why on its line |
+
+Tests check what the program does, and the arrows that keep it apart. How the code is written
+(the length of a function or a file, how imports are grouped, a reason beside each `_ =`, the
+language names kept in their table) is a rule of review, not a test: a test of style is code
+that has nothing to do with the program, and every change pays for it.
 
 ## How a pane talks to the window
 
