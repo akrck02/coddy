@@ -445,3 +445,18 @@ func TestTheFilesModeHasNothingOfTheReview(test *testing.T) {
 		test.Error("v marked the file as viewed in the files mode")
 	}
 }
+
+// The circle of a file in the sidebar marks it without opening another file, so nothing else
+// makes the rows again: the mark itself must, or the counts keep their old number.
+func TestMarkingAFileViewedUpdatesTheCountsAtOnce(test *testing.T) {
+	application := newReader(Settings{Folders: []string{makeRepository(test)}, WorkingTree: true, Synchronous: true,
+		Open: "lighthouse/src/lamp.go", Mode: "Review"})
+	window := newWindow(test, application)
+	window.Frames(2)
+	reviewing := application.mode.(*review.Mode)
+	reviewing.Press(workspace.FileReference{Project: 0, Path: "src/lamp.go"}, false)
+	window.Frames(2)
+	if viewed, total, _ := application.progress(); viewed != 1 || total != 3 {
+		test.Errorf("the status bar counts %d of %d viewed, want 1 of 3", viewed, total)
+	}
+}

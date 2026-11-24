@@ -261,6 +261,7 @@ func (uses *Mode) Press(file workspace.FileReference, moveOn bool) {
 	for _, index := range uses.byFile[file] {
 		uses.seen[uses.uses[index]] = seen
 	}
+	uses.window.Relist() // the rows' ticks and the counts are made with the rows
 	if seen && moveOn {
 		uses.goToUnseen()
 	}

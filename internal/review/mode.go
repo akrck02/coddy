@@ -145,6 +145,7 @@ func (review *Mode) Press(file workspace.FileReference, moveOn bool) {
 	if err := review.reviewed.SetViewed(project, file.Path, viewed); err != nil {
 		review.window.Toast("Could not keep the mark: " + err.Error())
 	}
+	review.window.Relist() // the rows' ticks and the counts are made with the rows
 	if viewed && moveOn && !review.openNextUnviewed(file) {
 		review.window.Toast("Every changed file has been viewed")
 	}
