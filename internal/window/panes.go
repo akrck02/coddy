@@ -127,8 +127,8 @@ func (application *Window) Loading() bool { return application.loading > 0 }
 // ReadingKinds tells whether class kinds are being read.
 func (application *Window) ReadingKinds() bool { return len(application.kindsWanted) > 0 }
 
-// FileButton is the viewer header's button for a file: the one of the mode that is on, else the
-// first mode that has one, so a file can be marked as viewed whatever the mode, as v can.
+// FileButton is the viewer header's button for a file: the one of the mode that is on, and none
+// when that mode has no button.
 func (application *Window) FileButton(file workspace.FileReference) (viewer.Button, bool) {
 	if owner := application.powers.button; owner != nil {
 		return owner.FileButton(file)
@@ -214,3 +214,38 @@ func (application *Window) ToggleChangedFilter() {
 
 // Toast shows a short note at the bottom of the window.
 func (application *Window) Toast(words string) { application.toast = words }
+
+// SidebarFolded tells whether the sidebar is folded away, to start so the next time.
+func (application *Window) SidebarFolded() bool { return application.sidebarFolded }
+
+// toggleSidebar folds the sidebar away, the file taking its room and the keyboard, or brings it
+// back with the keyboard in it.
+func (application *Window) toggleSidebar() {
+	application.sidebarFolded = !application.sidebarFolded
+	if !application.sidebarFolded {
+		application.focus = sidebarPane
+	} else if application.viewer.IsOpen() {
+		application.focus = viewerPane
+	}
+	application.focusBefore = application.focus
+}
+
+// unfoldForTheKeyboard brings the folded sidebar back when the keyboard has just gone to it (Tab,
+// ⌘F, Esc after editing…): what takes the keys is in sight.
+func (application *Window) unfoldForTheKeyboard() {
+	if application.sidebarFolded && application.focus == sidebarPane && application.focusBefore != sidebarPane {
+		application.sidebarFolded = false
+	}
+	application.focusBefore = application.focus
+}
+
+// buildFoldButton is the rail's button that folds the sidebar away, or brings it back.
+func (application *Window) buildFoldButton(context *ui.Context) {
+	name, icon := "Hide the sidebar (s)", "panel-left-close"
+	if application.sidebarFolded {
+		name, icon = "Show the sidebar (s)", "panel-left-open"
+	}
+	if theme.ToolButton(context, name, icon, false) {
+		application.toggleSidebar()
+	}
+}

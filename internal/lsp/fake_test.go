@@ -63,8 +63,8 @@ func TestTheFakeServerAnswersFromTheFiles(test *testing.T) {
 	}
 	defer command.Process.Kill()
 	conn := NewConn(output, input, nil)
-	ctx := within(test)
-	if err := conn.Call(ctx, "initialize", map[string]any{"rootUri": FileURI(folder)}, nil); err != nil {
+	requestContext := within(test)
+	if err := conn.Call(requestContext, "initialize", map[string]any{"rootUri": FileURI(folder)}, nil); err != nil {
 		test.Fatal(err)
 	}
 	at := TextDocumentPositionParams{TextDocument: TextDocumentIdentifier{URI: FileURI(filepath.Join(folder, "use.go"))},
@@ -73,9 +73,9 @@ func TestTheFakeServerAnswersFromTheFiles(test *testing.T) {
 	var hover struct {
 		Contents struct{ Value string } `json:"contents"`
 	}
-	conn.Call(ctx, "textDocument/definition", at, &declared)
-	conn.Call(ctx, "textDocument/references", at, &used)
-	conn.Call(ctx, "textDocument/hover", at, &hover)
+	conn.Call(requestContext, "textDocument/definition", at, &declared)
+	conn.Call(requestContext, "textDocument/references", at, &used)
+	conn.Call(requestContext, "textDocument/hover", at, &hover)
 	if len(declared) != 1 || !strings.HasSuffix(declared[0].URI, "lamp.go") || declared[0].Range.Start != (Position{Line: 2, Character: 5}) {
 		test.Errorf("Beam is declared at %+v", declared)
 	}

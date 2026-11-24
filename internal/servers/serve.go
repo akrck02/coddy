@@ -2,8 +2,8 @@ package servers
 
 import (
 	"context"
-	"github.com/akrck02/code-review/internal/language"
 
+	"github.com/akrck02/code-review/internal/language"
 	"github.com/akrck02/code-review/internal/lsp"
 	"github.com/akrck02/code-review/internal/text"
 	"github.com/akrck02/code-review/internal/workspace"

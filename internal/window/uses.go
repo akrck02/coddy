@@ -2,11 +2,11 @@ package window
 
 import (
 	"context"
-	"github.com/akrck02/code-review/internal/language"
 	"sort"
 
 	"github.com/akrck02/code-review/internal/finder"
 	"github.com/akrck02/code-review/internal/git"
+	"github.com/akrck02/code-review/internal/language"
 	"github.com/akrck02/code-review/internal/navigation"
 	"github.com/akrck02/code-review/internal/viewer"
 	"github.com/akrck02/go-renderer/draw2d"
@@ -36,13 +36,13 @@ func (application *Window) searchUses(question navigation.Question) {
 	projects, options := application.inSightPaths(), application.wordSearch()
 	application.waitFor(asked.Client)
 	application.work.Run("references", func(stop context.Context) func() {
-		ctx, cancel := context.WithTimeout(stop, navigation.RequestWait)
+		requestContext, cancel := context.WithTimeout(stop, navigation.RequestWait)
 		defer cancel()
 		asked.TellFirst()
 		answer := navigation.Answer{Busy: !asked.Client.Ready()}
-		locations, err := asked.Client.References(ctx, asked.Path, at)
+		locations, err := asked.Client.References(requestContext, asked.Path, at)
 		answer.Locations = locations
-		answer.Declared, _ = asked.Client.Definition(ctx, asked.Path, at) // no declaration: only the server's uses are listed
+		answer.Declared, _ = asked.Client.Definition(requestContext, asked.Path, at) // no declaration: only the server's uses are listed
 		answer.Hits = navigation.Grep(stop, application.work, projects, question.Name, options)
 		return func() {
 			application.waiting = nil
@@ -96,10 +96,10 @@ func (application *Window) Hover(place viewer.Place, resting bool) {
 	at := application.positionOf(place)
 	application.hover = navigation.HoverCard{Place: place, Resting: true, X: application.pointerX, Y: application.pointerY}
 	application.work.Run("hover", func(stop context.Context) func() {
-		ctx, cancel := context.WithTimeout(stop, navigation.RequestWait)
+		requestContext, cancel := context.WithTimeout(stop, navigation.RequestWait)
 		defer cancel()
 		asked.TellFirst()
-		text, err := asked.Client.Hover(ctx, asked.Path, at)
+		text, err := asked.Client.Hover(requestContext, asked.Path, at)
 		return func() {
 			if err == nil && application.hover.Resting && application.hover.Place == place {
 				application.hover.Text = text

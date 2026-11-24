@@ -3,12 +3,12 @@ package uses
 import (
 	"context"
 	"fmt"
-	"github.com/akrck02/code-review/internal/workspace"
 	"slices"
 	"sort"
 	"strings"
 
 	"github.com/akrck02/code-review/internal/builds"
+	"github.com/akrck02/code-review/internal/workspace"
 	ui "github.com/akrck02/go-ui"
 )
 

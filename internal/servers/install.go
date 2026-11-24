@@ -19,9 +19,9 @@ func (fleet *Fleet) Install(name string) {
 	}
 	fleet.installing[name] = true
 	fleet.work.Run("install "+name, func(context.Context) func() {
-		ctx, cancel := context.WithTimeout(context.Background(), installWait)
+		requestContext, cancel := context.WithTimeout(context.Background(), installWait)
 		defer cancel()
-		err := lsp.Install(ctx, server)
+		err := lsp.Install(requestContext, server)
 		return func() { fleet.installed(name, err) }
 	})
 }

@@ -68,8 +68,8 @@ func (conn *Conn) Err() error {
 }
 
 // Call sends a request and waits for its reply, decoding its result into result (nil drops it).
-// It stops early when ctx is done or the connection ends.
-func (conn *Conn) Call(ctx context.Context, method string, params, result any) error {
+// It stops early when requestContext is done or the connection ends.
+func (conn *Conn) Call(requestContext context.Context, method string, params, result any) error {
 	reply := make(chan message, 1)
 	conn.lock.Lock()
 	if conn.closed {
@@ -86,9 +86,9 @@ func (conn *Conn) Call(ctx context.Context, method string, params, result any) e
 		return err
 	}
 	select {
-	case <-ctx.Done():
+	case <-requestContext.Done():
 		_ = conn.Notify("$/cancelRequest", map[string]int64{"id": id}) // given up either way: a closed connection has none to stop
-		return ctx.Err()
+		return requestContext.Err()
 	case <-conn.done:
 		return failure.Wrap(ServerStopped, method, conn.Err())
 	case answer := <-reply:

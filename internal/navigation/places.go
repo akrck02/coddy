@@ -41,8 +41,8 @@ func Declares(location lsp.Location, path string, at lsp.Position) bool {
 
 // OutsideName names a declaration outside the projects open: its file, or the class in a jar.
 func OutsideName(uri, path string) string {
-	if pkg, class, isJar := lsp.ClassInJar(uri); isJar {
-		return pkg + "." + class + ", in a jar whose project is not open"
+	if packageName, class, isJar := lsp.ClassInJar(uri); isJar {
+		return packageName + "." + class + ", in a jar whose project is not open"
 	}
 	if path == "" {
 		return uri

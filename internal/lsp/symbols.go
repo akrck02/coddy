@@ -15,9 +15,9 @@ type Symbol struct {
 }
 
 // Symbols are the declarations of a document, as the server sees them.
-func (client *Client) Symbols(ctx context.Context, path string) ([]Symbol, error) {
+func (client *Client) Symbols(requestContext context.Context, path string) ([]Symbol, error) {
 	params := map[string]any{"textDocument": TextDocumentIdentifier{URI: FileURI(path)}}
-	raw, err := client.ask(ctx, "textDocument/documentSymbol", params, func(raw json.RawMessage) bool {
+	raw, err := client.ask(requestContext, "textDocument/documentSymbol", params, func(raw json.RawMessage) bool {
 		return len(raw) == 0 || string(raw) == "null" || string(raw) == "[]"
 	})
 	if err != nil {

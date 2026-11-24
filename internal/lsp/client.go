@@ -62,7 +62,7 @@ type Client struct {
 
 // Start runs a server in a root (or, with folders, for those workspace folders) and initializes
 // it. dataFolder is where it may keep its index, for a server that asks for one.
-func Start(ctx context.Context, server Server, root string, folders []string, dataFolder string) (*Client, error) {
+func Start(requestContext context.Context, server Server, root string, folders []string, dataFolder string) (*Client, error) {
 	path, err := Find(server)
 	if err != nil {
 		return nil, err
@@ -88,7 +88,7 @@ func Start(ctx context.Context, server Server, root string, folders []string, da
 		_ = command.Wait() // how the server ended is told by its output and exited, not by its status
 		close(client.exited)
 	}()
-	if err := client.initialize(ctx, root, folders); err != nil {
+	if err := client.initialize(requestContext, root, folders); err != nil {
 		client.kill()
 		return nil, err
 	}
@@ -147,7 +147,7 @@ func firstOf(root string, folders []string) string {
 }
 
 // initialize says who the reader is and what it can do, and waits for the server to be ready.
-func (client *Client) initialize(ctx context.Context, root string, folders []string) error {
+func (client *Client) initialize(requestContext context.Context, root string, folders []string) error {
 	if root != "" {
 		folders = []string{root}
 	}
@@ -176,7 +176,7 @@ func (client *Client) initialize(ctx context.Context, root string, folders []str
 			} `json:"workspace"`
 		} `json:"capabilities"`
 	}
-	if err := client.conn.Call(ctx, "initialize", params, &answer); err != nil {
+	if err := client.conn.Call(requestContext, "initialize", params, &answer); err != nil {
 		return err
 	}
 	client.followsFolders = answer.Capabilities.Workspace.WorkspaceFolders.Supported
@@ -287,12 +287,12 @@ func (client *Client) Ready() bool { return client.isReady() && !client.Busy() }
 
 // waitReady waits for the server to have read the projects, as a request asked before would be
 // answered with nothing; it gives up with the request's context, or when the server stops.
-func (client *Client) waitReady(ctx context.Context) error {
+func (client *Client) waitReady(requestContext context.Context) error {
 	select {
 	case <-client.ready:
 		return nil
-	case <-ctx.Done():
-		return failure.Wrap(RequestFailed, "waiting for "+client.Server.Name+" to read the projects", ctx.Err())
+	case <-requestContext.Done():
+		return failure.Wrap(RequestFailed, "waiting for "+client.Server.Name+" to read the projects", requestContext.Err())
 	case <-client.conn.Done():
 		return failure.Wrap(ServerStopped, client.Server.Name, client.conn.Err())
 	}
@@ -306,14 +306,14 @@ func (client *Client) Done() <-chan struct{} { return client.conn.Done() }
 
 // Stop asks the server to shut down and exit, and ends it if it has not within a moment.
 func (client *Client) Stop() {
-	ctx, cancel := context.WithTimeout(context.Background(), stopWait)
+	requestContext, cancel := context.WithTimeout(context.Background(), stopWait)
 	defer cancel()
-	if client.conn.Call(ctx, "shutdown", nil, nil) == nil {
+	if client.conn.Call(requestContext, "shutdown", nil, nil) == nil {
 		_ = client.conn.Notify("exit", nil) // a server that does not hear it is killed below
 	}
 	select {
 	case <-client.exited:
-	case <-ctx.Done():
+	case <-requestContext.Done():
 	}
 	client.kill()
 	if client.Server.Import.OwnGradle && client.data != "" {

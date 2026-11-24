@@ -27,14 +27,14 @@ func (application *Window) UsersOf(use mode.Use, done func(declaration string, u
 		return false
 	}
 	application.work.Run("users of "+path, func(stop context.Context) func() {
-		ctx, cancel := context.WithTimeout(stop, navigation.RequestWait)
+		requestContext, cancel := context.WithTimeout(stop, navigation.RequestWait)
 		defer cancel()
 		defer navigation.OpenFor(client, path)()
-		symbols, _ := client.Symbols(ctx, path) // no symbols: the use is in no declaration, as told
+		symbols, _ := client.Symbols(requestContext, path) // no symbols: the use is in no declaration, as told
 		around, found := lsp.Enclosing(symbols, at)
 		var locations []lsp.Location
 		if found {
-			locations, _ = client.References(ctx, path, around.Selection.Start) // no answer: no users
+			locations, _ = client.References(requestContext, path, around.Selection.Start) // no answer: no users
 		}
 		return func() {
 			if !found {

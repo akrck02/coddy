@@ -227,6 +227,48 @@ func TestNoFileIsLongerThanFourHundredLines(test *testing.T) {
 	}
 }
 
+// mostFilesInAPackage is how many files, tests left out, a package may hold: a bigger one is
+// usually several concepts, each worth a package of its own.
+const mostFilesInAPackage = 25
+
+// A package is one concept a reader can name, so none holds more than twenty-five files.
+func TestNoPackageHoldsMoreThanTwentyFiveFiles(test *testing.T) {
+	files := map[string]int{}
+	for path := range goSources(test) {
+		files[filepath.Dir(path)]++
+	}
+	for folder, count := range files {
+		if count > mostFilesInAPackage {
+			test.Errorf("%s holds %d files; split it into packages of %d at most", folder, count, mostFilesInAPackage)
+		}
+	}
+}
+
+// The imports come in groups, as goimports leaves them: the standard library first, then the
+// modules, a blank line between. A module in the first group hides where the code reaches.
+func TestTheStandardLibraryIsImportedApartFromTheModules(test *testing.T) {
+	files := token.NewFileSet()
+	for path, content := range goSources(test) {
+		file, err := parser.ParseFile(files, path, content, parser.ImportsOnly)
+		if err != nil {
+			test.Fatal(err)
+		}
+		for index := 1; index < len(file.Imports); index++ {
+			before, after := file.Imports[index-1], file.Imports[index]
+			together := files.Position(after.Pos()).Line == files.Position(before.Pos()).Line+1
+			if together && isStandard(before) != isStandard(after) {
+				test.Errorf("%s: %s and %s share a group; the standard library goes apart", path, before.Path.Value, after.Path.Value)
+			}
+		}
+	}
+}
+
+// isStandard tells whether an import is of the standard library, whose paths have no dot first.
+func isStandard(imported *ast.ImportSpec) bool {
+	first, _, _ := strings.Cut(strings.Trim(imported.Path.Value, `"`), "/")
+	return !strings.Contains(first, ".")
+}
+
 // modePackages are the modes, whose methods are checked by TestNoModeHasAMethodThatDoesNothing.
 var modePackages = []string{"internal/files", "internal/review", "internal/uses"}
 

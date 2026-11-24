@@ -1,16 +1,16 @@
 package viewer
 
 import (
-	"github.com/akrck02/code-review/internal/language"
-	"github.com/akrck02/code-review/internal/text"
-	"github.com/akrck02/code-review/internal/workspace"
 	"math"
 	"strings"
 
 	"github.com/akrck02/code-review/internal/highlight"
+	"github.com/akrck02/code-review/internal/language"
 	"github.com/akrck02/code-review/internal/markdown"
 	"github.com/akrck02/code-review/internal/pane"
+	"github.com/akrck02/code-review/internal/text"
 	"github.com/akrck02/code-review/internal/theme"
+	"github.com/akrck02/code-review/internal/workspace"
 	"github.com/akrck02/go-renderer/draw2d"
 	ui "github.com/akrck02/go-ui"
 )

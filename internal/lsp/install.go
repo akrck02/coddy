@@ -59,7 +59,7 @@ func Installable(server Server) bool {
 
 // Install runs a server's install command, without a shell, and gives InstallFailed with the end
 // of what it wrote when it cannot run or ends with an error.
-func Install(ctx context.Context, server Server) error {
+func Install(requestContext context.Context, server Server) error {
 	words := strings.Fields(server.Install)
 	if len(words) == 0 {
 		return failure.Wrap(InstallFailed, server.Name, nil)
@@ -68,7 +68,7 @@ func Install(ctx context.Context, server Server) error {
 	if err != nil {
 		return failure.Wrap(InstallFailed, server.Name, err)
 	}
-	command := exec.CommandContext(ctx, program, words[1:]...)
+	command := exec.CommandContext(requestContext, program, words[1:]...)
 	command.Env = append(os.Environ(), server.InstallEnvironment...)
 	output, err := command.CombinedOutput()
 	if err != nil {

@@ -71,10 +71,10 @@ func (uses *Uses) checkPlaces(search *Search, key string, client *lsp.Client, pl
 // askDeclaration asks a server where the name at a place is declared, telling it the file when it
 // does not have it open, and closing it after.
 func askDeclaration(stop context.Context, client *lsp.Client, place candidate) []lsp.Location {
-	ctx, cancel := context.WithTimeout(stop, RequestWait)
+	requestContext, cancel := context.WithTimeout(stop, RequestWait)
 	defer cancel()
 	defer OpenFor(client, place.path)()
-	asking, done := context.WithTimeout(ctx, checkWait)
+	asking, done := context.WithTimeout(requestContext, checkWait)
 	defer done()
 	locations, _ := client.Definition(asking, place.path, place.at) // a place the server cannot answer is no use
 	return locations
@@ -105,9 +105,9 @@ func (uses *Uses) askAgain(search *Search) {
 	search.busy = false
 	asked, at := search.Asked, search.At
 	uses.work.Run("references again", func(stop context.Context) func() {
-		ctx, cancel := context.WithTimeout(stop, RequestWait)
+		requestContext, cancel := context.WithTimeout(stop, RequestWait)
 		defer cancel()
-		locations, err := asked.Client.References(ctx, asked.Path, at)
+		locations, err := asked.Client.References(requestContext, asked.Path, at)
 		return func() {
 			if err != nil || uses.search != search {
 				return

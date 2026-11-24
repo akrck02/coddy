@@ -49,9 +49,9 @@ func (fleet *Fleet) Start(server lsp.Server, root, key, project string) {
 			}
 		}
 		snapshots := takeSnapshots(server.Name, options)
-		ctx, cancel := context.WithTimeout(context.Background(), startWait)
+		requestContext, cancel := context.WithTimeout(context.Background(), startWait)
 		defer cancel()
-		client, err := lsp.Start(ctx, server, root, folders, data)
+		client, err := lsp.Start(requestContext, server, root, folders, data)
 		return func() {
 			if len(removed) > 0 {
 				fleet.host.Toast(server.Name + ": removed " + english.Count(len(removed), "old index") + " of projects no longer open")

@@ -16,11 +16,11 @@ import (
 // is a dependency of the others as a jar, and its source is what the person reads. The line is
 // where the name is declared in the source, as the jar's lines need not be the source's.
 func FromJar(projects []*workspace.Project, location lsp.Location, name string) (lsp.Location, bool) {
-	pkg, class, isJar := lsp.ClassInJar(location.URI)
+	packageName, class, isJar := lsp.ClassInJar(location.URI)
 	if !isJar {
 		return location, false
 	}
-	source, found := sourceOfClass(projects, strings.ReplaceAll(pkg, ".", "/"), class)
+	source, found := sourceOfClass(projects, strings.ReplaceAll(packageName, ".", "/"), class)
 	if !found {
 		return location, false
 	}

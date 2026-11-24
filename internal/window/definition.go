@@ -61,10 +61,10 @@ func (application *Window) GoToDefinition(place viewer.Place) {
 	from, _ := application.here()
 	application.waitFor(asked.Client)
 	application.work.Run("definition", func(stop context.Context) func() {
-		ctx, cancel := context.WithTimeout(stop, navigation.RequestWait)
+		requestContext, cancel := context.WithTimeout(stop, navigation.RequestWait)
 		defer cancel()
 		asked.TellFirst()
-		locations, err := asked.Client.Definition(ctx, asked.Path, at)
+		locations, err := asked.Client.Definition(requestContext, asked.Path, at)
 		return func() {
 			application.waiting = nil
 			switch {

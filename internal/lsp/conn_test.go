@@ -19,9 +19,9 @@ func pair(first, second Handler) (*Conn, *Conn) {
 
 // within is a context that gives up after a second, so a broken test fails instead of hanging.
 func within(test *testing.T) context.Context {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	requestContext, cancel := context.WithTimeout(context.Background(), time.Second)
 	test.Cleanup(cancel)
-	return ctx
+	return requestContext
 }
 
 func echo(method string, params json.RawMessage) (any, error) {
@@ -148,8 +148,8 @@ func TestAJarLocationNamesItsClass(test *testing.T) {
 	uri := "jdt://contents/lamp-1.0-SNAPSHOT.jar/org.lighthouse.lamp/Lamp.java?=keeper/%5C/home%5C/.m2%5C/lamp.jar=/%3Corg.lighthouse.lamp%28Lamp.class"
 	kotlin := "jar:///home/.gradle/caches/lamp-1.0.jar!/org/lighthouse/lamp/Lamp$Beam.class"
 	for _, each := range []string{uri, kotlin} {
-		if pkg, class, found := ClassInJar(each); !found || pkg != "org.lighthouse.lamp" || class != "Lamp" {
-			test.Errorf("the class of %s is %q %q (%t)", each, pkg, class, found)
+		if packageName, class, found := ClassInJar(each); !found || packageName != "org.lighthouse.lamp" || class != "Lamp" {
+			test.Errorf("the class of %s is %q %q (%t)", each, packageName, class, found)
 		}
 	}
 	if _, _, found := ClassInJar("file:///lamp/Lamp.java"); found {

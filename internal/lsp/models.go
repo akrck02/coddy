@@ -98,10 +98,10 @@ func (client *Client) exportModels() error {
 		return failure.Wrap(BadModel, folder, err)
 	}
 	defer os.RemoveAll(folder)
-	ctx, cancel := context.WithTimeout(context.Background(), modelWait)
+	requestContext, cancel := context.WithTimeout(context.Background(), modelWait)
 	defer cancel()
 	arguments := map[string]any{"command": gradle.ExportCommand, "arguments": []string{folder}}
-	if err := client.conn.Call(ctx, "workspace/executeCommand", arguments, nil); err != nil {
+	if err := client.conn.Call(requestContext, "workspace/executeCommand", arguments, nil); err != nil {
 		return err
 	}
 	content, err := os.ReadFile(filepath.Join(folder, gradle.ModelFile))

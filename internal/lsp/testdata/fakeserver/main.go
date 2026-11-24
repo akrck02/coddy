@@ -32,7 +32,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/akrck02/code-review/internal/language"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -42,6 +41,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/akrck02/code-review/internal/language"
 	"github.com/akrck02/code-review/internal/lsp"
 )
 

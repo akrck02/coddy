@@ -296,14 +296,14 @@ func (client *Client) Busy() bool {
 const idleCheck = 200 * time.Millisecond
 
 // waitIdle waits for the server to end the work it reports, the request's context, or the server.
-func (client *Client) waitIdle(ctx context.Context) error {
+func (client *Client) waitIdle(requestContext context.Context) error {
 	ticker := time.NewTicker(idleCheck)
 	defer ticker.Stop()
 	for client.Busy() {
 		select {
 		case <-ticker.C:
-		case <-ctx.Done():
-			return failure.Wrap(RequestFailed, "waiting for "+client.Server.Name+" to finish reading", ctx.Err())
+		case <-requestContext.Done():
+			return failure.Wrap(RequestFailed, "waiting for "+client.Server.Name+" to finish reading", requestContext.Err())
 		case <-client.conn.Done():
 			return failure.Wrap(ServerStopped, client.Server.Name, client.conn.Err())
 		}
@@ -318,28 +318,28 @@ const askTries = 3
 // the big workspace answers minutes before it says it is ready). An answer with nothing before the server is
 // ready is asked again once it is; one from a server that was busy, once it is idle: kotlin-lsp,
 // still importing, answers every request empty.
-func (client *Client) ask(ctx context.Context, method string, params any, empty func(json.RawMessage) bool) (json.RawMessage, error) {
+func (client *Client) ask(requestContext context.Context, method string, params any, empty func(json.RawMessage) bool) (json.RawMessage, error) {
 	client.noteAsked()
 	defer client.noteAsked()
 	if !client.isReady() {
 		var raw json.RawMessage
-		if err := client.conn.Call(ctx, method, params, &raw); err == nil && !empty(raw) {
+		if err := client.conn.Call(requestContext, method, params, &raw); err == nil && !empty(raw) {
 			return raw, nil
 		}
-		if err := client.waitReady(ctx); err != nil {
+		if err := client.waitReady(requestContext); err != nil {
 			return nil, err
 		}
 	}
 	for try := 1; ; try++ {
 		busy := client.Busy()
 		var raw json.RawMessage
-		if err := client.conn.Call(ctx, method, params, &raw); err != nil {
+		if err := client.conn.Call(requestContext, method, params, &raw); err != nil {
 			return nil, err
 		}
 		if !empty(raw) || !(busy || client.Busy()) || try == askTries {
 			return raw, nil
 		}
-		if err := client.waitIdle(ctx); err != nil {
+		if err := client.waitIdle(requestContext); err != nil {
 			return nil, err
 		}
 	}

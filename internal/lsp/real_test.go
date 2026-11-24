@@ -51,9 +51,9 @@ func placeOf(test *testing.T, path, text string) Position {
 func TestGoplsFollowsANameInThisRepository(test *testing.T) {
 	server := realServer(test, "gopls")
 	root, _ := filepath.Abs("../..")
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	requestContext, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
-	client, err := Start(ctx, server, root, nil, "")
+	client, err := Start(requestContext, server, root, nil, "")
 	if err != nil {
 		test.Fatal(err)
 	}
@@ -61,15 +61,15 @@ func TestGoplsFollowsANameInThisRepository(test *testing.T) {
 	use := filepath.Join(root, "internal", "window", "uses.go")
 	content, _ := os.ReadFile(use)
 	client.Tell(use, string(content), 1)
-	declared, err := client.Definition(ctx, use, placeOf(test, use, "PathOf("))
+	declared, err := client.Definition(requestContext, use, placeOf(test, use, "PathOf("))
 	if err != nil || len(declared) == 0 || !strings.HasSuffix(PathOf(declared[0].URI), filepath.Join("lsp", "protocol.go")) {
 		test.Fatalf("PathOf is declared at %+v (%v), want internal/lsp/protocol.go", declared, err)
 	}
-	used, err := client.References(ctx, use, placeOf(test, use, "PathOf("))
+	used, err := client.References(requestContext, use, placeOf(test, use, "PathOf("))
 	if err != nil || len(used) < 3 {
 		test.Errorf("PathOf is used at %d places (%v), want several", len(used), err)
 	}
-	if hover, _ := client.Hover(ctx, use, placeOf(test, use, "PathOf(")); !strings.Contains(hover, "PathOf(uri string) string") {
+	if hover, _ := client.Hover(requestContext, use, placeOf(test, use, "PathOf(")); !strings.Contains(hover, "PathOf(uri string) string") {
 		test.Errorf("the hover of PathOf says %q", hover)
 	}
 }
@@ -86,9 +86,9 @@ func TestJdtlsFollowsANameAcrossFiles(test *testing.T) {
 		"src/keeper/Keeper.java": "package keeper;\n\nimport lamp.Lamp;\n\npublic class Keeper {\n    int light = Lamp.beam();\n}\n",
 	})
 	before := filesIn(test, folder)
-	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
+	requestContext, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
 	defer cancel()
-	client, err := Start(ctx, server, "", []string{folder}, test.TempDir())
+	client, err := Start(requestContext, server, "", []string{folder}, test.TempDir())
 	if err != nil {
 		test.Fatal(err)
 	}
@@ -96,7 +96,7 @@ func TestJdtlsFollowsANameAcrossFiles(test *testing.T) {
 	use := filepath.Join(folder, "src", "keeper", "Keeper.java")
 	content, _ := os.ReadFile(use)
 	client.Tell(use, string(content), 1)
-	declared, err := client.Definition(ctx, use, placeOf(test, use, "beam("))
+	declared, err := client.Definition(requestContext, use, placeOf(test, use, "beam("))
 	if err != nil || len(declared) == 0 || filepath.Base(PathOf(declared[0].URI)) != "Lamp.java" {
 		test.Errorf("beam is declared at %+v (%v), want Lamp.java", declared, err)
 	}
@@ -115,10 +115,10 @@ func TestKotlinLspFollowsANameAcrossFiles(test *testing.T) {
 		"src/main/kotlin/keeper/Keeper.kt": "package keeper\n\nimport lamp.Lamp\n\nclass Keeper {\n    val light = Lamp.beam()\n}\n",
 	})
 	before := filesIn(test, folder)
-	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Minute)
+	requestContext, cancel := context.WithTimeout(context.Background(), 8*time.Minute)
 	defer cancel()
 	data := test.TempDir()
-	client, err := Start(ctx, server, "", []string{folder}, data)
+	client, err := Start(requestContext, server, "", []string{folder}, data)
 	if err != nil {
 		test.Fatal(err)
 	}
@@ -126,7 +126,7 @@ func TestKotlinLspFollowsANameAcrossFiles(test *testing.T) {
 	use := filepath.Join(folder, "src", "main", "kotlin", "keeper", "Keeper.kt")
 	content, _ := os.ReadFile(use)
 	client.Tell(use, string(content), 1)
-	declared, err := client.Definition(ctx, use, placeOf(test, use, "beam("))
+	declared, err := client.Definition(requestContext, use, placeOf(test, use, "beam("))
 	if err != nil || len(declared) == 0 || filepath.Base(PathOf(declared[0].URI)) != "Lamp.kt" {
 		test.Errorf("beam is declared at %+v (%v), want Lamp.kt", declared, err)
 	}
@@ -175,16 +175,16 @@ func TestKotlinLspReadsAProjectFromItsModelTheSecondTime(test *testing.T) {
 // startedAndFollowing starts a server for a project and checks it follows Keeper's use of beam to
 // Lamp.kt, once it is ready.
 func startedAndFollowing(test *testing.T, server Server, folder, data string) *Client {
-	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Minute)
+	requestContext, cancel := context.WithTimeout(context.Background(), 8*time.Minute)
 	defer cancel()
-	client, err := Start(ctx, server, "", []string{folder}, data)
+	client, err := Start(requestContext, server, "", []string{folder}, data)
 	if err != nil {
 		test.Fatal(err)
 	}
 	use := filepath.Join(folder, "src", "main", "kotlin", "keeper", "Keeper.kt")
 	content, _ := os.ReadFile(use)
 	client.Tell(use, string(content), 1)
-	declared, err := client.Definition(ctx, use, placeOf(test, use, "beam("))
+	declared, err := client.Definition(requestContext, use, placeOf(test, use, "beam("))
 	if err != nil || len(declared) == 0 || filepath.Base(PathOf(declared[0].URI)) != "Lamp.kt" {
 		test.Errorf("beam is declared at %+v (%v), want Lamp.kt", declared, err)
 	}
@@ -241,9 +241,9 @@ func TestJdtlsImportsEveryProjectItStartsWith(test *testing.T) {
 	lamp := project(test, map[string]string{"pom.xml": pomNamed("lamp"), "src/lamp/Lamp.java": "package lamp;\npublic class Lamp {}\n"})
 	keeper := project(test, map[string]string{"pom.xml": pomNamed("keeper"), "src/keeper/Keeper.java": "package keeper;\npublic class Keeper {}\n"})
 	data := test.TempDir()
-	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
+	requestContext, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
 	defer cancel()
-	client, err := Start(ctx, server, "", []string{lamp, keeper}, data)
+	client, err := Start(requestContext, server, "", []string{lamp, keeper}, data)
 	if err != nil {
 		test.Fatal(err)
 	}

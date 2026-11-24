@@ -9,22 +9,22 @@ import (
 )
 
 // Definition is where the name at a place of a document is declared.
-func (client *Client) Definition(ctx context.Context, path string, at Position) ([]Location, error) {
-	return client.locations(ctx, "textDocument/definition", path, at, nil)
+func (client *Client) Definition(requestContext context.Context, path string, at Position) ([]Location, error) {
+	return client.locations(requestContext, "textDocument/definition", path, at, nil)
 }
 
 // References are every place the name at a place of a document is used, its declaration included.
-func (client *Client) References(ctx context.Context, path string, at Position) ([]Location, error) {
-	return client.locations(ctx, "textDocument/references", path, at, map[string]bool{"includeDeclaration": true})
+func (client *Client) References(requestContext context.Context, path string, at Position) ([]Location, error) {
+	return client.locations(requestContext, "textDocument/references", path, at, map[string]bool{"includeDeclaration": true})
 }
 
 // locations asks a request whose answer is a location, a list of them, or nothing.
-func (client *Client) locations(ctx context.Context, method, path string, at Position, context any) ([]Location, error) {
+func (client *Client) locations(requestContext context.Context, method, path string, at Position, context any) ([]Location, error) {
 	params := map[string]any{"textDocument": TextDocumentIdentifier{URI: FileURI(path)}, "position": at}
 	if context != nil {
 		params["context"] = context
 	}
-	raw, err := client.ask(ctx, method, params, func(raw json.RawMessage) bool {
+	raw, err := client.ask(requestContext, method, params, func(raw json.RawMessage) bool {
 		found, _ := decodeLocations(raw)
 		return len(found) == 0
 	})
@@ -63,9 +63,9 @@ func decodeLocations(raw json.RawMessage) ([]Location, error) {
 
 // Hover is the text the server shows for the name at a place: its type and documentation, as
 // Markdown; "" when it has none.
-func (client *Client) Hover(ctx context.Context, path string, at Position) (string, error) {
+func (client *Client) Hover(requestContext context.Context, path string, at Position) (string, error) {
 	params := TextDocumentPositionParams{TextDocument: TextDocumentIdentifier{URI: FileURI(path)}, Position: at}
-	raw, err := client.ask(ctx, "textDocument/hover", params, func(raw json.RawMessage) bool { return hoverOf(raw) == "" })
+	raw, err := client.ask(requestContext, "textDocument/hover", params, func(raw json.RawMessage) bool { return hoverOf(raw) == "" })
 	if err != nil {
 		return "", err
 	}
