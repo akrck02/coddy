@@ -49,8 +49,7 @@ func (uses *Mode) buildTabs(context *ui.Context) {
 	context.Frame(ui.Layout{Width: ui.Grow(), Padding: ui.PadXY(16, 6), Gap: 10, AlignY: ui.Center}, ui.Look{Fill: look.Editor}, func() {
 		context.IconSized("scan-search", 14, palette.InkQuiet)
 		context.Text(uses.name, ui.TextStyle{Weight: draw2d.Bold})
-		context.Text(fmt.Sprintf("%d uses in %d files · %s", len(uses.uses), len(uses.byFile), uses.Header()),
-			ui.TextStyle{Size: palette.SmallTextSize, Color: palette.InkSoft})
+		context.Text(uses.tabWords.Of(uses.tally(), tabTitle), ui.TextStyle{Size: palette.SmallTextSize, Color: palette.InkSoft})
 		uses.buildNote(context)
 		chosen := int(uses.view)
 		if theme.IconSwitch(context, "uses view", &chosen, []theme.IconChoice{
@@ -76,8 +75,7 @@ func (uses *Mode) BuildInsteadOfAFile(context *ui.Context) bool {
 					ui.TextStyle{Color: palette.InkSoft})
 				return
 			}
-			context.Text(fmt.Sprintf("%d uses of %s in %d files · %s", len(uses.uses), uses.name, len(uses.byFile), uses.Header()),
-				ui.TextStyle{Color: palette.InkSoft})
+			context.Text(uses.pageWords.Of(uses.tally(), pageTitle), ui.TextStyle{Color: palette.InkSoft})
 			context.Caption("n / ⇧N go through the uses · v ticks one as seen · r searches again · ⇧1 ⇧2 ⇧3 the list and the graphs")
 		})
 	return true
@@ -96,10 +94,31 @@ func (uses *Mode) buildNote(context *ui.Context) {
 	height := palette.SmallTextSize * 1.6
 	context.Clickable("uses note", ui.Layout{Width: ui.Grow(), Height: ui.Fixed(height)}, ui.Looks{}, func() {
 		context.Paint(ui.Layout{Width: ui.Grow(), Height: ui.Fixed(height)}, func(area draw2d.Rectangle, drawing *draw2d.List) {
-			if fitted := theme.FitText(context, uses.note, style, area.Width); fitted != "" {
+			if fitted := uses.fittedNote.Fit(context, uses.note, style, area.Width); fitted != "" {
 				drawing.Text(fitted, area.X, area.Y+(area.Height+style.Size*0.7)/2, style.Size, draw2d.Regular, style.Color)
 			}
 		})
 	})
 	context.Tooltip(uses.note)
+}
+
+// usesTally is what the titles of the uses count, so they are written again only when it changes.
+type usesTally struct {
+	name                         string
+	uses, files, seen, probables int
+}
+
+// tally counts the uses as the titles say them.
+func (uses *Mode) tally() usesTally {
+	return usesTally{name: uses.name, uses: len(uses.uses), files: len(uses.byFile), seen: uses.seenCount(), probables: uses.probableCount()}
+}
+
+// tabTitle is the tab's count of the uses: "4 uses in 3 files · 1 of 4 seen".
+func tabTitle(tally usesTally) string {
+	return fmt.Sprintf("%d uses in %d files · %s", tally.uses, tally.files, headerOf(tally))
+}
+
+// pageTitle is the page's count of the uses, with the name searched.
+func pageTitle(tally usesTally) string {
+	return fmt.Sprintf("%d uses of %s in %d files · %s", tally.uses, tally.name, tally.files, headerOf(tally))
 }

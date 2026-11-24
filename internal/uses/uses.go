@@ -11,6 +11,7 @@ import (
 	"github.com/akrck02/code-review/internal/mode"
 	"github.com/akrck02/code-review/internal/pane"
 	"github.com/akrck02/code-review/internal/sidebar"
+	"github.com/akrck02/code-review/internal/theme"
 	"github.com/akrck02/code-review/internal/viewer"
 	"github.com/akrck02/code-review/internal/workspace"
 	"github.com/akrck02/go-renderer/input"
@@ -33,7 +34,11 @@ type Mode struct {
 	home   int
 	uses   []mode.Use // in the order n goes through them
 	note   string
-	seen   map[mode.Use]bool
+	// tabWords and pageWords are the titles' counts, written when what they count changes
+	tabWords, pageWords pane.Words[usesTally]
+	// fittedNote is the note as wide as the tab shows it, made when the note or the width change
+	fittedNote theme.FittedText
+	seen       map[mode.Use]bool
 	// byFile are the uses of each file, as indexes in uses
 	byFile map[workspace.FileReference][]int
 	// current is the use n went to last, as an index in uses; -1 before the first
@@ -72,11 +77,7 @@ func (uses *Mode) Header() string {
 	if len(uses.uses) == 0 {
 		return ""
 	}
-	header := fmt.Sprintf("%d of %d seen", uses.seenCount(), len(uses.uses))
-	if probable := uses.probableCount(); probable > 0 {
-		header += fmt.Sprintf(" · %d probable", probable)
-	}
-	return header
+	return headerOf(uses.tally())
 }
 
 // probableCount is how many uses no server confirmed yet.
@@ -362,4 +363,13 @@ func (uses *Mode) searchAgain() {
 		return
 	}
 	uses.window.Toast("No search to make again: press ⌥F7 on a name")
+}
+
+// headerOf says how many uses were seen, and how many are only probable: "1 of 4 seen · 1 probable".
+func headerOf(tally usesTally) string {
+	header := fmt.Sprintf("%d of %d seen", tally.seen, tally.uses)
+	if tally.probables > 0 {
+		header += fmt.Sprintf(" · %d probable", tally.probables)
+	}
+	return header
 }

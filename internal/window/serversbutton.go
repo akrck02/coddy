@@ -153,13 +153,14 @@ func (application *Window) buildModeMark(context *ui.Context, mode serversMode, 
 	case serversFull:
 		icon, colour = "zap", palette.Positive
 	}
+	ring := &application.ring
 	context.Paint(ui.Layout{Width: ui.Fixed(markSize), Height: ui.Fixed(markSize)}, func(area draw2d.Rectangle, drawing *draw2d.List) {
 		track := application.look.Hover.Mix(palette.Ink, 0.12)
 		if mode != textOnly {
-			drawing.Stroke(arc(1), area.X, area.Y, 1, 1.6, track)
+			drawing.Stroke(ring.part(1), area.X, area.Y, 1, 1.6, track)
 		}
 		if mode == serversFull || mode == serversLoading && fraction > 0 {
-			drawing.Stroke(arc(fraction), area.X, area.Y, 1, 1.6, colour)
+			drawing.Stroke(ring.part(fraction), area.X, area.Y, 1, 1.6, colour)
 		}
 		drawing.Icon(icon, area.X+4, area.Y+4, 12, colour)
 		if broken {
@@ -167,6 +168,27 @@ func (application *Window) buildModeMark(context *ui.Context, mode serversMode, 
 			drawing.Rectangle(dot, 3, palette.Warning, draw2d.Color{}, 0)
 		}
 	})
+}
+
+// markRing keeps the paths of the mark's ring: the whole one, and the part of the fraction drawn
+// last, made again only when the servers' progress moves.
+type markRing struct {
+	whole, last *draw2d.Path
+	fraction    float32
+}
+
+// part is the ring's path for a fraction, kept from the frames before when it is the same.
+func (ring *markRing) part(fraction float32) *draw2d.Path {
+	if fraction >= 1 {
+		if ring.whole == nil {
+			ring.whole = arc(1)
+		}
+		return ring.whole
+	}
+	if ring.last == nil || ring.fraction != fraction {
+		ring.last, ring.fraction = arc(fraction), fraction
+	}
+	return ring.last
 }
 
 // arc is the part of the mark's ring for a fraction, from its top, clockwise.

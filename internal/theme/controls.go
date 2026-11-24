@@ -116,6 +116,25 @@ func FitText(context *ui.Context, text string, style ui.TextStyle, width float32
 	return ""
 }
 
+// FittedText is a text shortened to fit a width, kept until the text, the style or the width
+// change: shortening measures the text once per letter cut, too much to do each frame.
+type FittedText struct {
+	text, fitted string
+	style        ui.TextStyle
+	width        float32
+	made         bool
+}
+
+// Fit is FitText, made again only when what it is made of changed since the last call.
+func (kept *FittedText) Fit(context *ui.Context, text string, style ui.TextStyle, width float32) string {
+	if kept.made && kept.text == text && kept.style == style && kept.width == width {
+		return kept.fitted
+	}
+	kept.text, kept.style, kept.width, kept.made = text, style, width, true
+	kept.fitted = FitText(context, text, style, width)
+	return kept.fitted
+}
+
 // TextWidth is how wide a text is drawn in a style.
 func TextWidth(context *ui.Context, text string, style ui.TextStyle) float32 {
 	size := style.Size

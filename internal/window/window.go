@@ -112,6 +112,8 @@ type Window struct {
 	serversOpen bool
 	// serversListed shows the status bar's popover of the servers and their states
 	serversListed bool
+	// ring is the servers' mark's ring, kept between frames (serversbutton.go)
+	ring markRing
 	// serverDetails are the servers whose card shows its projects and messages, by name
 	serverDetails map[string]bool
 	pickerOpen    bool
