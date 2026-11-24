@@ -38,6 +38,7 @@ internal/finder
 internal/settings
 internal/explorer     a folder's files, shown like a file manager
 internal/work         background jobs, and what they give back to the frame
+internal/servers      the language servers a window runs: start, tell, rest, install
 internal/pane         what every pane shares: the keys, key presses, a scrolling list
 internal/theme        Zed's One colours, file icons, the reader's own controls
 internal/java         the IntelliJ-style tree and the kinds of class

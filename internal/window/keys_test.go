@@ -2,7 +2,6 @@ package window
 
 import (
 	"fmt"
-	"github.com/akrck02/code-review/internal/settings"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -10,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/akrck02/code-review/internal/finder"
+	"github.com/akrck02/code-review/internal/settings"
 	"github.com/akrck02/code-review/internal/viewer"
 	"github.com/akrck02/go-renderer/input"
 	"github.com/akrck02/go-ui/uitest"

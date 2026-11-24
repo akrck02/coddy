@@ -13,14 +13,14 @@ import (
 func TestAServerNotAskedForAWhileRestsAndAQuestionWakesIt(test *testing.T) {
 	log := filepath.Join(test.TempDir(), "log")
 	application := readerWithServers(test, "lighthouse/src/lamp.go", fakeGo(test, log))
-	application.servers.rest = 300 * time.Millisecond
+	application.servers.Rest = 300 * time.Millisecond
 	window := newWindow(test, application)
 	key := "fakels " + application.projects[0].Path
-	first := application.servers.running[key]
+	first := application.servers.Running(key)
 	if first == nil {
 		test.Fatal("no server runs for lamp.go")
 	}
-	for attempt := 0; attempt < 200 && application.servers.running[key] != nil; attempt++ {
+	for attempt := 0; attempt < 200 && application.servers.Running(key) != nil; attempt++ {
 		time.Sleep(10 * time.Millisecond)
 		window.Frames(1)
 	}
@@ -30,19 +30,19 @@ func TestAServerNotAskedForAWhileRestsAndAQuestionWakesIt(test *testing.T) {
 		test.Fatal("the server unasked still runs")
 	}
 	window.Frames(2)
-	if application.servers.running[key] != nil || application.serverStatus() != "fakels resting" {
-		test.Fatalf("with lamp.go still open, the status bar says %q", application.serverStatus())
+	if application.servers.Running(key) != nil || application.servers.Status() != "fakels resting" {
+		test.Fatalf("with lamp.go still open, the status bar says %q", application.servers.Status())
 	}
 	application.GoToDefinition(viewer.Place{Line: 2, Column: 5})
 	// it starts once the one resting has ended, as both share the data folder
-	for attempt := 0; attempt < 200 && application.servers.running[key] == nil; attempt++ {
+	for attempt := 0; attempt < 200 && application.servers.Running(key) == nil; attempt++ {
 		time.Sleep(10 * time.Millisecond)
 		window.Frames(1)
 	}
-	if again := application.servers.running[key]; again == nil || again == first {
-		test.Errorf("a question did not wake the server: the status bar says %q", application.serverStatus())
+	if again := application.servers.Running(key); again == nil || again == first {
+		test.Errorf("a question did not wake the server: the status bar says %q", application.servers.Status())
 	}
-	if crashes := application.servers.crashes["fakels"]; crashes != 0 {
+	if crashes := application.servers.Crashes("fakels"); crashes != 0 {
 		test.Errorf("resting was taken for %d crashes", crashes)
 	}
 }
@@ -52,9 +52,9 @@ func TestTheServersPanelShowsWhatAServerTakesAndStopsIt(test *testing.T) {
 	application := readerWithServers(test, "lighthouse/src/lamp.go", fakeGo(test, log))
 	window := newWindow(test, application)
 	key := "fakels " + application.projects[0].Path
-	client := application.servers.running[key]
+	client := application.servers.Running(key)
 	application.serversOpen = true
-	for attempt := 0; attempt < 200 && application.usageOf(key) == ""; attempt++ {
+	for attempt := 0; attempt < 200 && application.servers.Usage(key) == ""; attempt++ {
 		time.Sleep(10 * time.Millisecond)
 		window.Frames(1)
 	}
@@ -69,8 +69,8 @@ func TestTheServersPanelShowsWhatAServerTakesAndStopsIt(test *testing.T) {
 	case <-time.After(5 * time.Second):
 		test.Fatal("the server stopped from the panel still runs")
 	}
-	if application.serverStatus() != "fakels resting" {
-		test.Errorf("the status bar says %q", application.serverStatus())
+	if application.servers.Status() != "fakels resting" {
+		test.Errorf("the status bar says %q", application.servers.Status())
 	}
 }
 
@@ -81,16 +81,16 @@ func TestAServerWokenWhileTheOneBeforeSavesStartsOnceItHasEnded(test *testing.T)
 	application := readerWithServers(test, "lighthouse/src/lamp.go", servers)
 	window := newWindow(test, application)
 	key := "fakels " + application.projects[0].Path
-	first := application.servers.running[key]
-	application.restServer(key, first)
+	first := application.servers.Running(key)
+	application.servers.Pause(key, first)
 	application.GoToDefinition(viewer.Place{Line: 2, Column: 5})
-	for attempt := 0; attempt < 300 && application.servers.running[key] == nil; attempt++ {
+	for attempt := 0; attempt < 300 && application.servers.Running(key) == nil; attempt++ {
 		time.Sleep(10 * time.Millisecond)
 		window.Frames(1)
 	}
 	content, _ := os.ReadFile(log)
 	saved, again := strings.Index(string(content), "saved"), strings.LastIndex(string(content), "initialize")
-	if application.servers.running[key] == nil || saved < 0 || again < saved {
+	if application.servers.Running(key) == nil || saved < 0 || again < saved {
 		test.Errorf("the server woke before the one resting had saved: it logged %q", content)
 	}
 }
@@ -100,10 +100,10 @@ func TestAServerStillImportingNeverRests(test *testing.T) {
 	servers := fakeGo(test, log)
 	servers[0].ReadyStatus = "ServiceReady" // never sent: it imports for as long as the test runs
 	application := readerWithServers(test, "lighthouse/src/lamp.go", servers)
-	application.servers.rest = 100 * time.Millisecond
+	application.servers.Rest = 100 * time.Millisecond
 	window := newWindow(test, application)
 	key := "fakels " + application.projects[0].Path
-	importing := application.servers.running[key]
+	importing := application.servers.Running(key)
 	if importing == nil {
 		test.Fatal("no server runs for lamp.go")
 	}
@@ -111,7 +111,7 @@ func TestAServerStillImportingNeverRests(test *testing.T) {
 		time.Sleep(10 * time.Millisecond)
 		window.Frames(1)
 	}
-	if application.servers.running[key] != importing {
+	if application.servers.Running(key) != importing {
 		test.Error("a server still importing the projects was stopped to rest, throwing its import away")
 	}
 }

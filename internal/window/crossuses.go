@@ -17,6 +17,7 @@ import (
 	"github.com/akrck02/code-review/internal/git"
 	"github.com/akrck02/code-review/internal/highlight"
 	"github.com/akrck02/code-review/internal/lsp"
+	"github.com/akrck02/code-review/internal/servers"
 )
 
 // usesSearch is a list of uses being made: those the file's server knows, then places in other
@@ -79,7 +80,7 @@ func (application *Window) inSightPaths() []string {
 func (application *Window) wordSearch() git.GrepOptions {
 	options := git.GrepOptions{WorkingTree: application.settings.WorkingTree, Word: true}
 	for extension, language := range lsp.LanguageIDs() {
-		if _, found := lsp.ServerFor(application.servers.table, language); found {
+		if application.servers.Reads(language) {
 			options.Files = append(options.Files, "*"+extension)
 		}
 	}
@@ -248,9 +249,9 @@ func (application *Window) advanceUses() {
 	batches, clients := map[string][]candidate{}, map[string]*lsp.Client{}
 	search.waitingFor = nil
 	for _, place := range search.pending {
-		client, key, state := application.clientOf(place)
+		client, key, reads := application.servers.ClientFor(place.project, place.path)
 		switch {
-		case state == "none":
+		case !reads:
 			search.unchecked++
 		case client != nil && !client.Ready():
 			waiting, search.waitingFor = append(waiting, place), client
@@ -266,28 +267,6 @@ func (application *Window) advanceUses() {
 		application.checkPlaces(search, key, clients[key], batch)
 	}
 	application.noteUses(search)
-}
-
-// clientOf is the running server of a place's file, starting it when it is not; state is "none"
-// when no server reads the file, or its server is not installed or failed.
-func (application *Window) clientOf(place candidate) (*lsp.Client, string, string) {
-	servers := &application.servers
-	server, found := lsp.ServerFor(servers.table, lsp.LanguageOf(place.path))
-	if !found || servers.missing[server.Name] || servers.failed[server.Name] != "" {
-		return nil, "", "none"
-	}
-	root, known := servers.roots[place.path]
-	if !known {
-		root = server.RootOf(place.project, place.path)
-		servers.roots[place.path] = root
-	}
-	key := serverKey(server, root)
-	application.wakeServer(key)
-	client := servers.running[key]
-	if client == nil && !servers.starting[key] && !application.Loading() {
-		application.startServer(server, root, key, place.project)
-	}
-	return client, key, "running"
 }
 
 // checkPlaces asks a server where the name at each of some places is declared, in the
@@ -412,10 +391,10 @@ func (application *Window) usesNote(search *usesSearch) string {
 		return "only " + search.asked.client.Server.Name + "'s: its declaration is not in a project open"
 	}
 	if search.busy {
-		words = append(words, "more once "+statusOf(search.asked.client.Server.Name, search.asked.client.Progress(), time.Now()))
+		words = append(words, "more once "+servers.StatusOf(search.asked.client.Server.Name, search.asked.client.Progress(), time.Now()))
 	}
 	if waiting := search.waitingFor; waiting != nil && waiting != search.asked.client {
-		words = append(words, "some wait for "+statusOf(waiting.Server.Name, waiting.Progress(), time.Now()))
+		words = append(words, "some wait for "+servers.StatusOf(waiting.Server.Name, waiting.Progress(), time.Now()))
 	}
 	if search.checked < search.total-search.unchecked {
 		words = append(words, fmt.Sprintf("checking %d of %d places in %s", search.checked, search.total-search.unchecked,

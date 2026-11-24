@@ -1,12 +1,12 @@
 package window
 
 import (
-	"github.com/akrck02/code-review/internal/theme"
 	"path/filepath"
 	"slices"
 	"testing"
 
 	"github.com/akrck02/code-review/internal/sidebar"
+	"github.com/akrck02/code-review/internal/theme"
 	"github.com/akrck02/go-renderer/input"
 	"github.com/akrck02/go-ui/uitest"
 )

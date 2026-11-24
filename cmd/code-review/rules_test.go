@@ -129,7 +129,7 @@ func TestTheDomainImportsNoInterface(test *testing.T) {
 // A pane asks the window for what it needs through an interface of its own, so the arrows only
 // point down: the window knows its panes, and no pane knows the window.
 func TestNoPaneImportsTheWindow(test *testing.T) {
-	for _, pane := range []string{"theme", "pane", "viewer", "sidebar", "finder", "settings", "explorer", "work"} {
+	for _, pane := range []string{"theme", "pane", "viewer", "sidebar", "finder", "settings", "explorer", "work", "servers"} {
 		if found := importsAny(test, pane, "github.com/akrck02/code-review/internal/window"); found != "" {
 			test.Errorf("%s imports %s", pane, found)
 		}

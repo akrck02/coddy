@@ -64,30 +64,12 @@ func (application *Window) readyServer() (asking, bool) {
 // runningServer is readyServer without a word: why there is no server, if there is none. A
 // resting server starts again when waking, as for a question asked; not for a pointer resting.
 func (application *Window) runningServer(waking bool) (asking, string) {
-	server, root, path, found := application.serverOfOpenFile()
-	if found && waking {
-		application.wakeServer(serverKey(server, root))
-	}
-	servers := &application.servers
-	switch {
-	case !found:
-		return asking{}, "No language server reads this file"
-	case servers.missing[server.Name]:
-		return asking{}, server.Name + " is not installed: " + server.Install
-	case servers.failed[server.Name] != "":
-		return asking{}, server.Name + " did not start: " + servers.failed[server.Name]
-	}
-	client, told := application.serveOpenFile()
-	if client == nil && application.Loading() {
-		return asking{}, server.Name + " starts once the projects are read"
-	}
-	if client == nil && servers.resting[serverKey(server, root)] != "" {
-		return asking{}, server.Name + " is resting: follow a name to wake it"
-	}
+	open := application.servedFile()
+	client, version, why := application.servers.Asked(open, waking)
 	if client == nil {
-		return asking{}, server.Name + " is starting: try again in a moment"
+		return asking{}, why
 	}
-	return asking{client: client, path: path, text: application.openText(), version: told.version}, ""
+	return asking{client: client, path: open.Path, text: open.Text(), version: version}, ""
 }
 
 // positionOf is a place of the file open as the protocol counts it.

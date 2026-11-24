@@ -4,22 +4,23 @@ package window
 
 import (
 	"context"
-	"github.com/akrck02/code-review/internal/explorer"
-	"github.com/akrck02/code-review/internal/settings"
-	"github.com/akrck02/code-review/internal/work"
 	"sort"
 	"strings"
 	"time"
 
+	"github.com/akrck02/code-review/internal/explorer"
 	"github.com/akrck02/code-review/internal/finder"
 	"github.com/akrck02/code-review/internal/git"
 	"github.com/akrck02/code-review/internal/java"
 	"github.com/akrck02/code-review/internal/lsp"
 	"github.com/akrck02/code-review/internal/mode"
 	"github.com/akrck02/code-review/internal/pane"
+	"github.com/akrck02/code-review/internal/servers"
+	"github.com/akrck02/code-review/internal/settings"
 	"github.com/akrck02/code-review/internal/sidebar"
 	"github.com/akrck02/code-review/internal/theme"
 	"github.com/akrck02/code-review/internal/viewer"
+	"github.com/akrck02/code-review/internal/work"
 	"github.com/akrck02/code-review/internal/workspace"
 	"github.com/akrck02/go-renderer/failure"
 	"github.com/akrck02/go-ui/uidrive"
@@ -160,7 +161,7 @@ type Window struct {
 	uses      *usesSearch
 	themeSet  bool
 	questions questions
-	servers   languageServers
+	servers   *servers.Fleet
 	trail     trail
 	hover     hoverCard
 	// pointer is where the pointer was in the last frame, for a card shown under it
@@ -182,9 +183,10 @@ func New(settings Settings, modes ...mode.Mode) (*Window, error) {
 		onlyChanged:   settings.OnlyChanged,
 		focus:         sidebarPane,
 		sidebarFolded: settings.SidebarFolded,
-		servers:       newLanguageServers(settings.Servers, settings.ServersWrote),
 		classKinds:    map[workspace.FileReference]java.ClassKind{},
 	}
+	application.servers = servers.New(servers.Settings{Table: settings.Servers, Wrote: settings.ServersWrote, Data: settings.ServerData},
+		application, application.work, wake)
 	application.overlays = overlaysOf(application)
 	application.sidebar = newSidebar(settings)
 	application.startThemes(settings)
@@ -240,7 +242,7 @@ func (application *Window) ThemeName() string { return application.theme.Name }
 // stops the language servers.
 func (application *Window) Closed() {
 	windowOpen.Store(false)
-	application.stopServers()
+	application.servers.Stop()
 }
 
 // openFolders adds repositories, or the repositories inside folders, and reads them.
@@ -297,11 +299,11 @@ func (application *Window) reloadAll() {
 func (application *Window) reload(index int) {
 	project := application.projects[index]
 	path := project.Path
-	options := application.loadOptions(path)
+	options := application.LoadOptions(path)
 	application.projects[index] = &workspace.Project{Name: project.Name, Path: path}
 	application.loading++
 	settle := func() { application.loading-- } // also when a newer reading replaced this one
-	snapshot, written := application.servers.snapshots[path], application.servers.written
+	snapshot, written := application.servers.Snapshot(path), application.servers.Written()
 	application.work.RunSettling("project "+path, func(stop context.Context) func() {
 		var loaded *workspace.Project
 		var sorting error
@@ -332,8 +334,8 @@ func (application *Window) reload(index int) {
 	}, settle)
 }
 
-// loadOptions are how a project is read: against its base, with the changes not committed yet or not.
-func (application *Window) loadOptions(path string) workspace.LoadOptions {
+// LoadOptions are how a project is read: against its base, with the changes not committed yet or not.
+func (application *Window) LoadOptions(path string) workspace.LoadOptions {
 	return workspace.LoadOptions{Base: application.baseFor(path), WorkingTree: application.settings.WorkingTree}
 }
 
@@ -348,8 +350,7 @@ func (application *Window) baseFor(path string) string {
 // projectsChanged rebuilds what is made from the projects: the finder's files, the order of the
 // changed files and the sidebar's rows.
 func (application *Window) projectsChanged() {
-	application.servers.roots = map[string]string{} // a go.mod may have come or gone
-	application.servers.inSight = map[string][]string{}
+	application.servers.ProjectsChanged()
 	application.candidates = application.candidates[:0]
 	application.changedOrder = application.changedOrder[:0]
 	for index, project := range application.projects {

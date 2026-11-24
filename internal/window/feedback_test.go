@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/akrck02/code-review/internal/lsp"
+	"github.com/akrck02/code-review/internal/servers"
 )
 
 func TestTheTimeLeftIsToldByHowLongItTookTheTimeBefore(test *testing.T) {
@@ -29,13 +30,13 @@ func TestTheTimeLeftIsToldByHowLongItTookTheTimeBefore(test *testing.T) {
 
 func TestTheStatusBarSaysAWorkingServerInAFewWords(test *testing.T) {
 	application := newReader(Settings{Servers: lsp.Servers})
-	importing := viewOf(lsp.Progress{Phase: "importing", Percent: -1, Done: 9, Total: 16})
-	importing.name = "kotlin-lsp"
+	importing := servers.ViewOf(lsp.Progress{Phase: "importing", Percent: -1, Done: 9, Total: 16})
+	importing.Name = "kotlin-lsp"
 	if words := application.shortStatus(importing); words != "Kotlin · importing 9/16" {
 		test.Errorf("an import says %q", words)
 	}
-	indexing := viewOf(lsp.Progress{Phase: "indexing", Percent: 45})
-	indexing.name = "jdtls"
+	indexing := servers.ViewOf(lsp.Progress{Phase: "indexing", Percent: 45})
+	indexing.Name = "jdtls"
 	if words := application.shortStatus(indexing); words != "Java · indexing 45 %" {
 		test.Errorf("an index says %q", words)
 	}
@@ -52,7 +53,7 @@ func TestAProjectLeftOutOfTheServersIsToldWithWhy(test *testing.T) {
 		ReadsAll: true, OwnGradle: true, Environment: []string{"FAKE_LSP_LOG=" + log}}}
 	application := newReader(Settings{Folders: []string{folder}, WorkingTree: true, Synchronous: true,
 		Open: "lighthouse/src/lamp.go", Servers: servers})
-	test.Cleanup(application.stopServers)
+	test.Cleanup(application.servers.Stop)
 	newWindow(test, application).Frames(2)
 	if count := application.leftOutCount(); count != 1 {
 		test.Errorf("the status bar counts %d projects left out, want harbour", count)
@@ -64,8 +65,8 @@ func TestAProjectLeftOutOfTheServersIsToldWithWhy(test *testing.T) {
 	if why := application.LeftOut(application.ProjectIndex(filepath.Join(folder, "lighthouse"))); why != "" {
 		test.Errorf("a project the server reads is marked left out: %q", why)
 	}
-	views := application.serverViews()
-	if len(views) == 0 || len(views[0].leftOut) != 1 || views[0].leftOut[0].name != "harbour" {
+	views := application.servers.Views()
+	if len(views) == 0 || len(views[0].LeftOut) != 1 || views[0].LeftOut[0].Name != "harbour" {
 		test.Errorf("the servers panel lists as left out %+v", views)
 	}
 }

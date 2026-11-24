@@ -2,12 +2,11 @@ package window
 
 import (
 	"fmt"
-	"path/filepath"
-	"sort"
 	"strings"
 	"time"
 
 	"github.com/akrck02/code-review/internal/lsp"
+	"github.com/akrck02/code-review/internal/servers"
 	"github.com/akrck02/go-renderer/draw2d"
 	ui "github.com/akrck02/go-ui"
 )
@@ -15,30 +14,11 @@ import (
 // What the reader tells of the servers' work besides their state: the projects a server leaves
 // out and why, about how long reading the projects has left, by how long it took the time before.
 
-// leftOutProject is a project a server does not read, and why.
-type leftOutProject struct{ name, why string }
-
-// leftOutOf are the projects of the window a server leaves out, by name: those of its languages
-// whose build it cannot import (lsp.CannotImport).
-func (application *Window) leftOutOf(server lsp.Server) []leftOutProject {
-	if !server.OwnGradle {
-		return nil
-	}
-	var left []leftOutProject
-	for _, project := range application.projects {
-		if why := application.servers.cannotImport[project.Path]; why != "" && hasFileOf(project, server) {
-			left = append(left, leftOutProject{name: filepath.Base(project.Path), why: why})
-		}
-	}
-	sort.Slice(left, func(first, second int) bool { return left[first].name < left[second].name })
-	return left
-}
-
 // leftOutCount is how many projects of the window some server leaves out.
 func (application *Window) leftOutCount() int {
 	count := 0
 	for _, project := range application.projects {
-		if application.servers.cannotImport[project.Path] != "" {
+		if application.servers.CannotImport(project.Path) != "" {
 			count++
 		}
 	}
@@ -50,7 +30,7 @@ func (application *Window) LeftOut(project int) string {
 	if project < 0 || project >= len(application.projects) {
 		return ""
 	}
-	why := application.servers.cannotImport[application.projects[project].Path]
+	why := application.servers.CannotImport(application.projects[project].Path)
 	if why == "" {
 		return ""
 	}
@@ -59,11 +39,11 @@ func (application *Window) LeftOut(project int) string {
 
 // timeLeft says about how long a working server has left, by how long it took the time before:
 // "~40 s", "~3 min"; "" when it is ready, was never timed, or already took longer.
-func timeLeft(view serverView, now time.Time) string {
-	if view.client == nil || view.state == serverReady || view.state == serverBroken {
+func timeLeft(view servers.View, now time.Time) string {
+	if view.Client == nil || view.State == servers.Ready || view.State == servers.Broken {
 		return ""
 	}
-	return leftWords(view.client.LastReading(), now.Sub(view.progress.Started))
+	return leftWords(view.Client.LastReading(), now.Sub(view.Progress.Started))
 }
 
 // leftWords say about how long is left of what took last the time before, elapsed in: "~45 s",
@@ -80,23 +60,23 @@ func leftWords(last, elapsed time.Duration) string {
 }
 
 // lastTime says how long a server took the time before: "last time 1:12"; "" when unknown.
-func lastTime(view serverView) string {
-	if view.client == nil || view.client.LastReading() == 0 {
+func lastTime(view servers.View) string {
+	if view.Client == nil || view.Client.LastReading() == 0 {
 		return ""
 	}
-	return "last time " + clock(view.client.LastReading())
+	return "last time " + servers.Clock(view.Client.LastReading())
 }
 
 // shortStatus is a working server in a few words, for the status bar: "Kotlin · importing 9/16",
 // "Java · indexing 45 %".
-func (application *Window) shortStatus(view serverView) string {
-	words := application.languageOf(view.name) + " · " + strings.ToLower(strings.SplitN(view.headline, " · ", 2)[0])
-	done, total := projectsDone(view.progress)
+func (application *Window) shortStatus(view servers.View) string {
+	words := application.languageOf(view.Name) + " · " + strings.ToLower(strings.SplitN(view.Headline, " · ", 2)[0])
+	done, total := servers.ProjectsDone(view.Progress)
 	switch {
 	case total > 1:
 		words += fmt.Sprintf(" %d/%d", done, total)
-	case view.progress.Percent >= 0:
-		words += fmt.Sprintf(" %d %%", view.progress.Percent)
+	case view.Progress.Percent >= 0:
+		words += fmt.Sprintf(" %d %%", view.Progress.Percent)
 	}
 	return words
 }
@@ -146,9 +126,17 @@ func (application *Window) buildLeftOutNote(context *ui.Context) {
 // waitingWords say what a question waits for, and about how long is left: "Waiting for kotlin-lsp
 // · importing (9 of 16) · 0:48 · ~40 s left".
 func waitingWords(client *lsp.Client, now time.Time) string {
-	words := "Waiting for " + statusOf(client.Server.Name, client.Progress(), now)
-	if left := timeLeft(runningView("", client), now); left != "" {
+	words := "Waiting for " + servers.StatusOf(client.Server.Name, client.Progress(), now)
+	if left := timeLeft(servers.RunningView(client), now); left != "" {
 		words += " · " + left + " left"
 	}
 	return words
+}
+
+// capitalised is a word with its first letter in capitals.
+func capitalised(word string) string {
+	if word == "" {
+		return word
+	}
+	return strings.ToUpper(word[:1]) + word[1:]
 }

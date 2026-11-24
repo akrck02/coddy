@@ -6,35 +6,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/akrck02/code-review/internal/lsp"
+	"github.com/akrck02/code-review/internal/servers"
 	"github.com/akrck02/go-ui/uitest"
 )
-
-func TestTheStatusBarSaysWhatAServerDoes(test *testing.T) {
-	started := time.Date(2026, 11, 9, 10, 0, 0, 0, time.UTC)
-	cases := []struct {
-		progress lsp.Progress
-		want     string
-	}{
-		{lsp.Progress{Phase: "importing", Detail: "harbour.api", Percent: -1, Done: 7, Total: 22, Started: started},
-			"kotlin-lsp · importing harbour.api (7 of 22) · 3:12"},
-		{lsp.Progress{Phase: "indexing", Detail: "45%", Percent: 45, Started: started}, "kotlin-lsp · indexing 45 % · 3:12"},
-		{lsp.Progress{Phase: "starting", Detail: "Importing Gradle project(s)", Percent: -1, Started: started},
-			"kotlin-lsp · starting Importing Gradle project(s) · 3:12"},
-		{lsp.Progress{Phase: "ready"}, "kotlin-lsp ready"},
-	}
-	for _, each := range cases {
-		if said := statusOf("kotlin-lsp", each.progress, started.Add(3*time.Minute+12*time.Second)); said != each.want {
-			test.Errorf("the status bar says %q, want %q", said, each.want)
-		}
-	}
-}
 
 func TestAQuestionSaysWhatItWaitsFor(test *testing.T) {
 	log := filepath.Join(test.TempDir(), "log")
 	application := readerWithServers(test, "lighthouse/src/lamp.go", fakeGo(test, log, "FAKE_LSP_BUSY=3000"))
 	window := newWindow(test, application)
-	client := application.servers.running["fakels "+application.projects[0].Path]
+	client := application.servers.Running("fakels " + application.projects[0].Path)
 	for deadline := time.Now().Add(2 * time.Second); client != nil && !client.Busy() && time.Now().Before(deadline); time.Sleep(10 * time.Millisecond) {
 	}
 	if client == nil || client.Ready() {
@@ -45,7 +25,7 @@ func TestAQuestionSaysWhatItWaitsFor(test *testing.T) {
 	if shown := strings.Join(window.Texts(), " "); !strings.Contains(shown, "Waiting for fakels · importing") {
 		test.Errorf("while the server works the window shows %q", shown)
 	}
-	if status := application.serverStatus(); !strings.HasPrefix(status, "fakels · importing") {
+	if status := application.servers.Status(); !strings.HasPrefix(status, "fakels · importing") {
 		test.Errorf("the status bar says %q", status)
 	}
 }
@@ -58,7 +38,7 @@ func TestAClickOnAServerOpensWhatItDoesProjectByProject(test *testing.T) {
 		test.Fatal(err)
 	}
 	window.Frames(2)
-	client := application.servers.running["fakels "+application.projects[0].Path]
+	client := application.servers.Running("fakels " + application.projects[0].Path)
 	for deadline := time.Now().Add(2 * time.Second); client != nil && !client.Busy() && time.Now().Before(deadline); time.Sleep(10 * time.Millisecond) {
 	}
 	window.Frames(1)
@@ -106,39 +86,19 @@ func clickText(test *testing.T, window *uitest.Window, start string) {
 	test.Fatalf("no text starts with %q: %q", start, window.Texts())
 }
 
-func TestAServerIsSummedUpInAFewWords(test *testing.T) {
-	started := time.Date(2026, 11, 10, 9, 0, 0, 0, time.UTC)
-	projects := []lsp.ProjectProgress{{Path: "/a", State: "read"}, {Path: "/b", State: "reading"}, {Path: "/c", State: "reading"}}
-	cases := []struct {
-		progress lsp.Progress
-		headline string
-		fraction float32
-	}{
-		{lsp.Progress{Phase: "importing", Percent: -1, Done: 7, Total: 28, Started: started}, "Importing · 7 of 28 projects", 0.25},
-		{lsp.Progress{Phase: "indexing", Percent: 71, Started: started, Projects: projects}, "Indexing · 71 % · 1 of 3 projects", 0.71},
-		{lsp.Progress{Phase: "ready"}, "Ready", 1},
-	}
-	for _, each := range cases {
-		view := viewOf(each.progress)
-		if view.headline != each.headline || view.fraction != each.fraction {
-			test.Errorf("%+v is shown as %q at %v, want %q at %v", each.progress, view.headline, view.fraction, each.headline, each.fraction)
-		}
-	}
-}
-
 func TestTheServersButtonSaysTheReadersMode(test *testing.T) {
-	ready := serverView{state: serverReady, fraction: 1}
-	reading := serverView{state: serverWorking, fraction: 0.4}
+	ready := servers.View{State: servers.Ready, Fraction: 1}
+	reading := servers.View{State: servers.Working, Fraction: 0.4}
 	cases := []struct {
-		views    []serverView
+		views    []servers.View
 		mode     serversMode
 		fraction float32
 		broken   bool
 	}{
 		{nil, textOnly, -1, false},
-		{[]serverView{{state: serverResting, fraction: -1}}, textOnly, -1, false},
-		{[]serverView{ready, reading}, serversLoading, 0.4, false},
-		{[]serverView{ready, {state: serverBroken, fraction: -1}}, serversFull, 1, true},
+		{[]servers.View{{State: servers.Resting, Fraction: -1}}, textOnly, -1, false},
+		{[]servers.View{ready, reading}, serversLoading, 0.4, false},
+		{[]servers.View{ready, {State: servers.Broken, Fraction: -1}}, serversFull, 1, true},
 	}
 	for _, each := range cases {
 		mode, fraction, broken := modeOf(each.views)

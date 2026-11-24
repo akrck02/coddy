@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/akrck02/code-review/internal/servers"
 	"github.com/akrck02/go-renderer/draw2d"
 	ui "github.com/akrck02/go-ui"
 )
@@ -21,18 +22,18 @@ const (
 
 // modeOf is the reader's mode by its servers, how far those still reading are (-1 when they
 // cannot tell), and whether one cannot run.
-func modeOf(views []serverView) (mode serversMode, fraction float32, broken bool) {
+func modeOf(views []servers.View) (mode serversMode, fraction float32, broken bool) {
 	ready, working, known, sum := 0, false, 0, float32(0)
 	for _, view := range views {
-		switch view.state {
-		case serverReady:
+		switch view.State {
+		case servers.Ready:
 			ready++
-		case serverWorking, serverStarting:
+		case servers.Working, servers.Starting:
 			working = true
-			if view.fraction >= 0 {
-				known, sum = known+1, sum+view.fraction
+			if view.Fraction >= 0 {
+				known, sum = known+1, sum+view.Fraction
 			}
-		case serverBroken:
+		case servers.Broken:
 			broken = true
 		}
 	}
@@ -76,7 +77,7 @@ func modeTitle(mode serversMode) (string, string) {
 // projects, green once they are ready, and a warning's dot when one cannot run. A click shows
 // each server and its state.
 func (application *Window) buildServersButton(context *ui.Context) {
-	views := application.serverViews()
+	views := application.servers.Views()
 	mode, fraction, broken := modeOf(views)
 	palette := context.Theme
 	hovered := ui.Look{Fill: application.look.Hover, Radius: 4}
@@ -98,11 +99,11 @@ func (application *Window) buildServersButton(context *ui.Context) {
 
 // buildWorkWords says beside the mark what the first server at work does, how far it is and about
 // how long it has left: "Kotlin · importing 9/16 · ~1 min", "+1" when another works too.
-func (application *Window) buildWorkWords(context *ui.Context, views []serverView) {
+func (application *Window) buildWorkWords(context *ui.Context, views []servers.View) {
 	palette := context.Theme
-	var working []serverView
+	var working []servers.View
 	for _, view := range views {
-		if view.client != nil && (view.state == serverWorking || view.state == serverStarting) {
+		if view.Client != nil && (view.State == servers.Working || view.State == servers.Starting) {
 			working = append(working, view)
 		}
 	}
@@ -189,7 +190,7 @@ const serversListWidth = 340
 
 // buildServersList is the popover of the servers' button: the mode in words, each server with its
 // state, and the way to the servers panel.
-func (application *Window) buildServersList(context *ui.Context, views []serverView, mode serversMode) {
+func (application *Window) buildServersList(context *ui.Context, views []servers.View, mode serversMode) {
 	palette := context.Theme
 	quiet := ui.TextStyle{Size: palette.SmallTextSize, Color: palette.InkSoft}
 	clipped := ui.Look{Clip: true}
@@ -213,16 +214,16 @@ func (application *Window) buildServersList(context *ui.Context, views []serverV
 
 // buildServerLine is a server in the list: its dot, language and own name, and under them what it
 // does.
-func (application *Window) buildServerLine(context *ui.Context, view serverView, quiet ui.TextStyle) {
+func (application *Window) buildServerLine(context *ui.Context, view servers.View, quiet ui.TextStyle) {
 	palette := context.Theme
 	context.Box(ui.Layout{Direction: ui.Vertical, Width: ui.Grow(), Gap: 2}, func() {
 		context.Box(ui.Layout{Width: ui.Grow(), Gap: 8, AlignY: ui.Center}, func() {
-			buildDot(context, view.state, 8)
-			context.Text(application.languageOf(view.name), ui.TextStyle{Weight: draw2d.Medium})
-			context.Text(view.name, ui.TextStyle{Size: palette.SmallTextSize, Color: palette.InkQuiet, Weight: draw2d.Mono})
+			buildDot(context, view.State, 8)
+			context.Text(application.languageOf(view.Name), ui.TextStyle{Weight: draw2d.Medium})
+			context.Text(view.Name, ui.TextStyle{Size: palette.SmallTextSize, Color: palette.InkQuiet, Weight: draw2d.Mono})
 		})
 		context.Frame(ui.Layout{Width: ui.Grow(), Padding: ui.Padding{Left: 16}}, ui.Look{Clip: true}, func() {
-			context.Text(view.headline, quiet)
+			context.Text(view.Headline, quiet)
 		})
 	})
 }

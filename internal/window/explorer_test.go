@@ -1,9 +1,10 @@
 package window
 
 import (
-	"github.com/akrck02/go-renderer/input"
 	"slices"
 	"testing"
+
+	"github.com/akrck02/go-renderer/input"
 )
 
 // A folder of the bar's breadcrumb shows what it holds where the file was, and a file chosen there

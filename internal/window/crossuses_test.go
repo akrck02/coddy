@@ -61,7 +61,7 @@ func TestUsesAreFoundInOtherProjectsThroughTheirJars(test *testing.T) {
 	servers := []lsp.Server{{Name: "fakels", Command: fakeServer(test), Languages: []string{"java"}, Environment: []string{"FAKE_LSP_JARS=1"}}}
 	application := newReader(Settings{Folders: []string{folder}, WorkingTree: true, Synchronous: true,
 		Open: "lighthouse/src/main/java/org/lighthouse/Lamp.java", Servers: servers})
-	test.Cleanup(application.stopServers)
+	test.Cleanup(application.servers.Stop)
 	window := newWindow(test, application)
 	application.focus = viewerPane
 	application.viewer.SetMode(viewer.FileView)
@@ -93,7 +93,7 @@ func TestUsesAskedWhileTheServerReadsAreAskedAgainOnceItIsDone(test *testing.T) 
 	application.focus = viewerPane
 	application.viewer.SetMode(viewer.FileView)
 	window.Frames(1)
-	client := application.servers.running["fakels "+application.projects[0].Path]
+	client := application.servers.Running("fakels " + application.projects[0].Path)
 	for deadline := time.Now().Add(2 * time.Second); client != nil && !client.Busy() && time.Now().Before(deadline); time.Sleep(10 * time.Millisecond) {
 	}
 	application.viewer.PlaceCaret(viewer.Place{Line: 2, Column: 6}) // on On

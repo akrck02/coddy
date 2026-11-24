@@ -21,7 +21,7 @@ func inSightReader(test *testing.T, environment ...string) (*Window, *uitest.Win
 		Environment: append([]string{"FAKE_LSP_LOG=" + log}, environment...)}}
 	application := newReader(Settings{Folders: []string{folder}, WorkingTree: true, Synchronous: true, OnlyChanged: true,
 		Open: "lighthouse/src/lamp.go", Servers: servers})
-	test.Cleanup(application.stopServers)
+	test.Cleanup(application.servers.Stop)
 	window := newWindow(test, application)
 	window.Frames(2)
 	return application, window, folder, log
@@ -46,21 +46,21 @@ func TestAServerReadsOnlyTheProjectsInSight(test *testing.T) {
 
 func TestAServerThatDoesNotFollowFoldersStartsAgainForThem(test *testing.T) {
 	application, window, folder, _ := inSightReader(test, "FAKE_LSP_NO_FOLDERS=1")
-	first := application.servers.running["fakels"]
+	first := application.servers.Running("fakels")
 	if first == nil || first.FollowsFolders() {
 		test.Fatalf("the server runs as %v", first)
 	}
 	application.setOnlyChanged(false)
-	for attempt := 0; attempt < 100 && application.servers.running["fakels"] == first; attempt++ {
+	for attempt := 0; attempt < 100 && application.servers.Running("fakels") == first; attempt++ {
 		window.Frames(1)
 		time.Sleep(10 * time.Millisecond)
 	}
 	window.Frames(2)
-	again := application.servers.running["fakels"]
+	again := application.servers.Running("fakels")
 	if again == nil || again == first || !slices.Contains(again.Folders(), filepath.Join(folder, "harbour")) {
 		test.Fatalf("after harbour came into sight the server runs as %v, reading %v", again, folderList(again))
 	}
-	if application.servers.crashes["fakels"] != 0 {
+	if application.servers.Crashes("fakels") != 0 {
 		test.Error("starting it again counted as a crash")
 	}
 }
@@ -80,10 +80,10 @@ func TestAServerWithAnIndexPerSetReadsEveryProjectWhateverIsInSight(test *testin
 		ReadsAll: true, Environment: []string{"FAKE_LSP_LOG=" + log, "FAKE_LSP_NO_FOLDERS=1"}}}
 	application := newReader(Settings{Folders: []string{folder}, WorkingTree: true, Synchronous: true, OnlyChanged: true,
 		Open: "lighthouse/src/lamp.go", Servers: servers})
-	test.Cleanup(application.stopServers)
+	test.Cleanup(application.servers.Stop)
 	window := newWindow(test, application)
 	window.Frames(2)
-	first := application.servers.running["fakels"]
+	first := application.servers.Running("fakels")
 	if first == nil || !slices.Contains(first.Folders(), filepath.Join(folder, "harbour")) {
 		test.Fatalf("the server reads %v, not harbour out of sight", folderList(first))
 	}
@@ -91,7 +91,7 @@ func TestAServerWithAnIndexPerSetReadsEveryProjectWhateverIsInSight(test *testin
 	window.Frames(2)
 	time.Sleep(50 * time.Millisecond)
 	window.Frames(2)
-	if application.servers.running["fakels"] != first {
+	if application.servers.Running("fakels") != first {
 		test.Error("the filter started the server again")
 	}
 }
@@ -107,15 +107,15 @@ func TestAServerThatImportsBuildsLeavesOutABuildItCannotImport(test *testing.T) 
 		ReadsAll: true, OwnGradle: true, Environment: []string{"FAKE_LSP_LOG=" + log}}}
 	application := newReader(Settings{Folders: []string{folder}, WorkingTree: true, Synchronous: true,
 		Open: "lighthouse/src/lamp.go", Servers: servers})
-	test.Cleanup(application.stopServers)
+	test.Cleanup(application.servers.Stop)
 	window := newWindow(test, application)
 	window.Frames(2)
-	client := application.servers.running["fakels"]
+	client := application.servers.Running("fakels")
 	harbour := filepath.Join(folder, "harbour")
 	if client == nil || slices.Contains(client.Folders(), harbour) || !slices.Contains(client.Folders(), filepath.Join(folder, "lighthouse")) {
 		test.Fatalf("the server reads %v: want lighthouse, without harbour's Gradle 4 build", folderList(client))
 	}
-	if why := application.servers.cannotImport[harbour]; !strings.Contains(why, "Gradle 4.10.3") {
+	if why := application.servers.CannotImport(harbour); !strings.Contains(why, "Gradle 4.10.3") {
 		test.Errorf("the reader notes harbour is left out for %q", why)
 	}
 }

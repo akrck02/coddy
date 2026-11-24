@@ -2,11 +2,11 @@ package window
 
 import (
 	"fmt"
-	"github.com/akrck02/code-review/internal/mode"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/akrck02/code-review/internal/mode"
 	"github.com/akrck02/code-review/internal/pane"
 	"github.com/akrck02/code-review/internal/viewer"
 	"github.com/akrck02/go-renderer/draw2d"
@@ -34,7 +34,7 @@ func (application *Window) Build(context *ui.Context) {
 	application.readClassKinds()
 	application.typeInTheFile(context, application.handleKeys(context))
 	application.unfoldForTheKeyboard()
-	application.serveOpenFile()
+	application.servers.Serve(application.servedFile())
 	application.advanceUses()
 
 	context.Frame(ui.Layout{Direction: ui.Vertical, Width: ui.Grow(), Height: ui.Grow()}, ui.Look{Fill: context.Theme.Background}, func() {

@@ -5,11 +5,22 @@ import (
 	"testing"
 
 	"github.com/akrck02/code-review/internal/lsp"
+	"github.com/akrck02/code-review/internal/servers"
 )
 
 // absentServer is a Go server that is not on this computer, installed with an installer that is.
 func absentServer(install string) []lsp.Server {
 	return []lsp.Server{{Name: "lampls", Command: "no-such-lamp-server-here", Languages: []string{"go"}, Install: install}}
+}
+
+// viewNamed is the view of a server by its name, empty when it is not among them.
+func viewNamed(views []servers.View, name string) servers.View {
+	for _, view := range views {
+		if view.Name == name {
+			return view
+		}
+	}
+	return servers.View{}
 }
 
 // A server installed from the panel lands where go install puts commands, off the PATH, and
@@ -24,7 +35,7 @@ func TestAMissingServerIsInstalledFromThePanelAndStarts(test *testing.T) {
 	application := readerWithServers(test, "lighthouse/src/lamp.go", []lsp.Server{server})
 	window := newWindow(test, application)
 	window.Frames(2)
-	if !application.servers.missing["fakels"] {
+	if !application.servers.Missing("fakels") {
 		test.Fatal("a server that is not on the computer is not missing")
 	}
 	application.serversOpen = true
@@ -33,8 +44,8 @@ func TestAMissingServerIsInstalledFromThePanelAndStarts(test *testing.T) {
 		test.Fatal(err)
 	}
 	window.Frames(3)
-	if application.servers.missing["fakels"] || len(application.servers.running) != 1 {
-		test.Errorf("after installing it, the server is missing (%v) or runs %d times", application.servers.missing["fakels"], len(application.servers.running))
+	if application.servers.Missing("fakels") || application.servers.RunningCount() != 1 {
+		test.Errorf("after installing it, the server is missing (%v) or runs %d times", application.servers.Missing("fakels"), application.servers.RunningCount())
 	}
 }
 
@@ -42,10 +53,10 @@ func TestAFailedInstallSaysWhyAndOffersToTryAgain(test *testing.T) {
 	application := readerWithServers(test, "lighthouse/src/lamp.go", absentServer("sh -c false"))
 	window := newWindow(test, application)
 	window.Frames(2)
-	application.installServer("lampls")
+	application.servers.Install("lampls")
 	window.Frames(2)
-	view := application.missingView("lampls")
-	if view.headline != "Install failed" || view.why == "" || !view.installable {
+	view := viewNamed(application.servers.Views(), "lampls")
+	if view.Headline != "Install failed" || view.Why == "" || !view.Installable {
 		test.Errorf("a failed install is shown as %+v", view)
 	}
 }

@@ -1,11 +1,11 @@
 package window
 
 import (
-	"github.com/akrck02/code-review/internal/settings"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/akrck02/code-review/internal/settings"
 	"github.com/akrck02/code-review/internal/theme"
 	"github.com/akrck02/go-renderer/draw2d"
 	"github.com/akrck02/go-renderer/input"

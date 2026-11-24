@@ -66,7 +66,7 @@ func logSays(test *testing.T, log, line string) bool {
 func readerWithServers(test *testing.T, open string, servers []lsp.Server) *Window {
 	application := newReader(Settings{Folders: []string{makeRepository(test)}, WorkingTree: true, Synchronous: true,
 		Open: open, Servers: servers})
-	test.Cleanup(application.stopServers)
+	test.Cleanup(application.servers.Stop)
 	return application
 }
 
@@ -74,16 +74,16 @@ func TestAServerStartsOnFirstUse(test *testing.T) {
 	log := filepath.Join(test.TempDir(), "log")
 	application := readerWithServers(test, "lighthouse/notes.txt", fakeGo(test, log))
 	window := newWindow(test, application)
-	if len(application.servers.running) != 0 {
+	if application.servers.RunningCount() != 0 {
 		test.Fatal("a server started before a file of its language was opened")
 	}
 	application.openFile(workspace.FileReference{Project: 0, Path: "src/lamp.go"})
 	window.Frames(2)
-	if len(application.servers.running) != 1 || !logSays(test, log, "opened lamp.go package lamp") {
-		test.Fatalf("opening lamp.go ran %d servers", len(application.servers.running))
+	if application.servers.RunningCount() != 1 || !logSays(test, log, "opened lamp.go package lamp") {
+		test.Fatalf("opening lamp.go ran %d servers", application.servers.RunningCount())
 	}
-	if !strings.Contains(application.serverStatus(), "fakels") {
-		test.Errorf("the status bar says %q of the servers", application.serverStatus())
+	if !strings.Contains(application.servers.Status(), "fakels") {
+		test.Errorf("the status bar says %q of the servers", application.servers.Status())
 	}
 	application.focus = viewerPane
 	application.viewer.SetMode(viewer.FileView)
@@ -99,9 +99,9 @@ func TestServersStopWithTheWindow(test *testing.T) {
 	log := filepath.Join(test.TempDir(), "log")
 	application := readerWithServers(test, "lighthouse/src/lamp.go", fakeGo(test, log))
 	newWindow(test, application)
-	client := application.servers.running["fakels "+application.projects[0].Path]
+	client := application.servers.Running("fakels " + application.projects[0].Path)
 	if client == nil {
-		test.Fatalf("no server runs for lamp.go: %v", application.servers.running)
+		test.Fatalf("no server runs for lamp.go: %s", application.servers.Status())
 	}
 	application.Closed()
 	select {
@@ -124,11 +124,11 @@ func TestAMissingServerIsNamed(test *testing.T) {
 	if shown := strings.Join(window.Texts(), " "); !strings.Contains(shown, "nols is not installed: brew install nols") {
 		test.Errorf("the window shows %q", shown)
 	}
-	if len(application.servers.snapshots) != 0 {
+	if application.servers.Snapshot(application.projects[0].Path) != nil {
 		test.Error("a server that never ran left a snapshot, which would take later changes for its own")
 	}
-	if application.serverStatus() != "nols not installed" {
-		test.Errorf("the status bar says %q", application.serverStatus())
+	if application.servers.Status() != "nols not installed" {
+		test.Errorf("the status bar says %q", application.servers.Status())
 	}
 }
 
@@ -143,7 +143,7 @@ func TestFilesWrittenByAServerAreNotChanges(test *testing.T) {
 	record, folder := filepath.Join(test.TempDir(), "wrote.json"), makeRepository(test)
 	application := newReader(Settings{Folders: []string{folder}, WorkingTree: true, Synchronous: true,
 		Open: "lighthouse/src/lamp.go", Servers: writingServer(test), ServersWrote: record})
-	test.Cleanup(application.stopServers)
+	test.Cleanup(application.servers.Stop)
 	window := newWindow(test, application)
 	application.focus = viewerPane
 	application.viewer.SetMode(viewer.FileView)
@@ -171,7 +171,7 @@ func TestFilesWrittenByAServerAreNotChanges(test *testing.T) {
 func TestFilesWrittenByAServerAreListed(test *testing.T) {
 	application := newReader(Settings{Folders: []string{makeRepository(test)}, WorkingTree: true, Synchronous: true,
 		Open: "lighthouse/src/lamp.go", Servers: writingServer(test)})
-	test.Cleanup(application.stopServers)
+	test.Cleanup(application.servers.Stop)
 	window := newWindow(test, application)
 	application.reloadAll()
 	window.Frames(2)
@@ -193,7 +193,7 @@ func TestACommitWhileAServerRunsStaysAChange(test *testing.T) {
 	folder := makeRepository(test)
 	application := newReader(Settings{Folders: []string{folder}, WorkingTree: true, Synchronous: true,
 		Open: "lighthouse/src/lamp.go", Servers: writingServer(test)})
-	test.Cleanup(application.stopServers)
+	test.Cleanup(application.servers.Stop)
 	window := newWindow(test, application)
 	repository := filepath.Join(folder, "lighthouse")
 	os.WriteFile(filepath.Join(repository, "src", "keeper.go"), []byte("package lamp\n\ntype Keeper struct{ Night bool }\n"), 0o644)
@@ -216,14 +216,14 @@ func TestAServerThatStopsIsStartedAgain(test *testing.T) {
 	application := readerWithServers(test, "lighthouse/src/lamp.go", fakeGo(test, log))
 	window := newWindow(test, application)
 	key := "fakels " + application.projects[0].Path
-	first := application.servers.running[key]
+	first := application.servers.Running(key)
 	first.Stop() // as if it had crashed
-	for attempt := 0; attempt < 100 && application.servers.running[key] == first; attempt++ {
+	for attempt := 0; attempt < 100 && application.servers.Running(key) == first; attempt++ {
 		time.Sleep(10 * time.Millisecond)
 		window.Frames(1)
 	}
 	window.Frames(2)
-	if again := application.servers.running[key]; again == nil || again == first {
+	if again := application.servers.Running(key); again == nil || again == first {
 		test.Fatalf("after it stopped, the server runs as %v (the first was %p)", again, first)
 	}
 }
@@ -238,21 +238,19 @@ func TestAProjectWhereOnlyAServerWroteStaysListed(test *testing.T) {
 }
 
 func TestAServerThatNeedsMoreFreeSpaceThanTheDiskHasDoesNotStart(test *testing.T) {
-	asked := freeSpace
-	freeSpace = func(string) (uint64, error) { return 3 << 30, nil }
-	test.Cleanup(func() { freeSpace = asked })
 	log := filepath.Join(test.TempDir(), "log")
 	servers := fakeGo(test, log)
 	servers[0].DataFlag, servers[0].NeedsFree = "--data", 10<<30
 	application := newReader(Settings{Folders: []string{makeRepository(test)}, WorkingTree: true, Synchronous: true,
 		Open: "lighthouse/src/lamp.go", Servers: servers, ServerData: test.TempDir()})
-	test.Cleanup(application.stopServers)
+	test.Cleanup(application.servers.Stop)
+	application.servers.FreeSpace = func(string) (uint64, error) { return 3 << 30, nil }
 	window := newWindow(test, application)
 	window.Frames(1)
-	if len(application.servers.running) != 0 {
+	if application.servers.RunningCount() != 0 {
 		test.Fatal("the server started on a disk too full for it")
 	}
-	why := application.servers.failed["fakels"]
+	why := application.servers.Failed("fakels")
 	if !strings.Contains(why, "it needs 10.0 GB free") || !strings.Contains(why, "which has 3.0 GB") || !strings.Contains(why, "-server-data") {
 		test.Errorf("the reader says %q", why)
 	}
@@ -267,17 +265,17 @@ func TestAServerWaitsForAnotherToHaveImportedTheProjects(test *testing.T) {
 	window := newWindow(test, application)
 	window.Frames(1)
 	project := application.projects[0].Path
-	application.startServer(second, "", "second", project)
-	if application.servers.starting["second"] || !strings.Contains(application.serverStatus(), "second waits for fakels") {
-		test.Fatalf("second started while fakels imported; the status says %q", application.serverStatus())
+	application.servers.Start(second, "", "second", project)
+	if application.servers.Starting("second") || !strings.Contains(application.servers.Status(), "second waits for fakels") {
+		test.Fatalf("second started while fakels imported; the status says %q", application.servers.Status())
 	}
-	for frame := 0; frame < 100 && strings.Contains(application.serverStatus(), "waits"); frame++ {
+	for frame := 0; frame < 100 && strings.Contains(application.servers.Status(), "waits"); frame++ {
 		window.Frames(1)
 		time.Sleep(10 * time.Millisecond)
 	}
-	application.startServer(second, "", "second", project)
-	if !application.servers.starting["second"] && application.servers.running["second"] == nil {
-		test.Errorf("second did not start once fakels was ready; the status says %q", application.serverStatus())
+	application.servers.Start(second, "", "second", project)
+	if !application.servers.Starting("second") && application.servers.Running("second") == nil {
+		test.Errorf("second did not start once fakels was ready; the status says %q", application.servers.Status())
 	}
 }
 
@@ -291,10 +289,10 @@ func TestServingTheOpenFileCopiesNothingWhileItIsUnchanged(test *testing.T) {
 	if !logSays(test, log, "opened lamp.go") {
 		test.Fatal("the server was not told of lamp.go")
 	}
-	small := testing.AllocsPerRun(50, func() { application.serveOpenFile() })
+	small := testing.AllocsPerRun(50, func() { application.servers.Serve(application.servedFile()) })
 	application.viewer.Edit.Insert(strings.Repeat("// a line of a long file\n", 3000))
-	application.serveOpenFile() // told once, as it changed
-	big := testing.AllocsPerRun(50, func() { application.serveOpenFile() })
+	application.servers.Serve(application.servedFile()) // told once, as it changed
+	big := testing.AllocsPerRun(50, func() { application.servers.Serve(application.servedFile()) })
 	if big > small {
 		test.Errorf("serving an unchanged file of 3,000 lines allocates %v times, one of 5 lines %v", big, small)
 	}

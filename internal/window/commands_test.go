@@ -1,11 +1,11 @@
 package window
 
 import (
-	"github.com/akrck02/code-review/internal/settings"
 	"strings"
 	"testing"
 
 	"github.com/akrck02/code-review/internal/pane"
+	"github.com/akrck02/code-review/internal/settings"
 	"github.com/akrck02/code-review/internal/viewer"
 	"github.com/akrck02/go-renderer/input"
 	"github.com/akrck02/go-ui/uitest"

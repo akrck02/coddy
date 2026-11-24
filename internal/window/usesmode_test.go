@@ -42,7 +42,7 @@ func readerOfUses(test *testing.T) (*Window, *uitest.Window) {
 	if err != nil {
 		test.Fatal(err)
 	}
-	test.Cleanup(application.stopServers)
+	test.Cleanup(application.servers.Stop)
 	window := newWindow(test, application)
 	application.focus = viewerPane
 	application.viewer.SetMode(viewer.FileView)

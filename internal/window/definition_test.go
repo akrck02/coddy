@@ -40,7 +40,7 @@ func followingNames(test *testing.T) (*Window, *uitest.Window) {
 	servers := []lsp.Server{{Name: "fakels", Command: fakeServer(test), Languages: []string{"go"}, OnePerWindow: true}}
 	application := newReader(Settings{Folders: []string{folder}, WorkingTree: true, Synchronous: true,
 		Open: "harbour/src/use.go", Servers: servers})
-	test.Cleanup(application.stopServers)
+	test.Cleanup(application.servers.Stop)
 	window := newWindow(test, application)
 	application.focus = viewerPane
 	application.viewer.SetMode(viewer.FileView)

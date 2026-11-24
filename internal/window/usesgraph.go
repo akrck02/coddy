@@ -17,9 +17,9 @@ func (application *Window) UsersOf(use mode.Use, done func(declaration string, u
 	path := filepath.Join(project.Path, filepath.FromSlash(use.File.Path))
 	text := lineOf(path, use.Line-1, application)
 	place := candidate{path: path, project: project.Path, at: lsp.Position{Line: use.Line - 1, Character: lsp.UTF16Column(text, use.Start)}}
-	client, _, state := application.clientOf(place)
+	client, _, reads := application.servers.ClientFor(place.project, place.path)
 	switch {
-	case state == "none":
+	case !reads:
 		application.toast = "No language server reads " + filepath.Base(path)
 		return false
 	case client == nil:
