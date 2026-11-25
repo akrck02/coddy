@@ -1,0 +1,25 @@
+{
+  "name": "python",
+  "version": "0.1.0",
+  "author": "Coddy",
+  "description": "Reads Python with Pyright: go to a definition, find the uses of a name.",
+  "icon": "icon.svg",
+  "command": ["pyright-langserver", "--stdio"],
+  "speaks": "lsp",
+  "requires": [
+    {
+      "program": "pyright-langserver",
+      "install": {
+        "linux": ["npm install -g pyright"],
+        "darwin": ["npm install -g pyright"],
+        "windows": ["npm install -g pyright"]
+      }
+    }
+  ],
+  "contributes": {
+    "languageServer": {
+      "languages": ["python"],
+      "rootMarkers": ["pyproject.toml", "setup.py", "requirements.txt"]
+    }
+  }
+}

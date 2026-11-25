@@ -5,7 +5,7 @@ colours, its Markdown fences and its language server's name for it. By the end, 
 
 ## The shortest way
 
-Add an entry to `Languages` in `internal/language/language.go`:
+Add an entry to `Languages` in `editor/internal/language/language.go`:
 
 ```go
 {Name: "Zig", Extensions: []string{".zig"}, ServerLanguage: "zig", Fences: []string{"zig"}, Icon: "file-code", Tint: "keyword"},

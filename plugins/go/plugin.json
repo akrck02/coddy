@@ -1,0 +1,26 @@
+{
+  "name": "go",
+  "version": "0.1.0",
+  "author": "Coddy",
+  "description": "Reads Go with gopls: go to a definition, find the uses of a name.",
+  "icon": "icon.svg",
+  "command": ["gopls"],
+  "speaks": "lsp",
+  "requires": [
+    {
+      "program": "gopls",
+      "install": {
+        "linux": ["go install golang.org/x/tools/gopls@latest"],
+        "darwin": ["go install golang.org/x/tools/gopls@latest"],
+        "windows": ["go install golang.org/x/tools/gopls@latest"]
+      },
+      "environment": ["GOTOOLCHAIN=auto"]
+    }
+  ],
+  "contributes": {
+    "languageServer": {
+      "languages": ["go"],
+      "rootMarkers": ["go.mod"]
+    }
+  }
+}

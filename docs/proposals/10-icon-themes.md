@@ -86,7 +86,7 @@ Go Renderer's tasks T1–T6 come first (its proposal 6). Then:
 - [x] T1 — read icon theme files and match names as Zed does · `internal/theme/icontheme.go`, `errors.go`, `testdata/icons/` (a made-up set) · R1, R2, R7 · tests: `an icon theme names the icon of each file and folder`, `a file takes the icon of its name, then of its longest extension`, `a broken icon theme file is told by its code`
 - [x] T2 — find icon themes in the reader's folder and in Zed's extensions · `internal/theme/iconthemes.go` · R3 · test: `the icon themes of the folder and of Zed's extensions are listed`
 - [x] T3 — `Icon` and `DrawIcon`: pictures kept per size; the sidebar, the finder and the review draw through it; fallbacks · `internal/theme/fileicons.go`, `internal/sidebar/paint.go`, `classes.go`, `internal/finder/finder.go` · R4, R6, R7, R8 · tests: `without an icon theme the files keep today's icons`, `a missing or broken icon falls back and is told by its code`, allocations of drawing a listed file
-- [x] T4 — choose the icon theme in Settings › Appearance, each a card of a few of its icons; remembered · `internal/window/settingsappearance.go`, `window.go`, `cmd/code-review/main.go` · R5 · test: `choosing an icon theme paints the sidebar with it`; captures in light and dark
+- [x] T4 — choose the icon theme in Settings › Appearance, each a card of a few of its icons; remembered · `internal/window/settingsappearance.go`, `window.go`, `cmd/coddy/main.go` · R5 · test: `choosing an icon theme paints the sidebar with it`; captures in light and dark
 - [x] T5 — docs: features, getting started (where icon themes go), this proposal's Result · `docs/1-features.md`, `docs/2-get-started.md` · by hand on a Mac and on Fedora with Catppuccin's set
 
 ## Result

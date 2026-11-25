@@ -5,12 +5,12 @@ and reviewing changes. A mode is one package and one line in `main`.
 
 ## The shortest way
 
-1. Make a package, say `internal/usages`, with a type that implements `mode.Mode`. The files mode,
-   `internal/files/files.go`, is the smallest example.
+1. Make a package, say `editor/internal/usages`, with a type that implements `mode.Mode`. The files mode,
+   `editor/internal/files/files.go`, is the smallest example.
 2. Answer what every mode answers. `ChangesOnly` and `ShowsChanges` decide what is listed and how a
    file opens. `Decorate(row)` says what a row shows beside its name.
 3. Reach the window through the `mode.Window` it is given in `Start`, never by importing `window`.
-4. Register it in `cmd/code-review/main.go`, after the others:
+4. Register it in `editor/cmd/coddy/main.go`, after the others:
    `window.New(settings, files.New(), review.New(path), usages.New())`. It takes the next place on
    the rail and the next number key.
 

@@ -50,7 +50,7 @@ by a `switch`:
 The tests that list every shortcut keep their tables, but as functions that return the cases
 (`windowShortcuts()`), so the test itself is a short loop.
 
-`TestNoFunctionIsLongerThanFortyLines` goes in `cmd/code-review/rules_test.go` beside the other
+`TestNoFunctionIsLongerThanFortyLines` goes in `cmd/coddy/rules_test.go` beside the other
 rules. It uses the standard library's `go/parser`, so it adds no dependency. It names each
 function over the limit with its file and line.
 

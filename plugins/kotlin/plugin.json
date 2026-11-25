@@ -1,0 +1,45 @@
+{
+  "name": "kotlin",
+  "version": "0.1.0",
+  "author": "Coddy",
+  "description": "Reads Kotlin with JetBrains' kotlin-lsp, still a preview, which imports Gradle builds.",
+  "icon": "icon.svg",
+  "command": ["kotlin-lsp", "--stdio"],
+  "speaks": "lsp",
+  "requires": [
+    {
+      "program": "kotlin-lsp",
+      "install": {
+        "linux": ["brew install JetBrains/utils/kotlin-lsp"],
+        "darwin": ["brew install JetBrains/utils/kotlin-lsp"]
+      }
+    }
+  ],
+  "contributes": {
+    "languageServer": {
+      "languages": ["kotlin"],
+      "dataFlag": "--system-path",
+      "onePerWindow": true,
+      "readsAll": true,
+      "ready": {
+        "afterWork": true
+      },
+      "memory": {
+        "most": "2g",
+        "variable": "IJ_JAVA_OPTIONS"
+      },
+      "index": {
+        "folder": "indexes",
+        "keep": 1,
+        "option": "indexDir",
+        "retired": ["rocks"],
+        "needsFreeGigabytes": 10
+      },
+      "gradle": {
+        "keepModels": true,
+        "ownHome": true,
+        "after": ["jdtls"]
+      }
+    }
+  }
+}

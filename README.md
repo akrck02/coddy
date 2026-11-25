@@ -9,7 +9,7 @@ Open a folder of projects, see which ones a development changed against their ba
 read each changed file's diff, coloured, without leaving the keyboard. Fix what you find as you
 read, follow names across repositories with their language servers, or lock it and only read.
 
-[![Go](https://img.shields.io/github/go-mod/go-version/akrck02/coddy)](go.mod)
+[![Go](https://img.shields.io/github/go-mod/go-version/akrck02/coddy)](editor/go.mod)
 ![Platforms](https://img.shields.io/badge/runs%20on-macOS%20%7C%20Linux-informational)
 ![Status](https://img.shields.io/badge/status-experiment-orange)
 [![Licence](https://img.shields.io/github/license/akrck02/coddy)](LICENSE)
@@ -81,16 +81,21 @@ Commits made with AI carry a `Co-Authored-By: Claude` line.
 ## 🚀 Quick start
 
 ```bash
-go build -o bin/code-review ./cmd/code-review
-./bin/code-review ~/workspace                    # a folder of repositories
-./bin/code-review ../api ../web                  # or the repositories themselves
-./bin/code-review -review -base origin/release/2.4 ~/workspace
-go vet ./... && go test ./...                    # the interface tests drive the window with no display
+go build -C editor -o ../out/coddy ./cmd/coddy
+./out/coddy ~/workspace                    # a folder of repositories
+./out/coddy ../api ../web                  # or the repositories themselves
+./out/coddy -review -base origin/release/2.4 ~/workspace
+(cd editor && go vet ./... && go test ./...)   # the interface tests drive the window with no display
 ```
 
+The repository holds three Go modules that are released together: `editor/` is Coddy itself,
+`sdk/` is what a plugin is written with, and `plugins/` are the official plugins. The editor and
+the plugins both build on the sdk, and never on each other.
+
 It needs Go 1.25 or later and the Xcode command line tools: the window is opened through cgo and
-drawn with Metal. `gopls`, `jdtls` and `kotlin-lsp`, when they are on the `PATH`, start the first
-time a file of their language opens. `?` shows every key, in the settings.
+drawn with Metal. `gopls`, `jdtls` and `kotlin-lsp` come with the official plugins
+(`plugins/install.sh`, or `./dev.sh`); when on the `PATH`, each starts the first time a file of its
+language opens. `F1` shows every key, in the settings.
 
 [More on getting started →](docs/2-get-started.md)
 

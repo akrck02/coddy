@@ -197,7 +197,7 @@ Built on 24 November 2026, one commit per task, pending the author's review. `go
 `window` has 24 files besides its tests, down from 32. The requirements' checks:
 
 - R1, R8: the idle-frame and cache tests pass; R2: `-race` and the link test pass; R3, R5, R6, R7,
-  R9, R10: each has its test beside its package, or in `cmd/code-review/rules_test.go` for the
+  R9, R10: each has its test beside its package, or in `cmd/coddy/rules_test.go` for the
   arrows. The author chose that tests check only what the program does: the checks of style
   (function length, import groups, `_ =` reasons, names outside the language table, empty mode
   methods, the contributing list) are rules of review.

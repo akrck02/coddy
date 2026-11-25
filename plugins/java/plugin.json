@@ -1,0 +1,55 @@
+{
+  "name": "java",
+  "version": "0.1.0",
+  "author": "Coddy",
+  "description": "Reads Java with Eclipse's jdtls, which imports Gradle and Maven builds.",
+  "icon": "icon.svg",
+  "command": ["jdtls", "--jvm-arg=-Djava.import.generatesMetadataFilesAtProjectRoot=false"],
+  "speaks": "lsp",
+  "requires": [
+    {
+      "program": "jdtls",
+      "install": {
+        "linux": ["brew install jdtls"],
+        "darwin": ["brew install jdtls"]
+      }
+    }
+  ],
+  "contributes": {
+    "languageServer": {
+      "languages": ["java"],
+      "dataFlag": "-data",
+      "onePerWindow": true,
+      "readsAll": true,
+      "foldersInOptions": true,
+      "initializationOptions": {
+        "extendedClientCapabilities": {
+          "classFileContentsSupport": true
+        }
+      },
+      "settings": {
+        "java": {
+          "import": {
+            "generatesMetadataFilesAtProjectRoot": false
+          },
+          "autobuild": {
+            "enabled": false
+          },
+          "configuration": {
+            "updateBuildConfiguration": "disabled"
+          }
+        }
+      },
+      "ready": {
+        "status": "ServiceReady"
+      },
+      "memory": {
+        "most": "2g",
+        "flag": "--jvm-arg=-Xmx"
+      },
+      "gradle": {
+        "ownHome": true
+      }
+    }
+  }
+}

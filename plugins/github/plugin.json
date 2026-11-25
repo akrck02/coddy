@@ -1,0 +1,34 @@
+{
+  "name": "github",
+  "version": "0.1.0",
+  "author": "Coddy",
+  "description": "Lists the pull requests of a GitHub repository and their comments, through the gh command.",
+  "icon": "icon.svg",
+  "command": ["github"],
+  "speaks": "coddy",
+  "requires": [
+    {
+      "program": "gh",
+      "install": {
+        "linux": ["sudo dnf install gh", "sudo apt install gh", "brew install gh"],
+        "darwin": ["brew install gh"],
+        "windows": ["winget install --id GitHub.cli --exact"]
+      }
+    }
+  ],
+  "settings": [
+    {
+      "id": "pullRequests",
+      "title": "Pull requests",
+      "description": "Which open pull requests the review lists.",
+      "type": "choice",
+      "choices": ["Every open one", "Mine", "Asking for my review"],
+      "default": "Every open one"
+    }
+  ],
+  "contributes": {
+    "reviewSource": {
+      "name": "GitHub"
+    }
+  }
+}

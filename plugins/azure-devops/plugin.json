@@ -1,0 +1,38 @@
+{
+  "name": "azure-devops",
+  "version": "0.1.0",
+  "author": "Coddy",
+  "description": "Lists the active pull requests of an Azure DevOps repository and their comments, through its REST API.",
+  "icon": "icon.svg",
+  "command": ["azure-devops"],
+  "speaks": "coddy",
+  "requires": [
+    {
+      "program": "git",
+      "install": {
+        "linux": ["sudo dnf install git", "sudo apt install git", "brew install git"],
+        "darwin": ["xcode-select --install"],
+        "windows": ["winget install --id Git.Git --exact"]
+      }
+    }
+  ],
+  "settings": [
+    {
+      "id": "token",
+      "title": "Personal access token",
+      "description": "A token that may read code (Code: Read), kept in the system's keyring. Without one, AZURE_DEVOPS_EXT_PAT.",
+      "type": "secret"
+    },
+    {
+      "id": "organizationUrl",
+      "title": "Organization URL",
+      "description": "Only for Azure DevOps Server on your company's own machine: its collection's URL.",
+      "type": "text"
+    }
+  ],
+  "contributes": {
+    "reviewSource": {
+      "name": "Azure DevOps"
+    }
+  }
+}

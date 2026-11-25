@@ -7,20 +7,33 @@ the first time a file of its language is opened.
 ## The shortest way
 
 Make sure the language is in the table, with its `ServerLanguage` (see
-[adding a language](1-adding-a-language.md)). Then add the server to `Servers` in
-`internal/lsp/servers.go`:
+[adding a language](1-adding-a-language.md)). Then make a plugin whose program is the server: a
+folder in `plugins/` with a `plugin.json`, as `plugins/go/plugin.json` is for gopls:
 
-```go
-{Name: "zls", Command: "zls", Languages: language.ServerLanguages("Zig"), RootMarkers: []string{"build.zig"},
-	Install: "brew install zls"},
+```json
+{
+  "name": "zig",
+  "version": "0.1.0",
+  "description": "Reads Zig with zls.",
+  "command": ["zls"],
+  "speaks": "lsp",
+  "requires": [{ "program": "zls", "install": { "linux": ["brew install zls"], "darwin": ["brew install zls"] } }],
+  "contributes": {
+    "languageServer": {
+      "languages": ["zig"],
+      "rootMarkers": ["build.zig"]
+    }
+  }
+}
 ```
 
-Open a `.zig` file of a project with a `build.zig`. The servers' panel (the button at the right of the
-status bar) shows `zls` starting, then ready.
+Install it (`plugins/install.sh zig`), start Coddy, and open a `.zig` file of a project with a
+`build.zig`. The servers' panel (the button at the right of the status bar) shows `zls`
+starting, then ready.
 
 ## How it is run
 
-`internal/servers` runs the table. For a file open, it finds the server whose `Languages` holds the
+`editor/internal/servers` runs the servers of the plugins on. For a file open, it finds the server whose `Languages` holds the
 file's `ServerLanguage`, and its root: the nearest folder above the file with one of `RootMarkers`.
 One server runs per root, unless `OnePerWindow` asks for one for the whole window, each project a
 workspace folder (as jdtls wants).
@@ -31,16 +44,9 @@ asks for a while rests (it is stopped) and starts again when needed. When its co
 
 ## The variations
 
-| Field | Use it when the server… |
-|---|---|
-| `Arguments`, `Environment` | needs flags or variables to start |
-| `DataFlag` | keeps an index in a folder it is given (`-data` for jdtls) |
-| `Options`, `Settings` | documents `initializationOptions`, or asks `workspace/configuration` |
-| `ReadsAll` | keeps one index per set of projects, so it should read all of them from the start |
-| `Ready.Status` | says when it has read the projects; requests wait until then |
-| `Memory`, `Index`, `Import` | is a Java virtual machine, keeps indexes, or imports Gradle builds |
-
-Each field has its comment in `servers.go`; jdtls and kotlin-lsp use most of them.
+A server on the Java virtual machine, or one that imports Gradle builds, needs more fields: the
+[plugin guide](5-writing-a-plugin.md) lists each, and `plugins/java` and `plugins/kotlin` use most
+of them.
 
 ## Checking it
 
@@ -48,4 +54,4 @@ Each field has its comment in `servers.go`; jdtls and kotlin-lsp use most of the
 go test ./internal/lsp ./internal/servers
 ```
 
-The tests run a fake server (`internal/lsp/fake_test.go`), so they need no real one installed.
+The tests run a fake server (`editor/internal/lsp/fake_test.go`), so they need no real one installed.

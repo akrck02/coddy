@@ -4,10 +4,10 @@ You need Go 1.25 or later and the Xcode command line tools (`xcode-select --inst
 is opened through cgo and drawn with Metal.
 
 ```bash
-go build -o bin/code-review ./cmd/code-review
-./bin/code-review /path/to/workspace                 # a folder of repositories
-./bin/code-review ../api ../web                      # or the repositories themselves
-./bin/code-review -base origin/release/2.4 /path/to/workspace
+go build -C editor -o ../out/coddy ./cmd/coddy
+./out/coddy /path/to/workspace                 # a folder of repositories
+./out/coddy ../api ../web                      # or the repositories themselves
+./out/coddy -base origin/release/2.4 /path/to/workspace
 ```
 
 | Flag | |
@@ -24,7 +24,7 @@ go build -o bin/code-review ./cmd/code-review
 | `-width`, `-height`, `-capture shot.png` | go-ui's window flags; `-capture` draws one frame to a picture |
 
 ```bash
-go vet ./... && go test ./...     # the interface tests drive the window with no display
+(cd editor && go vet ./... && go test ./...)   # the interface tests drive the window with no display
 ```
 
 ## Bring your icons 🎨
@@ -33,6 +33,6 @@ The file icons can come from any icon theme made for Zed, such as
 [Catppuccin's](https://github.com/catppuccin/zed-icons). If Zed is installed, its icon themes are
 listed already. Otherwise, copy the extension's folder (the one holding `icon_themes/`) into the
 reader's `icon-themes/` folder, beside `themes/`: on a Mac
-`~/Library/Application Support/code-review/icon-themes/`, on Linux
-`~/.config/code-review/icon-themes/`. Start the reader, open the settings (`⌘,`) and choose one
+`~/Library/Application Support/coddy/icon-themes/`, on Linux
+`~/.config/coddy/icon-themes/`. Start the reader, open the settings (`⌘,`) and choose one
 under *File icons*; it is remembered.

@@ -1,6 +1,6 @@
 # What Coddy does
 
-It has two modes, chosen on the rail at the far left (or with `1`, `2`, `c`):
+It has two modes, chosen on the rail at the far left (or with `⌘1`, `⌘2`, `⌘⇧0`):
 
 - **Files** (the default) is for reading code: every file of every project in a tree, the changed
   ones named in colour (green added, amber modified, red deleted), and a file opens whole with its
@@ -9,27 +9,31 @@ It has two modes, chosen on the rail at the far left (or with `1`, `2`, `c`):
   and tasks, quotes, coloured code, tables and links. The eye in the bar at the top turns that off, to
   read its text, its changes, or to edit it.
 - **Review** is for going through a development: only the changed files, each with the lines it
-  adds and removes, opened as diffs. `v` marks the file as viewed and opens the next one not viewed;
+  adds and removes, opened as diffs. `⌘⇧V` marks the file as viewed and opens the next one not viewed;
   each project shows how much of it was viewed, and the status bar the whole. A mark is kept by the
   file's text, so a file that changes again is shown as not viewed (the marks live in
-  `~/Library/Application Support/code-review/reviewed.json`, never in the repositories). With no
+  `~/Library/Application Support/coddy/reviewed.json`, never in the repositories). With no
   file open, the review mode shows an overview of the projects: branch against base, commits,
   files, lines, progress.
 
 - **Opens several repositories at once.** Give it repositories, or folders of repositories side by
-  side (a workspace of twenty projects), on the command line or with `o`. The folders are
-  remembered for the next start.
+  side (a workspace of twenty projects), on the command line or with `⌘O`, in the system's own folder chooser. The folder
+  chosen with `⌘O` becomes the workspace, in place of the one open. Repositories are found up to
+  three folders down. A folder with loose files beside its repositories is shown as one tree, each
+  repository in its place with its branch and changes; a folder of repositories alone lists just
+  them; a folder with none is a plain folder (every file, no change). The folders are remembered
+  for the next start.
 - **Shows what the development changed in each project**: added, modified, deleted and renamed
   files, measured from where the branch left its base (`git merge-base`), so what landed on the base
   since is not counted. The base is each project's `origin/HEAD`, or the first of `origin/main`,
-  `origin/master`, `main`, `master`, `develop`; `b` (or `-base`) chooses another branch, tag or
-  commit for one project or for all of them. Changes not committed yet count too, unless `w` (or
+  `origin/master`, `main`, `master`, `develop`; `⌘⇧B` (or `-base`) chooses another branch, tag or
+  commit for one project or for all of them. Changes not committed yet count too, unless `⌘⇧W` (or
   `-committed`) leaves them out.
 - **Reads a changed file as a diff**, both sides interleaved with their line numbers, whole at first
-  (`f` or the *Fold* button folds the unchanged lines away, Enter or a click opens one fold), with
-  arrows to the previous and next change (`F7` and `⇧F7`, or `]` and `[`), and a map of the changes along the scroll bar. Inside a replaced line the words that changed are washed stronger. `d`
+  (`⌘U` or the *Fold* button folds the unchanged lines away, Enter or a click opens one fold), with
+  arrows to the previous and next change (`F7` and `⇧F7`), and a map of the changes along the scroll bar. Inside a replaced line the words that changed are washed stronger. `⌘D`
   switches to the whole file.
-- **Only the changes**, when you ask: `g` (or `h`) or the button over the sidebar leaves the
+- **Only the changes**, when you ask: `⌘⇧G` or the button over the sidebar leaves the
   projects a development did not touch out of the sidebar, the finder and the language servers,
   and the *Files* mode lists only the changed files, with its folders left as you opened them.
   Every project and file is shown at first; the choice is remembered, and `-all` shows everything
@@ -39,22 +43,21 @@ It has two modes, chosen on the rail at the far left (or with `1`, `2`, `c`):
   leave the sidebar while you only read, and so do the file's status and lines changed in its
   title, and the marks in its gutter and along its scroll bar, formatted or not. The Review mode
   and every diff keep them: there they are what you read.
-- **A filter over the sidebar** (`⌘F`) lists only the files whose path holds each of its words,
+- **A filter over the sidebar** (`⌥F`) lists only the files whose path holds each of its words,
   folders open, and the projects it names, whole; Enter takes the keyboard to the first file found.
 - **One bar at the top, for what is in front**: the file open, named by its path with how it
-  changed, or the workspace while none is open; then, on the right, the search (`⌘P`) and the
+  changed, or the workspace while none is open; then, on the right, the search (`⇧⇧`) and the
   buttons of the mode on. The review's (the changes' arrows, folding, the diff or the whole file, viewed, the
   changes counted and the base) are there only in the Review mode; the others have the lock.
-- **A folder opens like a file manager**: choosing one in the sidebar, or one of the bar's folders, shows
-  what it holds in the file's place, folders and then files, each a tile with its icon. A folder
-  opens the same way, the bar's own folders go back up, and a file chosen there opens in its place.
-- **What is the review's stays in the review**: the Viewed button, `v` and how much was viewed
+- **A folder chosen in the sidebar** names itself in the bar, and asks in the file's place for one
+  of its files, or to find one with `⇧⇧`.
+- **What is the review's stays in the review**: the Viewed button, `⌘⇧V` and how much was viewed
   in the status bar exist only in the Review mode.
-- **The sidebar folds away** (`s`, or the panel button at the foot of the rail), and the file takes
-  its room; it comes back when the keyboard goes to it (`Tab`, `⌘F`, `Esc`), and stays folded the
+- **The sidebar folds away** (`⌘⇧E`, or the panel button at the foot of the rail), and the file takes
+  its room; it comes back when the keyboard goes to it (`Tab`, `⌥F`, `Esc`), and stays folded the
   next time if it was left so.
 - **Every other file stays readable**: the *Files* mode lists them all, and the finder finds them.
-- **Enter a project** to see only its tree, from its top (Enter on its row, `e`, or the → that
+- **Enter a project** to see only its tree, from its top (Enter on its row, `⌘E`, or the → that
   shows on its row under the pointer); `Esc` goes back to every project.
 - **One button folds or opens everything** at the top of the sidebar: *Collapse all* while
   something is open, *Expand all* once nothing is. Outside, it folds or opens the projects;
@@ -79,7 +82,8 @@ It has two modes, chosen on the rail at the far left (or with `1`, `2`, `c`):
   opening another file or quitting asks first. A saved file shows as changed at once. The diff
   stays for reading.
 - **Follows names with language servers**: `gopls` for Go, `jdtls` for Java and `kotlin-lsp` for
-  Kotlin (JetBrains' preview, `brew install JetBrains/utils/kotlin-lsp`), found on
+  Kotlin (JetBrains' preview, `brew install JetBrains/utils/kotlin-lsp`), each brought by an
+  official plugin (`plugins/go`, `java`, `kotlin`; without them installed Coddy runs no server), found on
   the `PATH`, or where `go install` and Homebrew put commands (`~/go/bin`, `/opt/homebrew/bin`),
   and started the first time a file of their language opens. `⌘B` or `⌘`-click goes
   to where a name is declared, even in another project, and `⌘[` comes back; on the declaration
@@ -88,6 +92,8 @@ It has two modes, chosen on the rail at the far left (or with `1`, `2`, `c`):
   type and documentation. A server not installed is named, with the command that installs it, and
   its card in the servers panel has an *Install* button when that command's program (`go`,
   `brew`) is on the computer: it installs in the background, and the server starts once it is done.
+  Every plugin says so of the programs it requires (`pandoc`, `gh`, `git`): Settings › Plugins
+  lists those missing, with *Install*, or the command to run in a terminal when it needs `sudo`.
   One `jdtls` reads every Java project of the window, and one `kotlin-lsp` every Kotlin one, so
   names cross repositories; a name another repository gives as a jar opens in that repository's
   source when it is open. While a server reads the projects (`kotlin-lsp` imports each Gradle
@@ -105,13 +111,13 @@ It has two modes, chosen on the rail at the far left (or with `1`, `2`, `c`):
   and that its uses are found by their text; and the panel's list. The status bar's
   left shows, as icons, the files changed, the projects with changes, and in the Review mode how much was viewed. Servers
   start once the projects are read, and read only the projects in sight.
-- **A mode for the uses of a name** (`⌥F7`, or `3` once a search was made): the sidebar lists only
+- **A mode for the uses of a name** (`⌥F7`, or `⌘3` once a search was made): the sidebar lists only
   the files that use it, by project, the name's own first, then those with changes, each with its
   count. A file opens with its uses marked and the lines away from them folded, still editable
-  (`d` shows it whole). `n` and `⇧N` go from use to use across files, `v` ticks one as seen, and
-  the header counts them; `r` searches again. While a server still imports the projects, a place
+  (`⌘D` shows it whole). `F3` and `⇧F3` go from use to use across files, `⌥V` ticks one as seen, and
+  the header counts them; `⌥R` searches again. While a server still imports the projects, a place
   whose file imports the name, or its package, shows at once as a probable use, counted apart
-  (`2+1?`), until the server confirms it or not. Over the viewer, three views (`⇧1` `⇧2` `⇧3`):
+  (`2+1?`), until the server confirms it or not. Over the viewer, three views (`⌥1` `⌥2` `⌥3`):
   - the list of uses, in the files;
   - the graph of the name: the name in the middle, the projects that use it on either side, each
     file with its count. A click opens the file at its use; a `⌘`-click asks that file's server
@@ -121,7 +127,7 @@ It has two modes, chosen on the rail at the far left (or with `1`, `2`, `c`):
     use the name lit; a dependency declared in a way not read (a version catalog, a coordinate
     made in code) is counted under it.
 
-  The graphs zoom with the wheel, move with a drag, and `0` fits them in again.
+  The graphs zoom with the wheel, move with a drag, and `⌥0` fits them in again.
 - **Servers that leave nothing behind**:
   - Indexes go in the reader's own folder, or in the one `-server-data` names (another disk; the
     choice is remembered). `kotlin-lsp` keeps one index per set of projects, in its data folder's
@@ -165,7 +171,7 @@ It has two modes, chosen on the rail at the far left (or with `1`, `2`, `c`):
 - **Writes a file only when you save it; git only reads.** Language servers may write their own
   files, shown apart as above. It only runs `git cat-file`, `diff`,
   `ls-files`, `merge-base`, `rev-list`, `rev-parse` and `symbolic-ref` (any other command is
-  refused by `internal/git/run.go`), without the optional locks, the file system monitor or
+  refused by `editor/internal/git/run.go`), without the optional locks, the file system monitor or
   external diff programs: no commit, no push, no checkout. It never fetches, so a remote branch is
   as fresh as the last `git fetch` you ran.
 
@@ -183,13 +189,26 @@ The interface follows what review tools have settled on, and keeps colour for me
   sections are listed on the left: *Appearance*, each theme as a small window painted in it and
   each icon theme as a card of a few of its icons; *Memory*, how much memory the files you
   open may keep (a slider from 32 to 512 MB that says about how many files that is, 64 to start with, remembered), so going back to one is
-  instant; and *Keys*, every command with its keys drawn as caps.
+  instant; *Keys*, every command with its keys drawn as caps; and *Plugins*, a grid of cards, one for each
+  plugin: its icon (its own, or its initial on a colour of its own), name, version, author, two
+  lines of what it does, its state and a switch, and the programs it misses with how to install
+  them. Chips above choose a kind (all, languages, version control, review, actions, modes), each
+  with how many there are; turning on or off a plugin that waits for the next start says so. A
+  plugin with settings has a gear on its card that opens them (a text, a secret kept in the
+  system's keyring, a switch or a choice each), saved as they change.
+- **Plugins** (an experiment) add language servers, and actions on the file open in the "…" menu,
+  such as exporting it to PDF. Each is a folder in Coddy's own folder, on until you turn it off;
+  git is a plugin built into Coddy, which can be turned off too (folders are then not read as git);
+  [writing a plugin](5-guides/5-writing-a-plugin.md) says how. A plugin can bring pull requests,
+  as `plugins/github` does with `gh` and `plugins/azure-devops` with Azure DevOps' REST API (a
+  token in its settings, kept in the system's keyring): *Review a pull request…* in the "…" menu lists a project's,
+  and choosing one reviews its changes against its base, its comments beside their lines.
 - **Themes**, chosen in the settings (the gear in the bar, or `⌘,`) and remembered: Zed's One Dark and One Light,
   IntelliJ's Dark and Light, Visual Studio Code's Dark Modern (its colours, from
   [microsoft/vscode](https://github.com/microsoft/vscode), MIT), and [Dracula](https://draculatheme.com/)'s Dracula Solid
   (from [dracula/zed](https://github.com/dracula/zed), MIT), and juanmnl's
   [Mr Pink](https://github.com/juanmnl/vs-mr-pink) (MIT) come with it. Your own are Zed's theme files: drop any
-  of them (a theme family, `.json`) in `~/Library/Application Support/code-review/themes/` and it
+  of them (a theme family, `.json`) in `~/Library/Application Support/coddy/themes/` and it
   is listed the next time the reader starts; one with the name of a theme of the reader takes its
   place. The reader takes the colours it paints with from the file's `style` (`text`,
   `editor.background`, `created`, `modified`, `deleted`…) and its `syntax`, and makes up those a
