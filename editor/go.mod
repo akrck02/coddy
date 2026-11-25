@@ -5,7 +5,7 @@ go 1.25.6
 require (
 	github.com/akrck02/coddy/sdk v0.0.0
 	github.com/akrck02/go-renderer v0.4.1-0.20261124160721-64873f987a26
-	github.com/akrck02/go-ui v0.2.1-0.20261121222325-e723937b48d1
+	github.com/akrck02/go-ui v0.2.1-0.20261125170215-b22c458851e4
 	github.com/alecthomas/chroma/v2 v2.27.0
 	golang.org/x/image v0.45.0
 )
@@ -22,7 +22,7 @@ require (
 
 replace github.com/akrck02/bubble v0.0.0 => github.com/akrck02/bubble v0.0.0-20261026072519-58a38f47f25f
 
-replace github.com/akrck02/go-ui v0.0.0 => github.com/akrck02/go-ui v0.2.1-0.20261121222325-e723937b48d1
+replace github.com/akrck02/go-ui v0.0.0 => github.com/akrck02/go-ui v0.2.1-0.20261125170215-b22c458851e4
 
 // the editor is built with the sdk beside it, in the same repository
 replace github.com/akrck02/coddy/sdk => ../sdk
