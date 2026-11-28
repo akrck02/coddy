@@ -7,9 +7,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/akrck02/coddy/editor/internal/codebase"
 	"github.com/akrck02/coddy/editor/internal/lsp"
 	"github.com/akrck02/coddy/editor/internal/work"
-	"github.com/akrck02/coddy/editor/internal/workspace"
 )
 
 // Host is what the servers need of the window that runs them.
@@ -17,11 +17,11 @@ type Host interface {
 	// Loading tells whether projects are being read: a server waits for them before it starts.
 	Loading() bool
 	// Projects are the projects open, in the window's order.
-	Projects() []*workspace.Project
+	Projects() []*codebase.Project
 	// InSight tells whether a project is shown, so a server for the whole window reads it.
-	InSight(project *workspace.Project) bool
+	InSight(project *codebase.Project) bool
 	// LoadOptions are how a project is read, to note what it holds before a server writes in it.
-	LoadOptions(path string) workspace.LoadOptions
+	LoadOptions(path string) codebase.LoadOptions
 	// Toast tells the person something for a moment.
 	Toast(words string)
 }
@@ -64,8 +64,8 @@ type Fleet struct {
 	stopped       bool              // the window closed: a server that starts now stops at once
 	// snapshots are what each project held when a server started in it, by the project's folder;
 	// written is what servers wrote, kept across starts of the reader
-	snapshots map[string]*workspace.Snapshot
-	written   *workspace.Written
+	snapshots map[string]*codebase.Snapshot
+	written   *codebase.Written
 	adding    map[string]bool   // projects being added to a server for the whole window
 	roots     map[string]string // the root of each file asked, as finding it reads the disk
 	// openProject is the folder of the project of the file open, as the last Serve was told
@@ -104,7 +104,7 @@ func New(settings Settings, host Host, queue *work.Queue, wake func()) *Fleet {
 		data: settings.Data, running: map[string]*lsp.Client{}, starting: map[string]bool{}, told: map[string]told{},
 		missing: map[string]bool{}, installable: map[string]bool{}, installing: map[string]bool{},
 		installFailed: map[string]string{}, failed: map[string]string{}, crashes: map[string]int{},
-		snapshots: map[string]*workspace.Snapshot{}, written: workspace.OpenWritten(settings.Wrote),
+		snapshots: map[string]*codebase.Snapshot{}, written: codebase.OpenWritten(settings.Wrote),
 		adding: map[string]bool{}, roots: map[string]string{}, inSight: map[string][]string{},
 		restarting: map[string]string{}, resting: map[string]string{}, usage: map[string]usage{},
 		queued: map[string]string{}, stopping: map[string]bool{}, cannotImport: map[string]string{}}
@@ -153,10 +153,10 @@ func (fleet *Fleet) Failed(name string) string { return fleet.failed[name] }
 func (fleet *Fleet) Crashes(name string) int { return fleet.crashes[name] }
 
 // Snapshot is what a project held when a server first started in it, nil when none has.
-func (fleet *Fleet) Snapshot(project string) *workspace.Snapshot { return fleet.snapshots[project] }
+func (fleet *Fleet) Snapshot(project string) *codebase.Snapshot { return fleet.snapshots[project] }
 
 // Written is what servers wrote in the repositories, kept across starts of the reader.
-func (fleet *Fleet) Written() *workspace.Written { return fleet.written }
+func (fleet *Fleet) Written() *codebase.Written { return fleet.written }
 
 // CannotImport says why the servers that import builds leave a project out, by its folder; "" when
 // they read it, or it was not looked at yet.

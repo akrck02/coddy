@@ -5,9 +5,9 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/akrck02/coddy/editor/internal/controls"
 	"github.com/akrck02/coddy/editor/internal/keymap"
 	"github.com/akrck02/coddy/editor/internal/pane"
-	"github.com/akrck02/coddy/editor/internal/theme"
 	"github.com/akrck02/go-renderer/draw2d"
 	"github.com/akrck02/go-renderer/input"
 	ui "github.com/akrck02/go-ui"
@@ -173,13 +173,13 @@ func (editor *keysEditor) buildProfiles(context *ui.Context, window Window, edit
 					}
 				}
 			})
-			if theme.LabelledButton(context, "Make a profile, a copy of this one", "plus", "New profile") {
+			if controls.LabelledButton(context, "Make a profile, a copy of this one", "plus", "New profile") {
 				editor.openNaming(namingNew, "")
 			}
-			if editable && theme.ToolButton(context, "Rename this profile", "pencil", false) {
+			if editable && controls.ToolButton(context, "Rename this profile", "pencil", false) {
 				editor.openNaming(renaming, window.KeyProfile())
 			}
-			if editable && theme.ToolButton(context, "Delete this profile", "trash-2", false) {
+			if editable && controls.ToolButton(context, "Delete this profile", "trash-2", false) {
 				editor.stopRecording()
 				editor.problem = problemWords(window.RemoveKeyProfile())
 			}
@@ -247,12 +247,12 @@ func (editor *keysEditor) buildCaps(context *ui.Context, window Window, row KeyR
 		}
 		for index, key := range row.Keys {
 			if !editable {
-				theme.KeyCaps(context, key)
+				controls.KeyCaps(context, key)
 				continue
 			}
 			editor.buildCapButton(context, row.ID, index, key)
 		}
-		if editable && row.Changed && theme.ToolButton(context, "Give it Coddy's keys again", "rotate-ccw", false) {
+		if editable && row.Changed && controls.ToolButton(context, "Give it Coddy's keys again", "rotate-ccw", false) {
 			editor.stopRecording()
 			editor.problem = problemWords(window.ResetKeys(row.ID))
 		}
@@ -269,7 +269,7 @@ func (editor *keysEditor) buildCapButton(context *ui.Context, id string, slot in
 		normal = ui.Look{Radius: 6, Fill: palette.PrimaryTint, Border: palette.Primary, BorderWidth: 1}
 	}
 	// as tall as a cap, so the row keeps its height while it records
-	layout := ui.Layout{Height: ui.Fixed(theme.KeyCapHeight), AlignY: ui.Center}
+	layout := ui.Layout{Height: ui.Fixed(controls.KeyCapHeight), AlignY: ui.Center}
 	if recording {
 		layout.Padding = ui.PadXY(10, 0)
 	}
@@ -282,7 +282,7 @@ func (editor *keysEditor) buildCapButton(context *ui.Context, id string, slot in
 			context.Text("Press the keys…", ui.TextStyle{Size: palette.SmallTextSize, Color: palette.Primary})
 			return
 		}
-		theme.KeyCaps(context, key)
+		controls.KeyCaps(context, key)
 	})
 	context.Describe(ui.Description{Role: ui.ButtonRole, Label: name})
 	context.Tooltip("Click, then press the new keys")
@@ -331,7 +331,7 @@ func (editor *keysEditor) record(window Window) {
 		return
 	}
 	if !keymap.Safe(press) {
-		editor.problem = theme.KeyCapWords(press.Label) + " would type: hold " + modifiers() + " with it, or use a function key"
+		editor.problem = controls.KeyCapWords(press.Label) + " would type: hold " + modifiers() + " with it, or use a function key"
 		return
 	}
 	if conflict := window.KeyConflict(editor.recording, press); conflict != "" {
@@ -398,7 +398,7 @@ func (editor *keysEditor) saveName(window Window) bool {
 }
 
 // modifiers are the keys that keep a letter from typing, as this system names them.
-func modifiers() string { return theme.ModifierName("⌘") + " or " + theme.ModifierName("⌥") }
+func modifiers() string { return controls.ModifierName("⌘") + " or " + controls.ModifierName("⌥") }
 
 // problemWords say why a change of keys was refused, "" when it was not.
 func problemWords(err error) string {

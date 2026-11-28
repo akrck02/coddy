@@ -3,9 +3,9 @@ package window
 import (
 	"testing"
 
+	"github.com/akrck02/coddy/editor/internal/codebase"
 	"github.com/akrck02/coddy/editor/internal/mode"
 	"github.com/akrck02/coddy/editor/internal/sidebar"
-	"github.com/akrck02/coddy/editor/internal/workspace"
 	ui "github.com/akrck02/go-ui"
 )
 
@@ -26,7 +26,7 @@ func TestAPowerAModeLacksIsNotOffered(test *testing.T) {
 		test.Fatal(err)
 	}
 	window := newWindow(test, application)
-	file := workspace.FileReference{Project: 0, Path: "src/lamp.go"}
+	file := codebase.FileReference{Project: 0, Path: "src/lamp.go"}
 	if _, shown := application.FileButton(file); shown {
 		test.Error("a mode with no file button has one in the viewer's header")
 	}

@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/akrck02/coddy/editor/internal/codebase"
 	"github.com/akrck02/coddy/editor/internal/lsp"
-	"github.com/akrck02/coddy/editor/internal/workspace"
 	"github.com/akrck02/coddy/sdk/jsonrpc"
 )
 
@@ -15,7 +15,7 @@ type shownHost struct {
 	noted string
 }
 
-func (host *shownHost) Projects() []*workspace.Project      { return nil }
+func (host *shownHost) Projects() []*codebase.Project       { return nil }
 func (host *shownHost) LineOf(path string, line int) string { return "" }
 func (host *shownHost) ClientFor(project, path string) (*lsp.Client, string, bool) {
 	return nil, "", false

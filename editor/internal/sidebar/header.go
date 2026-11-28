@@ -1,8 +1,8 @@
 package sidebar
 
 import (
-	"github.com/akrck02/coddy/editor/internal/theme"
-	"github.com/akrck02/coddy/editor/internal/workspace"
+	"github.com/akrck02/coddy/editor/internal/codebase"
+	"github.com/akrck02/coddy/editor/internal/controls"
 	"github.com/akrck02/go-renderer/draw2d"
 	ui "github.com/akrck02/go-ui"
 )
@@ -13,10 +13,10 @@ func (sidebar *Sidebar) buildHeader(context *ui.Context, window Window) {
 	title := sidebar.listing.Name()
 	titleStyle := ui.TextStyle{Weight: draw2d.Medium, Color: palette.InkSoft}
 	context.Text(title, titleStyle)
-	room := sidebar.headerRoom() - theme.TextWidth(context, title, titleStyle) - toolButtonWidth*2 - headerGap*3
+	room := sidebar.headerRoom() - controls.TextWidth(context, title, titleStyle) - toolButtonWidth*2 - headerGap*3
 	if header := sidebar.header; header != "" {
 		progressStyle := ui.TextStyle{Size: palette.SmallTextSize, Color: palette.InkQuiet}
-		if progress := theme.FitText(context, header, progressStyle, room); progress != "" {
+		if progress := controls.FitText(context, header, progressStyle, room); progress != "" {
 			context.Text(progress, progressStyle)
 		}
 	}
@@ -29,12 +29,12 @@ func (sidebar *Sidebar) buildHeader(context *ui.Context, window Window) {
 // is: the projects, or inside a project its folders.
 func (sidebar *Sidebar) buildFoldButton(context *ui.Context, window Window) {
 	if sidebar.anyOpen {
-		if theme.ToolButton(context, "Collapse all", "chevrons-down-up", false) {
+		if controls.ToolButton(context, "Collapse all", "chevrons-down-up", false) {
 			sidebar.setAllOpen(window, false)
 		}
 		return
 	}
-	if theme.ToolButton(context, "Expand all", "chevrons-up-down", false) {
+	if controls.ToolButton(context, "Expand all", "chevrons-up-down", false) {
 		sidebar.setAllOpen(window, true)
 	}
 }
@@ -47,7 +47,7 @@ func (sidebar *Sidebar) buildEnteredHeader(context *ui.Context, window Window) {
 		return
 	}
 	project := window.Projects()[index]
-	if theme.ToolButton(context, "Every project (Esc)", "arrow-left", false) {
+	if controls.ToolButton(context, "Every project (Esc)", "arrow-left", false) {
 		sidebar.Leave(window)
 		return
 	}
@@ -55,17 +55,17 @@ func (sidebar *Sidebar) buildEnteredHeader(context *ui.Context, window Window) {
 	// what is left for the name and the branch once the buttons and the count have their room
 	room := sidebar.headerRoom() - 2*(toolButtonWidth+headerGap) // going back, and folding
 	if count != "" {
-		room -= theme.TextWidth(context, count, countStyle) + headerGap
+		room -= controls.TextWidth(context, count, countStyle) + headerGap
 	}
 	if !sidebar.listing.ChangesOnly() {
 		room -= toolButtonWidth + headerGap
 	}
 	nameStyle := ui.TextStyle{Weight: draw2d.Medium}
-	name := theme.FitText(context, project.Name, nameStyle, room)
+	name := controls.FitText(context, project.Name, nameStyle, room)
 	context.Text(name, nameStyle)
-	room -= theme.TextWidth(context, name, nameStyle) + headerGap
+	room -= controls.TextWidth(context, name, nameStyle) + headerGap
 	branchStyle := ui.TextStyle{Size: palette.SmallTextSize, Color: palette.InkQuiet}
-	if branch := theme.FitText(context, project.Branch, branchStyle, room); len([]rune(branch)) > 3 {
+	if branch := controls.FitText(context, project.Branch, branchStyle, room); len([]rune(branch)) > 3 {
 		context.Text(branch, branchStyle)
 	}
 	context.Spacer()
@@ -77,7 +77,7 @@ func (sidebar *Sidebar) buildEnteredHeader(context *ui.Context, window Window) {
 }
 
 // enteredCount is what the mode counts in the project entered, and the style it is written in.
-func (sidebar *Sidebar) enteredCount(context *ui.Context, index int, project *workspace.Project) (string, ui.TextStyle) {
+func (sidebar *Sidebar) enteredCount(context *ui.Context, index int, project *codebase.Project) (string, ui.TextStyle) {
 	palette := context.Theme
 	count, countStyle := "", ui.TextStyle{Size: palette.SmallTextSize, Weight: draw2d.Mono, Color: palette.Warning}
 	if len(project.Changes) == 0 {

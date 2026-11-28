@@ -3,8 +3,8 @@ package sidebar
 import (
 	"slices"
 
+	"github.com/akrck02/coddy/editor/internal/codebase"
 	"github.com/akrck02/coddy/editor/internal/java"
-	"github.com/akrck02/coddy/editor/internal/workspace"
 )
 
 // keptFilters is how many filters typed last keep their trees. Each letter typed is a new
@@ -14,7 +14,7 @@ const keptFilters = 4
 
 // projectLayouts are the kinds of project laid out otherwise than as their folders are on disk,
 // tried in order; a project none fits is laid out plain.
-var projectLayouts = []workspace.Layout{java.Layout}
+var projectLayouts = []codebase.Layout{java.Layout}
 
 // treeKey is what a project's tree depends on: the mode, whether only changes are listed, and
 // the filter when it chooses the files.
@@ -28,7 +28,7 @@ type treeKey struct {
 
 // tree is a project's tree as the sidebar lists it now, made the first time it is asked for and
 // kept until the projects change (Invalidate) or, for a filter, until it is among the oldest.
-func (sidebar *Sidebar) tree(window Window, project int) *workspace.Folder {
+func (sidebar *Sidebar) tree(window Window, project int) *codebase.Folder {
 	model := window.Projects()[project]
 	key := treeKey{project, sidebar.listing.Name(), sidebar.listsChangesOnly(), "", sidebar.nesting[model.Path]}
 	if sidebar.filtersFiles(window, project) {
@@ -43,11 +43,11 @@ func (sidebar *Sidebar) tree(window Window, project int) *workspace.Folder {
 		paths = sidebar.found(paths)
 		sidebar.keepFilter(key.filter)
 	}
-	var tree *workspace.Folder
+	var tree *codebase.Folder
 	if key.nested {
-		tree = workspace.BuildTreeAround(paths, sidebar.placesIn(window, model), isChanged)
+		tree = codebase.BuildTreeAround(paths, sidebar.placesIn(window, model), isChanged)
 	} else {
-		tree = workspace.LayoutOf(projectLayouts, model.Files).Tree(paths, isChanged)
+		tree = codebase.LayoutOf(projectLayouts, model.Files).Tree(paths, isChanged)
 	}
 	sidebar.trees[key] = tree
 	return tree
@@ -55,7 +55,7 @@ func (sidebar *Sidebar) tree(window Window, project int) *workspace.Folder {
 
 // listedPaths are the paths of a project the listing shows, before any filter: every file, only
 // the changed ones, or those the listing chooses, less the deleted ones in a mode that hides them.
-func (sidebar *Sidebar) listedPaths(model *workspace.Project, project int) []string {
+func (sidebar *Sidebar) listedPaths(model *codebase.Project, project int) []string {
 	paths := model.Files
 	if sidebar.listsChangesOnly() {
 		paths = model.ChangedPaths()

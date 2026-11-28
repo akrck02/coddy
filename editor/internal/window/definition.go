@@ -4,10 +4,10 @@ import (
 	"context"
 	"path/filepath"
 
+	"github.com/akrck02/coddy/editor/internal/codebase"
 	"github.com/akrck02/coddy/editor/internal/lsp"
 	"github.com/akrck02/coddy/editor/internal/navigation"
 	"github.com/akrck02/coddy/editor/internal/viewer"
-	"github.com/akrck02/coddy/editor/internal/workspace"
 )
 
 // here is the spot the person is at: the file open and the line to come back to.
@@ -75,7 +75,7 @@ func (application *Window) GoToDefinition(place viewer.Place) {
 			case navigation.Declares(locations[0], asked.Path, at):
 				application.searchUses(question)
 			default:
-				location, _ := navigation.FromJar(application.session.Projects, locations[0], question.Name)
+				location, _ := navigation.FromJar(application.workspace.Projects, locations[0], question.Name)
 				application.goToLocation(from, location)
 			}
 		}
@@ -104,7 +104,7 @@ func (application *Window) definitionAsked() {
 // the person left on the trail.
 func (application *Window) goToLocation(from navigation.Spot, location lsp.Location) {
 	path := lsp.PathOf(location.URI)
-	reference, found := navigation.ReferenceOf(application.session.Projects, path)
+	reference, found := navigation.ReferenceOf(application.workspace.Projects, path)
 	if !found {
 		application.toast = "Outside the projects open: " + navigation.OutsideName(location.URI, path)
 		return
@@ -124,7 +124,7 @@ func (application *Window) LineOf(path string, line int) string {
 	if view.IsOpen() && view.Project != nil && filepath.Join(view.Project.Path, filepath.FromSlash(view.Reference.Path)) == path {
 		return view.LineText(line)
 	}
-	lines := workspace.LinesOfFile(path)
+	lines := codebase.LinesOfFile(path)
 	if line < 0 || line >= len(lines) {
 		return ""
 	}
@@ -138,7 +138,7 @@ func (application *Window) stepTrail(step int) {
 	if !found {
 		return
 	}
-	reference, open := navigation.ReferenceOf(application.session.Projects, target.Path)
+	reference, open := navigation.ReferenceOf(application.workspace.Projects, target.Path)
 	if !open {
 		application.trail.Drop(step) // its project was closed
 		application.toast = "No longer open: " + target.Path
@@ -153,7 +153,7 @@ func (application *Window) stepTrail(step int) {
 
 // leavingFor does what goes to another file once the edits not saved of the one open are kept or
 // dropped, as the person answers; a person who cancels stays, and nothing is done.
-func (application *Window) leavingFor(reference workspace.FileReference, going func()) {
+func (application *Window) leavingFor(reference codebase.FileReference, going func()) {
 	if application.viewer.Reference != reference {
 		application.keepingEdits(going)
 		return

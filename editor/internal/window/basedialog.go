@@ -3,7 +3,7 @@ package window
 import (
 	"strings"
 
-	"github.com/akrck02/coddy/editor/internal/session"
+	"github.com/akrck02/coddy/editor/internal/workspace"
 	"github.com/akrck02/go-renderer/draw2d"
 	ui "github.com/akrck02/go-ui"
 )
@@ -25,11 +25,11 @@ func (application *Window) openBaseDialog() {
 	if application.viewer.IsOpen() {
 		dialog.forProject = application.viewer.Project.Path
 	} else if row, ok := application.sidebar.SelectedRow(); ok && row.Project >= 0 {
-		dialog.forProject = application.session.Projects[row.Project].Path
+		dialog.forProject = application.workspace.Projects[row.Project].Path
 	}
-	dialog.ref = application.session.Base
+	dialog.ref = application.workspace.Base
 	if dialog.forProject != "" {
-		if base, chosen := application.session.BaseOf(dialog.forProject); chosen {
+		if base, chosen := application.workspace.BaseOf(dialog.forProject); chosen {
 			dialog.ref = base
 		}
 	}
@@ -70,7 +70,7 @@ func (application *Window) buildBaseSheet(context *ui.Context) bool {
 		apply = true
 	}
 	if dialog.forProject != "" {
-		context.Tabs("base scope", &dialog.forAll, session.BaseName(dialog.forProject), "Every project")
+		context.Tabs("base scope", &dialog.forAll, workspace.BaseName(dialog.forProject), "Every project")
 	}
 	context.Row(func() {
 		context.Spacer()
@@ -91,12 +91,12 @@ func (application *Window) applyBase() {
 	application.review = pullRequest{}
 	ref := strings.TrimSpace(dialog.ref)
 	if dialog.forAll == 1 || dialog.forProject == "" {
-		application.session.SetBaseForAll(ref)
+		application.workspace.SetBaseForAll(ref)
 		application.reloadAll()
 		return
 	}
-	application.session.SetBase(dialog.forProject, ref)
-	for index, project := range application.session.Projects {
+	application.workspace.SetBase(dialog.forProject, ref)
+	for index, project := range application.workspace.Projects {
 		if project.Path == dialog.forProject {
 			application.reload(index)
 		}

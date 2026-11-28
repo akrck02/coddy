@@ -6,9 +6,9 @@ import (
 	"testing"
 
 	"github.com/akrck02/coddy/editor/internal/icons"
-	"github.com/akrck02/coddy/editor/internal/session"
 	"github.com/akrck02/coddy/editor/internal/settings"
 	"github.com/akrck02/coddy/editor/internal/theme"
+	"github.com/akrck02/coddy/editor/internal/workspace"
 	"github.com/akrck02/go-renderer/draw2d"
 	"github.com/akrck02/go-renderer/input"
 	"github.com/akrck02/go-ui/uitest"
@@ -183,8 +183,8 @@ func TestANameTooLongForItsCardEndsInAnEllipsis(test *testing.T) {
 func TestChoosingABudgetInTheSettingsChangesTheCacheAndIsRemembered(test *testing.T) {
 	application := newReader(Settings{Folders: []string{makeRepository(test)}, Synchronous: true, Open: "lighthouse/src/lamp.go"})
 	window := newWindow(test, application)
-	if application.DocumentMegabytes() != session.DefaultDocumentMegabytes {
-		test.Fatalf("with no budget chosen the files may keep %d MB, want %d", application.DocumentMegabytes(), session.DefaultDocumentMegabytes)
+	if application.DocumentMegabytes() != workspace.DefaultDocumentMegabytes {
+		test.Fatalf("with no budget chosen the files may keep %d MB, want %d", application.DocumentMegabytes(), workspace.DefaultDocumentMegabytes)
 	}
 	if err := window.Click("Settings (⌘,)"); err != nil {
 		test.Fatal(err)
@@ -200,15 +200,15 @@ func TestChoosingABudgetInTheSettingsChangesTheCacheAndIsRemembered(test *testin
 	}
 	window.ClickAt(slider.Rect.X+slider.Rect.Width-1, slider.Rect.Y+slider.Rect.Height/2) // the far end: the most
 	window.Frames(2)
-	if application.DocumentMegabytes() != session.DocumentMegabytesMost {
-		test.Fatalf("after sliding to the end the files may keep %d MB, want %d", application.DocumentMegabytes(), session.DocumentMegabytesMost)
+	if application.DocumentMegabytes() != workspace.DocumentMegabytesMost {
+		test.Fatalf("after sliding to the end the files may keep %d MB, want %d", application.DocumentMegabytes(), workspace.DocumentMegabytesMost)
 	}
 	if documents, _ := application.DocumentUse(); documents == 0 {
 		test.Error("the file open is not kept")
 	}
 	reopened := newReader(Settings{Synchronous: true, DocumentMegabytes: application.DocumentMegabytes()})
-	if reopened.DocumentMegabytes() != session.DocumentMegabytesMost {
-		test.Errorf("the reader started with the budget kept starts with %d MB, want %d", reopened.DocumentMegabytes(), session.DocumentMegabytesMost)
+	if reopened.DocumentMegabytes() != workspace.DocumentMegabytesMost {
+		test.Errorf("the reader started with the budget kept starts with %d MB, want %d", reopened.DocumentMegabytes(), workspace.DocumentMegabytesMost)
 	}
 }
 
@@ -227,12 +227,12 @@ func TestTheMemoryForFilesIsChosenWhenTheSliderIsLetGo(test *testing.T) {
 	window.MoveTo(slider.Rect.X+slider.Rect.Width-1, middle)
 	window.Press()
 	window.Frames(2)
-	if application.DocumentMegabytes() != session.DefaultDocumentMegabytes {
-		test.Fatalf("while the slider is held the files may keep %d MB, want the %d in use", application.DocumentMegabytes(), session.DefaultDocumentMegabytes)
+	if application.DocumentMegabytes() != workspace.DefaultDocumentMegabytes {
+		test.Fatalf("while the slider is held the files may keep %d MB, want the %d in use", application.DocumentMegabytes(), workspace.DefaultDocumentMegabytes)
 	}
 	window.Release()
 	window.Frames(2)
-	if application.DocumentMegabytes() != session.DocumentMegabytesMost {
-		test.Errorf("once the slider is let go the files may keep %d MB, want %d", application.DocumentMegabytes(), session.DocumentMegabytesMost)
+	if application.DocumentMegabytes() != workspace.DocumentMegabytesMost {
+		test.Errorf("once the slider is let go the files may keep %d MB, want %d", application.DocumentMegabytes(), workspace.DocumentMegabytesMost)
 	}
 }

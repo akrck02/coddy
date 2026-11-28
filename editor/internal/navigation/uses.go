@@ -7,10 +7,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/akrck02/coddy/editor/internal/codebase"
 	"github.com/akrck02/coddy/editor/internal/git"
 	"github.com/akrck02/coddy/editor/internal/lsp"
 	"github.com/akrck02/coddy/editor/internal/work"
-	"github.com/akrck02/coddy/editor/internal/workspace"
 )
 
 const (
@@ -121,7 +121,7 @@ func candidatesOf(search *Search, hits map[string][]git.Hit) []candidate {
 }
 
 // projectRanks orders the projects for checking: the home one, those with changes, the others.
-func projectRanks(projects []*workspace.Project, home int) map[string]int {
+func projectRanks(projects []*codebase.Project, home int) map[string]int {
 	ranks := map[string]int{}
 	for index, project := range projects {
 		switch {

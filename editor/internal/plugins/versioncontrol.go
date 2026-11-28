@@ -3,8 +3,8 @@ package plugins
 import (
 	"context"
 
+	"github.com/akrck02/coddy/editor/internal/codebase"
 	"github.com/akrck02/coddy/editor/internal/git"
-	"github.com/akrck02/coddy/editor/internal/workspace"
 	"github.com/akrck02/coddy/sdk"
 )
 
@@ -21,7 +21,7 @@ type VersionControlContribution struct {
 
 // VersionControl reads repositories through the plugin, which must contribute a version control.
 // Its methods wait for the plugin, so they run off the frame, as git's commands do.
-func (plugin *Plugin) VersionControl() workspace.VersionControl { return pluginControl{plugin} }
+func (plugin *Plugin) VersionControl() codebase.VersionControl { return pluginControl{plugin} }
 
 type pluginControl struct{ plugin *Plugin }
 

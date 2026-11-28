@@ -9,23 +9,6 @@ import (
 	"github.com/akrck02/go-renderer/failure"
 )
 
-func TestAFileIsKnownByItsNameBeforeItsExtension(test *testing.T) {
-	look := Find(BuiltIn(), DefaultDark, true).Look
-	cases := map[string]string{
-		"lighthouse/Lamp.java":   "coffee",
-		"build.gradle.kts":       "file-cog",
-		"docs/README.md":         "book-open",
-		"Dockerfile.release":     "container",
-		"go.sum":                 "file-lock",
-		"notes/without-a-kind.q": "file",
-	}
-	for name, want := range cases {
-		if icon := FileIcon(name, look); icon.Name != want {
-			test.Errorf("FileIcon(%q) = %q, want %q", name, icon.Name, want)
-		}
-	}
-}
-
 func TestTheReaderComesWithTheThemesOfZedIntelliJVisualStudioCodeDraculaAndMrPink(test *testing.T) {
 	themes := BuiltIn()
 	want := []string{"Dark Modern", "Dracula Solid", "IntelliJ Dark", "Mr Pink", "One Dark", "IntelliJ Light", "One Light"}

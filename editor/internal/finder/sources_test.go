@@ -7,28 +7,28 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/akrck02/coddy/editor/internal/codebase"
 	"github.com/akrck02/coddy/editor/internal/pane"
 	"github.com/akrck02/coddy/editor/internal/theme"
-	"github.com/akrck02/coddy/editor/internal/workspace"
 )
 
 // fakeWindow is a window of one project that runs its work at once, as a test window does, and
 // keeps the file it was asked to open.
 type fakeWindow struct {
-	projects   []*workspace.Project
+	projects   []*codebase.Project
 	candidates []Candidate
-	opened     workspace.FileReference
+	opened     codebase.FileReference
 	openedLine int
 }
 
-func (window *fakeWindow) Look() theme.Look               { return theme.Look{} }
-func (window *fakeWindow) Keys() pane.Keys                { return pane.Keys{} }
-func (window *fakeWindow) Projects() []*workspace.Project { return window.projects }
-func (window *fakeWindow) Candidates() []Candidate        { return window.candidates }
-func (window *fakeWindow) Searchable(project int) bool    { return true }
-func (window *fakeWindow) WorkingTree() bool              { return true }
-func (window *fakeWindow) Synchronous() bool              { return true }
-func (window *fakeWindow) Cancel(key string)              {}
+func (window *fakeWindow) Look() theme.Look              { return theme.Look{} }
+func (window *fakeWindow) Keys() pane.Keys               { return pane.Keys{} }
+func (window *fakeWindow) Projects() []*codebase.Project { return window.projects }
+func (window *fakeWindow) Candidates() []Candidate       { return window.candidates }
+func (window *fakeWindow) Searchable(project int) bool   { return true }
+func (window *fakeWindow) WorkingTree() bool             { return true }
+func (window *fakeWindow) Synchronous() bool             { return true }
+func (window *fakeWindow) Cancel(key string)             {}
 
 func (window *fakeWindow) Read(stop context.Context, reading func()) bool {
 	reading()
@@ -41,7 +41,7 @@ func (window *fakeWindow) Run(key string, do func(stop context.Context) func()) 
 	}
 }
 
-func (window *fakeWindow) OpenAt(file workspace.FileReference, line int) {
+func (window *fakeWindow) OpenAt(file codebase.FileReference, line int) {
 	window.opened, window.openedLine = file, line
 }
 
@@ -60,7 +60,7 @@ func newFakeWindow(test *testing.T) *fakeWindow {
 		}
 	}
 	return &fakeWindow{
-		projects: []*workspace.Project{{Name: "lighthouse", Path: folder}},
+		projects: []*codebase.Project{{Name: "lighthouse", Path: folder}},
 		candidates: []Candidate{
 			{Project: 0, Path: "lamp.go", Label: "lighthouse/lamp.go"},
 			{Project: 0, Path: "tower.md", Label: "lighthouse/tower.md"},

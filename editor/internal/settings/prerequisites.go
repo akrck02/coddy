@@ -4,9 +4,9 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/akrck02/coddy/editor/internal/controls"
 	"github.com/akrck02/coddy/editor/internal/plugins"
 	"github.com/akrck02/coddy/editor/internal/programs"
-	"github.com/akrck02/coddy/editor/internal/theme"
 	"github.com/akrck02/go-renderer/draw2d"
 	ui "github.com/akrck02/go-ui"
 )
@@ -161,7 +161,7 @@ func buildCommand(context *ui.Context, step prerequisite) {
 	context.Frame(ui.Layout{Width: ui.Grow(), Padding: ui.Padding{Left: 12, Right: 4, Top: 6, Bottom: 6}, Gap: 8, AlignY: ui.Center}, strip, func() {
 		context.Text("$", ui.TextStyle{Weight: draw2d.Mono, Color: palette.InkQuiet})
 		buildWrapped(context, step.commandWords, code)
-		if theme.LabelledButton(context, "Copy the command", "copy", "Copy") {
+		if controls.LabelledButton(context, "Copy the command", "copy", "Copy") {
 			context.Copy(step.command)
 		}
 	})

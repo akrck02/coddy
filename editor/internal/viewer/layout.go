@@ -1,9 +1,9 @@
 package viewer
 
 import (
+	"github.com/akrck02/coddy/editor/internal/codebase"
 	"github.com/akrck02/coddy/editor/internal/git"
 	"github.com/akrck02/coddy/editor/internal/highlight"
-	"github.com/akrck02/coddy/editor/internal/workspace"
 )
 
 // layOut chooses the presentation of the mode and works out the rows it shows, and the marks
@@ -24,8 +24,8 @@ func (view *Viewer) layOut() {
 func (view *Viewer) countChanges() {
 	document := view.Document
 	if document.Changed {
-		view.Added, view.Gone = workspace.Counts(document.Diff)
-		view.Marks = workspace.LineMarks(document.Diff)
+		view.Added, view.Gone = codebase.Counts(document.Diff)
+		view.Marks = codebase.LineMarks(document.Diff)
 	}
 }
 

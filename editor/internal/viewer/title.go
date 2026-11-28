@@ -3,7 +3,7 @@ package viewer
 import (
 	"strings"
 
-	"github.com/akrck02/coddy/editor/internal/theme"
+	"github.com/akrck02/coddy/editor/internal/controls"
 	"github.com/akrck02/go-renderer/draw2d"
 	ui "github.com/akrck02/go-ui"
 )
@@ -50,7 +50,7 @@ func (view *Viewer) ButtonsWidth(context *ui.Context, compact, reviewing bool) f
 	}
 	width := float32(0)
 	if !compact {
-		width += theme.TextWidth(context, document.Language, ui.TextStyle{Size: context.Theme.SmallTextSize}) + 12
+		width += controls.TextWidth(context, document.Language, ui.TextStyle{Size: context.Theme.SmallTextSize}) + 12
 	}
 	if view.IsMarkdown() && !document.Binary {
 		width += 40
@@ -63,9 +63,9 @@ func (view *Viewer) ButtonsWidth(context *ui.Context, compact, reviewing bool) f
 
 // titleRoom is the width left for the file's folder once the rest of the title has its room.
 func (view *Viewer) titleRoom(context *ui.Context, room float32, name string, compact bool) float32 {
-	room -= theme.TextWidth(context, name, ui.TextStyle{Weight: draw2d.Medium}) + 40
+	room -= controls.TextWidth(context, name, ui.TextStyle{Weight: draw2d.Medium}) + 40
 	if !compact {
-		room -= theme.TextWidth(context, view.Project.Name, ui.TextStyle{Color: context.Theme.InkQuiet}) + 20
+		room -= controls.TextWidth(context, view.Project.Name, ui.TextStyle{Color: context.Theme.InkQuiet}) + 20
 	}
 	if view.Document != nil && view.Document.Changed {
 		room -= 70 // the counts
@@ -85,15 +85,15 @@ func (view *Viewer) buildPath(context *ui.Context, window Window, room float32, 
 	room = view.titleRoom(context, room, name, compact)
 	if !compact {
 		context.Text(view.Project.Name, quiet)
-		theme.CrumbChevron(context)
+		controls.CrumbChevron(context)
 	}
 	for _, crumb := range view.crumbsOf(context, folder, room) {
-		theme.CrumbText(context, crumb)
-		theme.CrumbChevron(context)
+		controls.CrumbText(context, crumb)
+		controls.CrumbChevron(context)
 	}
 	nameInk := palette.Ink
 	if document != nil && document.Changed && view.showsStatus(window) {
-		nameInk = theme.StatusColour(palette, document.Change.Status)
+		nameInk = controls.StatusColour(palette, document.Change.Status)
 	}
 	context.Text(name, ui.TextStyle{Weight: draw2d.Medium, Color: nameInk})
 	if view.Unsaved() {
@@ -103,7 +103,7 @@ func (view *Viewer) buildPath(context *ui.Context, window Window, room float32, 
 
 // crumbWidth is what a crumb takes besides its text: its padding, the chevron after it and the gaps
 // around it.
-const crumbWidth = 2*theme.CrumbPadding + theme.CrumbChevronSize + 2*6
+const crumbWidth = 2*controls.CrumbPadding + controls.CrumbChevronSize + 2*6
 
 // gathered stands for the folders of a breadcrumb left out for room.
 const gathered = "…"
@@ -125,7 +125,7 @@ func (view *Viewer) crumbsOf(context *ui.Context, folder string, room float32) [
 		return kept.shown
 	}
 	quiet := ui.TextStyle{Color: context.Theme.InkQuiet}
-	width := func(text string) float32 { return theme.TextWidth(context, text, quiet) }
+	width := func(text string) float32 { return controls.TextWidth(context, text, quiet) }
 	*kept = keptCrumbs{laidOut: true, folder: folder, room: room, size: size, shown: crumbs(folder, width, room)}
 	return kept.shown
 }

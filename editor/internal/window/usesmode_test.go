@@ -6,14 +6,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/akrck02/coddy/editor/internal/files"
+	"github.com/akrck02/coddy/editor/internal/codebase"
 	"github.com/akrck02/coddy/editor/internal/lsp"
 	"github.com/akrck02/coddy/editor/internal/mode"
-	"github.com/akrck02/coddy/editor/internal/review"
+	"github.com/akrck02/coddy/editor/internal/mode/files"
+	"github.com/akrck02/coddy/editor/internal/mode/review"
+	"github.com/akrck02/coddy/editor/internal/mode/uses"
 	"github.com/akrck02/coddy/editor/internal/sidebar"
-	"github.com/akrck02/coddy/editor/internal/uses"
 	"github.com/akrck02/coddy/editor/internal/viewer"
-	"github.com/akrck02/coddy/editor/internal/workspace"
 	"github.com/akrck02/go-renderer/input"
 	uitest "github.com/akrck02/go-ui/uitest"
 )
@@ -140,9 +140,9 @@ func TestTheUsersOfTheDeclarationAUseIsInAreFound(test *testing.T) {
 func lastUseIn(application *Window, base string) (mode.Use, bool) {
 	holder, _ := application.usesHolder()
 	last, found := mode.Use{}, false
-	for index, project := range application.session.Projects {
+	for index, project := range application.workspace.Projects {
 		for _, path := range project.Files {
-			reference := workspace.FileReference{Project: index, Path: path}
+			reference := codebase.FileReference{Project: index, Path: path}
 			for line, spans := range holder.UsesIn(reference) {
 				if filepath.Base(path) == base && line > last.Line {
 					last, found = mode.Use{File: reference, Line: line, Start: spans[0].Start, End: spans[0].End}, true

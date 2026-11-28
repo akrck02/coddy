@@ -7,10 +7,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/akrck02/coddy/editor/internal/codebase"
 	"github.com/akrck02/coddy/editor/internal/gradle"
 	"github.com/akrck02/coddy/editor/internal/language"
 	"github.com/akrck02/coddy/editor/internal/lsp"
-	"github.com/akrck02/coddy/editor/internal/workspace"
 )
 
 // restartPause is how long the projects in sight must stay the same before a server that does not
@@ -134,7 +134,7 @@ func (fleet *Fleet) importable(server lsp.Server, project string) bool {
 }
 
 // hasFileOf tells whether a project has a file a server reads.
-func hasFileOf(project *workspace.Project, server lsp.Server) bool {
+func hasFileOf(project *codebase.Project, server lsp.Server) bool {
 	for _, path := range project.Files {
 		if slices.Contains(server.Languages, language.ServerLanguageOf(path)) {
 			return true

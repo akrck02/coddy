@@ -1,134 +1,113 @@
 package workspace
 
 import (
-	"context"
 	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
-	"github.com/akrck02/coddy/editor/internal/git"
+	"github.com/akrck02/coddy/editor/internal/codebase"
 )
 
-// TestReadingARealRepository reads a repository named by REVIEW_REPOSITORY, to try the reading
-// against real developments; without it the test is skipped.
-func TestARealRepositoryIsReadWithItsChanges(test *testing.T) {
-	path := os.Getenv("REVIEW_REPOSITORY")
-	if path == "" {
-		test.Skip("set REVIEW_REPOSITORY to a repository to read")
+// workspaceWithFile is a workspace with one project, a plain folder holding one file.
+func workspaceWithFile(test *testing.T, content string) (Workspace, codebase.FileReference, string) {
+	folder := test.TempDir()
+	path := filepath.Join(folder, "harbour.txt")
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		test.Fatal(err)
 	}
-	project := LoadProject(context.Background(), path, LoadOptions{WorkingTree: true})
-	test.Logf("%s on %s against %s (%s), %d commits ahead, %d changed of %d files, error %q",
-		project.Name, project.Branch, project.Base, project.MergeBase, project.Ahead,
-		len(project.Changes), len(project.Files), project.Error)
-	for index, change := range project.Changes {
-		if index >= 6 {
-			break
+	opened := New("", true)
+	opened.Projects = []*codebase.Project{{Name: "harbour", Path: folder}}
+	return opened, codebase.FileReference{Project: 0, Path: "harbour.txt"}, path
+}
+
+func TestADocumentChangedOnDiskIsReadAgain(test *testing.T) {
+	opened, reference, path := workspaceWithFile(test, "one boat\n")
+	opened.Keep(ReadDocument(opened.Projects[0], reference, true))
+	if _, cached := opened.Document(reference); !cached {
+		test.Fatal("a document just read is not kept")
+	}
+	if err := os.WriteFile(path, []byte("two boats and a lighthouse\n"), 0o644); err != nil {
+		test.Fatal(err)
+	}
+	if _, cached := opened.Document(reference); cached {
+		test.Error("a document whose file changed on disk is still given from the cache")
+	}
+}
+
+func TestACacheOverItsBudgetForgetsTheLeastRecentlyUsedDocument(test *testing.T) {
+	document := &codebase.Document{Text: "a line of text"}
+	size := sizeOf(document)
+	cache := newDocumentCache(2 * size)
+	first, second, third := codebase.FileReference{Path: "first"}, codebase.FileReference{Path: "second"}, codebase.FileReference{Path: "third"}
+	cache.keep(Read{Reference: first, Document: document})
+	cache.keep(Read{Reference: second, Document: document})
+	cache.take(first, diskStamp{}) // the first is now the most recently used
+	cache.keep(Read{Reference: third, Document: document})
+	if _, kept := cache.take(second, diskStamp{}); kept {
+		test.Error("the least recently used document is kept past the budget")
+	}
+	for _, reference := range []codebase.FileReference{first, third} {
+		if _, kept := cache.take(reference, diskStamp{}); !kept {
+			test.Errorf("%s is forgotten, though it was used more recently", reference.Path)
 		}
-		document := OpenDocument(project, change.Path, true)
-		added, removed := Counts(document.Diff)
-		test.Logf("  %s %s (%s) +%d -%d, %d rows folded, error %q", change.Status.Letter(), change.Path,
-			document.Language, added, removed, len(DiffRows(document.Diff, 3, nil)), document.Error)
+	}
+	if cache.used != 2*size {
+		test.Errorf("the cache counts %d bytes, want %d", cache.used, 2*size)
 	}
 }
 
-func unchangedLines(count int) []git.DiffLine {
-	lines := make([]git.DiffLine, count)
-	for index := range lines {
-		lines[index] = git.DiffLine{Kind: git.Context, OldNumber: index + 1, NewNumber: index + 1}
+func TestASmallerBudgetForgetsTheLeastRecentlyUsedDocumentsAtOnce(test *testing.T) {
+	opened := New("", true)
+	opened.SetDocumentMegabytes(64)
+	text := strings.Repeat("a line of text that fills the cache\n", 30000) // about a megabyte
+	references := []codebase.FileReference{{Path: "first"}, {Path: "second"}, {Path: "third"}}
+	for _, reference := range references {
+		opened.documents.keep(Read{Reference: reference, Document: &codebase.Document{Text: text}})
 	}
-	return lines
-}
-
-func TestUnchangedLinesFarFromAChangeAreFolded(test *testing.T) {
-	diff := unchangedLines(20)
-	diff[10].Kind = git.Insertion
-	rows := DiffRows(diff, 3, nil)
-	// 7 folded, 3 before, the change, 3 after, 6 folded
-	if len(rows) != 9 || !rows[0].IsFold() || rows[0].Folded != 7 || !rows[8].IsFold() || rows[8].Folded != 6 {
-		test.Fatalf("rows: %+v", rows)
+	opened.documents.setBudget(2 * sizeOf(&codebase.Document{Text: text}))
+	if documents, _ := opened.DocumentUse(); documents != 2 {
+		test.Fatalf("after the budget shrank to two documents, %d are kept", documents)
 	}
-	opened := DiffRows(diff, 3, map[int]bool{0: true})
-	if len(opened) != 15 {
-		test.Errorf("opening the first fold shows %d rows, want 15", len(opened))
-	}
-	if all := DiffRows(diff, -1, nil); len(all) != 20 {
-		test.Errorf("the full view shows %d rows, want 20", len(all))
-	}
-	if starts := HunkStarts(rows); len(starts) != 1 || starts[0] != 4 {
-		test.Errorf("hunks start at %v, want [4]", starts)
+	if _, kept := opened.documents.take(references[0], diskStamp{}); kept {
+		test.Error("the document opened longest ago is kept")
 	}
 }
 
-func TestAChainOfLoneFoldersIsOneFolder(test *testing.T) {
-	tree := BuildTree([]string{"src/main/java/com/lamp/Lamp.java", "src/main/java/com/lamp/Beam.java", "README.md"},
-		func(path string) bool { return path == "README.md" || path == "src/main/java/com/lamp/Beam.java" })
-	if tree.Changed != 2 || len(tree.Folders) != 1 || len(tree.Files) != 1 {
-		test.Fatalf("root: %+v", tree)
-	}
-	folder := tree.Folders[0]
-	if folder.Name != "src/main/java/com/lamp" || folder.Changed != 1 || len(folder.Files) != 2 {
-		test.Errorf("folder: %+v", folder)
-	}
-}
-
-func TestLatinOneTextIsRead(test *testing.T) {
-	if text := asText([]byte{'c', 0xe1, 'f'}); text != "cáf" {
-		test.Errorf("read %q", text)
-	}
-}
-
-func TestTheChangedWordsOfAReplacedLineAreFound(test *testing.T) {
-	rows := []Row{
-		{Line: git.DiffLine{Kind: git.Removal, OldNumber: 1}},
-		{Line: git.DiffLine{Kind: git.Insertion, NewNumber: 1}},
-		{Line: git.DiffLine{Kind: git.Removal, OldNumber: 2}},
-		{Line: git.DiffLine{Kind: git.Insertion, NewNumber: 2}},
-	}
-	texts := map[git.DiffLine]string{
-		rows[0].Line: `version = "1.5.26"`, rows[1].Line: `version = "1.5.27"`,
-		rows[2].Line: `alpha`, rows[3].Line: `something else entirely`,
-	}
-	spans := InlineChanges(rows, func(line git.DiffLine) []rune { return []rune(texts[line]) })
-	if spans[0] != (Span{16, 17}) || spans[1] != (Span{16, 17}) {
-		test.Errorf("the version's changed digit is at %+v and %+v, want 16–17", spans[0], spans[1])
-	}
-	if _, marked := spans[3]; marked {
-		test.Errorf("a line replaced wholly has a changed part marked: %+v", spans[3])
-	}
-}
-
-func TestTheGutterMarksAddedChangedAndRemovedLines(test *testing.T) {
-	diff := []git.DiffLine{
-		{Kind: git.Context, OldNumber: 1, NewNumber: 1},
-		{Kind: git.Removal, OldNumber: 2},
-		{Kind: git.Insertion, NewNumber: 2},
-		{Kind: git.Insertion, NewNumber: 3},
-		{Kind: git.Context, OldNumber: 3, NewNumber: 4},
-		{Kind: git.Removal, OldNumber: 4},
-		{Kind: git.Context, OldNumber: 5, NewNumber: 5},
-		{Kind: git.Insertion, NewNumber: 6},
-		{Kind: git.Removal, OldNumber: 6},
-	}
-	marks := LineMarks(diff)
-	want := map[int]Mark{2: ModifiedMark, 3: ModifiedMark, 5: RemovedAbove, 6: AddedMark}
-	for number, mark := range want {
-		if marks[number] != mark {
-			test.Errorf("line %d is marked %d, want %d", number, marks[number], mark)
+func TestABudgetIsKeptWithinItsEndsInWholeSteps(test *testing.T) {
+	cases := map[int]int{0: DefaultDocumentMegabytes, 100: 96, 8: DocumentMegabytesLeast, 4000: DocumentMegabytesMost, 128: 128}
+	for asked, want := range cases {
+		opened := New("", true)
+		opened.SetDocumentMegabytes(asked)
+		if opened.DocumentMegabytes() != want {
+			test.Errorf("asking %d MB keeps %d MB, want %d", asked, opened.DocumentMegabytes(), want)
 		}
 	}
 }
 
-// In a plain folder's tree, each project inside it has a folder of its own, even one that holds
-// nothing else, and no chain of lone folders swallows it.
-func TestAPlainFoldersTreeHasAPlaceForEachProjectInside(test *testing.T) {
-	tree := BuildTreeAround([]string{"guide.pdf"}, []string{"archive/projects/harbour"}, nil)
-	if len(tree.Folders) != 1 {
-		test.Fatalf("the top holds %d folders, want 1", len(tree.Folders))
+func TestAProjectReadAgainForgetsItsDocuments(test *testing.T) {
+	opened, reference, _ := workspaceWithFile(test, "one boat\n")
+	opened.Keep(ReadDocument(opened.Projects[0], reference, true))
+	opened.Loaded(&codebase.Project{Name: "harbour", Path: opened.Projects[0].Path, Loaded: true})
+	if !opened.Projects[0].Loaded {
+		test.Error("the project read is not put in the place of the old one")
 	}
-	chain := tree.Folders[0]
-	if chain.Name != "archive/projects" || len(chain.Folders) != 1 {
-		test.Fatalf("the top's folder is %q with %d folders, want archive/projects with 1", chain.Name, len(chain.Folders))
+	if _, cached := opened.Document(reference); cached {
+		test.Error("a document read from the project before it was read again is still kept")
 	}
-	if place := chain.Folders[0]; !place.IsProject || place.Path != "archive/projects/harbour" || place.Name != "harbour" {
-		test.Errorf("the place is %+v, want harbour, the place of a project", place)
+}
+
+func TestABaseOfOneProjectLeavesTheOthersOnTheBaseForAll(test *testing.T) {
+	opened := New("origin/main", true)
+	opened.SetBase("/harbour", "v1.0")
+	if base := opened.BaseFor("/harbour"); base != "v1.0" {
+		test.Errorf("the project with its own base is compared against %q", base)
+	}
+	if base := opened.BaseFor("/lighthouse"); base != "origin/main" {
+		test.Errorf("another project is compared against %q, not the base for all", base)
+	}
+	opened.SetBaseForAll("develop")
+	if base := opened.BaseFor("/harbour"); base != "develop" {
+		test.Errorf("after a base for all, the project keeps its own %q", base)
 	}
 }

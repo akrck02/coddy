@@ -6,10 +6,10 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/akrck02/coddy/editor/internal/codebase"
 	"github.com/akrck02/coddy/editor/internal/highlight"
 	"github.com/akrck02/coddy/editor/internal/pane"
 	"github.com/akrck02/coddy/editor/internal/text"
-	"github.com/akrck02/coddy/editor/internal/workspace"
 	"github.com/akrck02/go-renderer/draw2d"
 	"github.com/akrck02/go-renderer/input"
 )
@@ -72,10 +72,10 @@ func (view *Viewer) keepEditing() {
 func (view *Viewer) Unsaved() bool { return view.showing && view.Edit != nil && view.Edit.Modified() }
 
 // EditedFrom is what the file was when the edits started from it, for saving over it safely.
-func (view *Viewer) EditedFrom() workspace.Stamp { return view.editedFrom }
+func (view *Viewer) EditedFrom() codebase.Stamp { return view.editedFrom }
 
 // Saved records that the buffer was written: what it wrote, and the file's stamp now.
-func (view *Viewer) Saved(content string, stamp workspace.Stamp) {
+func (view *Viewer) Saved(content string, stamp codebase.Stamp) {
 	view.Edit.MarkSaved()
 	view.editedFrom = stamp
 	if view.Document != nil {

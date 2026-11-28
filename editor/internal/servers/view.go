@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/akrck02/coddy/editor/internal/codebase"
 	"github.com/akrck02/coddy/editor/internal/english"
 	"github.com/akrck02/coddy/editor/internal/lsp"
-	"github.com/akrck02/coddy/editor/internal/workspace"
 )
 
 // State is where a language server stands.
@@ -55,7 +55,7 @@ type shownViews struct {
 	revision int    // the fleet's revision
 	versions uint64 // the running servers' versions, added up: each only grows
 	second   int64  // the second the views were made in, while a server is at work; else 0
-	projects []*workspace.Project
+	projects []*codebase.Project
 	views    []View
 }
 

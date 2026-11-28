@@ -3,6 +3,7 @@ package language_test
 import (
 	"testing"
 
+	"github.com/akrck02/coddy/editor/internal/controls"
 	"github.com/akrck02/coddy/editor/internal/highlight"
 	"github.com/akrck02/coddy/editor/internal/language"
 	"github.com/akrck02/coddy/editor/internal/theme"
@@ -21,7 +22,7 @@ func TestEveryLanguageOfTheTableIsHighlightedIconedAndServedTheSameWay(test *tes
 			names = append(names, "lighthouse"+extension)
 		}
 		for _, name := range names {
-			if icon := theme.FileIcon(name, look); known.Icon != "" && icon.Name != known.Icon {
+			if icon := controls.FileIcon(name, look); known.Icon != "" && icon.Name != known.Icon {
 				test.Errorf("%s (%s) is drawn as %q, the table says %q", name, known.Name, icon.Name, known.Icon)
 			}
 			if served := language.ServerLanguageOf(name); served != known.ServerLanguage {

@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/akrck02/coddy/editor/internal/controls"
 	"github.com/akrck02/coddy/editor/internal/pane"
-	"github.com/akrck02/coddy/editor/internal/theme"
 	"github.com/akrck02/coddy/editor/internal/viewer"
 	"github.com/akrck02/go-renderer/input"
 	"github.com/akrck02/go-ui/uitest"
@@ -78,7 +78,7 @@ func TestTheHelpListsEveryCommand(test *testing.T) {
 		}
 		for _, press := range command.keys {
 			// a key is drawn as a cap for each key pressed together
-			if press.Label == "" || !strings.Contains(shown, theme.KeyCapWords(press.Label)) {
+			if press.Label == "" || !strings.Contains(shown, controls.KeyCapWords(press.Label)) {
 				test.Errorf("the help does not show the key %q of %q", press.Label, command.description)
 			}
 		}

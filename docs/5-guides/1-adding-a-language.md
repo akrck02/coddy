@@ -33,7 +33,7 @@ gets them.
 ## Checking it
 
 ```bash
-go test ./internal/language ./internal/highlight ./internal/theme
+go test ./internal/language ./internal/highlight ./internal/theme ./internal/controls
 ```
 
 `TestEveryLanguageOfTheTableIsHighlightedIconedAndServedTheSameWay` checks each entry is coloured,

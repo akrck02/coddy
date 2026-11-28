@@ -7,11 +7,11 @@ package mode
 import (
 	"context"
 
+	"github.com/akrck02/coddy/editor/internal/codebase"
 	"github.com/akrck02/coddy/editor/internal/pane"
 	"github.com/akrck02/coddy/editor/internal/sidebar"
 	"github.com/akrck02/coddy/editor/internal/theme"
 	"github.com/akrck02/coddy/editor/internal/viewer"
-	"github.com/akrck02/coddy/editor/internal/workspace"
 	ui "github.com/akrck02/go-ui"
 )
 
@@ -35,7 +35,7 @@ type Mode interface {
 type WithFileButton interface {
 	sidebar.Presser
 	// FileButton is the mode's button for a file; shown is false when the file has none.
-	FileButton(file workspace.FileReference) (button viewer.Button, shown bool)
+	FileButton(file codebase.FileReference) (button viewer.Button, shown bool)
 }
 
 // WithProgress is a mode with work to count, shown in the status bar whatever mode is on.
@@ -72,7 +72,7 @@ type Command struct {
 
 // Use is a place a name is used: a line of a file, from 1, and the characters of the name in it.
 type Use struct {
-	File       workspace.FileReference
+	File       codebase.FileReference
 	Line       int
 	Start, End int
 	// Probable is a place no server confirmed yet, whose file names the declaration for sure
@@ -89,7 +89,7 @@ type UsesHolder interface {
 	// SetUsesNote says again how the search goes, the uses unchanged.
 	SetUsesNote(note string)
 	// UsesIn are the uses of a file to mark, by line from 1.
-	UsesIn(file workspace.FileReference) map[int][]workspace.Span
+	UsesIn(file codebase.FileReference) map[int][]codebase.Span
 }
 
 // Cover is a mode that may show something of its own over the viewer, such as a graph;
@@ -104,25 +104,25 @@ type Cover interface {
 // Window is what a mode needs from the window it works in.
 type Window interface {
 	Look() theme.Look
-	Projects() []*workspace.Project
+	Projects() []*codebase.Project
 	// Hidden tells whether a project is left out of the lists.
-	Hidden(project *workspace.Project) bool
+	Hidden(project *codebase.Project) bool
 	// ChangedFiles are the files the development changed, in the order n goes through them;
 	// Shows tells whether one is in the project entered, if any.
-	ChangedFiles() []workspace.FileReference
-	Shows(file workspace.FileReference) bool
+	ChangedFiles() []codebase.FileReference
+	Shows(file codebase.FileReference) bool
 	// Reveal opens a file and shows it in the sidebar; FocusViewer gives it the keyboard.
-	Reveal(file workspace.FileReference)
+	Reveal(file codebase.FileReference)
 	FocusViewer()
 	// Target is the file a key acts on: the one selected in the sidebar while it has the
 	// keyboard, else the one open; inViewer tells whether it is the one open.
-	Target() (file workspace.FileReference, inViewer bool, found bool)
+	Target() (file codebase.FileReference, inViewer bool, found bool)
 	ToggleChangedFilter()
 	Loading() bool
 	// Toast shows a short note at the bottom of the window.
 	Toast(words string)
 	// RevealLine opens a file at a line, from 1, marked, and shows it in the sidebar.
-	RevealLine(file workspace.FileReference, line int)
+	RevealLine(file codebase.FileReference, line int)
 	// Relist lists the files again, as what the mode lists changed.
 	Relist()
 	// Keys are the frame's keys and pointer, for a mode that draws something of its own.

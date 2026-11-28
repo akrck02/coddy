@@ -3,7 +3,7 @@ package window
 import (
 	"strings"
 
-	"github.com/akrck02/coddy/editor/internal/theme"
+	"github.com/akrck02/coddy/editor/internal/controls"
 	"github.com/akrck02/go-renderer/draw2d"
 	ui "github.com/akrck02/go-ui"
 )
@@ -52,8 +52,8 @@ func (folder *chosenFolder) buildTitle(context *ui.Context) {
 				context.Text(name, ui.TextStyle{Weight: draw2d.Medium})
 				return
 			}
-			theme.CrumbText(context, name)
-			theme.CrumbChevron(context)
+			controls.CrumbText(context, name)
+			controls.CrumbChevron(context)
 		}
 	})
 }

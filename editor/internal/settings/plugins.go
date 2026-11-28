@@ -3,6 +3,7 @@ package settings
 import (
 	"strconv"
 
+	"github.com/akrck02/coddy/editor/internal/controls"
 	"github.com/akrck02/coddy/editor/internal/plugins"
 	"github.com/akrck02/coddy/editor/internal/theme"
 	"github.com/akrck02/go-renderer/draw2d"
@@ -70,7 +71,7 @@ func buildPluginsHeader(context *ui.Context, window Window) {
 		context.Text("Plugins teach Coddy new languages, version controls and tools. Each is on until you turn it off.",
 			ui.TextStyle{Color: context.Theme.InkSoft})
 		context.Spacer()
-		if theme.LabelledButton(context, "Open the folder plugins are installed in", "folder-open", "Open folder") {
+		if controls.LabelledButton(context, "Open the folder plugins are installed in", "folder-open", "Open folder") {
 			window.OpenPluginsFolder()
 		}
 	})

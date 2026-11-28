@@ -7,16 +7,16 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/akrck02/coddy/editor/internal/codebase"
 	"github.com/akrck02/coddy/editor/internal/language"
 	"github.com/akrck02/coddy/editor/internal/lsp"
-	"github.com/akrck02/coddy/editor/internal/workspace"
 )
 
 // FromJar turns a location in a jar (jdtls's jdt://, kotlin-lsp's jar:) into the class's source,
 // when a project open holds it, and tells whether it did: in the big workspace every repository
 // is a dependency of the others as a jar, and its source is what the person reads. The line is
 // where the name is declared in the source, as the jar's lines need not be the source's.
-func FromJar(projects []*workspace.Project, location lsp.Location, name string) (lsp.Location, bool) {
+func FromJar(projects []*codebase.Project, location lsp.Location, name string) (lsp.Location, bool) {
 	packageName, class, isJar := lsp.ClassInJar(location.URI)
 	if !isJar {
 		return location, false
@@ -25,7 +25,7 @@ func FromJar(projects []*workspace.Project, location lsp.Location, name string) 
 	if !found {
 		return location, false
 	}
-	lines := workspace.LinesOfFile(source)
+	lines := codebase.LinesOfFile(source)
 	line := declarationLine(lines, name, location.Range.Start.Line)
 	column := 0
 	if line < len(lines) {
@@ -38,7 +38,7 @@ func FromJar(projects []*workspace.Project, location lsp.Location, name string) 
 // sourceOfClass is the source of a class in a folder of packages: Class.java, Class.kt, Name.kt
 // for the class NameKt Kotlin makes of a file's functions, or else a Kotlin file of the folder that
 // declares the class, as one Kotlin file may hold several.
-func sourceOfClass(projects []*workspace.Project, folder, class string) (string, bool) {
+func sourceOfClass(projects []*codebase.Project, folder, class string) (string, bool) {
 	kotlin := kotlinExtension()
 	var names []string
 	for _, extension := range language.ClassExtensions() {
@@ -85,7 +85,7 @@ func memberDeclaration(name string) *regexp.Regexp {
 
 // sourceOf is the file on disk of a project open whose path ends with a class's path: the main
 // sources first, then any other.
-func sourceOf(projects []*workspace.Project, classPath string) (string, bool) {
+func sourceOf(projects []*codebase.Project, classPath string) (string, bool) {
 	var other string
 	for _, project := range projects {
 		for _, file := range project.Files {

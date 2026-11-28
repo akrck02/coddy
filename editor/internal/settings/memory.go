@@ -5,7 +5,7 @@ import (
 	"strconv"
 
 	"github.com/akrck02/coddy/editor/internal/english"
-	"github.com/akrck02/coddy/editor/internal/session"
+	"github.com/akrck02/coddy/editor/internal/workspace"
 	"github.com/akrck02/go-renderer/draw2d"
 	ui "github.com/akrck02/go-ui"
 )
@@ -38,8 +38,8 @@ func budgetFiles(megabytes int) string {
 
 // The names of the slider's two ends, written once.
 var (
-	leastBudgetName = budgetName(session.DocumentMegabytesLeast)
-	mostBudgetName  = budgetName(session.DocumentMegabytesMost)
+	leastBudgetName = budgetName(workspace.DocumentMegabytesLeast)
+	mostBudgetName  = budgetName(workspace.DocumentMegabytesMost)
 )
 
 // roughly is a count rounded to the nearest hundred, never below one hundred, with a comma
@@ -82,7 +82,7 @@ func (screen *Screen) buildMemory(context *ui.Context, window Window) {
 			context.Text(screen.budgetFiles.Of(chosen, budgetFiles), ui.TextStyle{Color: palette.InkSoft})
 		})
 		value := float32(chosen)
-		if context.SliderStep(memorySliderLabel, &value, session.DocumentMegabytesLeast, session.DocumentMegabytesMost, session.DocumentMegabytesStep) {
+		if context.SliderStep(memorySliderLabel, &value, workspace.DocumentMegabytesLeast, workspace.DocumentMegabytesMost, workspace.DocumentMegabytesStep) {
 			screen.slidTo = int(value)
 		}
 		context.Box(ui.Layout{Width: ui.Grow()}, func() {

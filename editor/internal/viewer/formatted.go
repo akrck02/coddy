@@ -4,13 +4,14 @@ import (
 	"math"
 	"strings"
 
+	"github.com/akrck02/coddy/editor/internal/codebase"
+	"github.com/akrck02/coddy/editor/internal/controls"
 	"github.com/akrck02/coddy/editor/internal/highlight"
 	"github.com/akrck02/coddy/editor/internal/language"
 	"github.com/akrck02/coddy/editor/internal/markdown"
 	"github.com/akrck02/coddy/editor/internal/pane"
 	"github.com/akrck02/coddy/editor/internal/text"
 	"github.com/akrck02/coddy/editor/internal/theme"
-	"github.com/akrck02/coddy/editor/internal/workspace"
 	"github.com/akrck02/go-renderer/draw2d"
 	ui "github.com/akrck02/go-ui"
 )
@@ -41,7 +42,7 @@ func (view *Viewer) buildFormatSwitch(context *ui.Context) {
 	if view.Formatted() {
 		tip = "Show its text, to edit it"
 	}
-	if theme.ToolButton(context, tip, "eye", view.Formatted()) {
+	if controls.ToolButton(context, tip, "eye", view.Formatted()) {
 		view.ToggleFormatted()
 	}
 }
@@ -81,7 +82,7 @@ type formatting struct {
 // the buffer's version. Comparing these is enough to know the text is the same, without building
 // it whole every frame.
 type sourceVersion struct {
-	document    *workspace.Document
+	document    *codebase.Document
 	buffer      *text.Buffer
 	editVersion int
 }

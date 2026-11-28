@@ -34,5 +34,5 @@ installed extensions. [Get started](../2-get-started.md) says where they go on e
 
 Icon themes are read and matched in `editor/internal/icons`, apart from the colours: `icons.LoadThemes`
 lists them, `Theme.FilePicture` names a file's picture as Zed does, and `icons.Pictures` draws each
-SVG once per size. The `theme` package only joins them to the look, in `theme.FileIcon` and
-`theme.DrawIcon`. A file of a kind Lucide has no icon for gets one in `icons/kinds.go`.
+SVG once per size. The `controls` package only joins them to the look, in `controls.FileIcon` and
+`controls.DrawIcon`. A file of a kind Lucide has no icon for gets one in `icons/kinds.go`.

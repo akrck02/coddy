@@ -3,10 +3,10 @@
 package sidebar
 
 import (
+	"github.com/akrck02/coddy/editor/internal/codebase"
 	"github.com/akrck02/coddy/editor/internal/java"
 	"github.com/akrck02/coddy/editor/internal/pane"
 	"github.com/akrck02/coddy/editor/internal/theme"
-	"github.com/akrck02/coddy/editor/internal/workspace"
 	"github.com/akrck02/go-renderer/draw2d"
 	ui "github.com/akrck02/go-ui"
 )
@@ -17,23 +17,23 @@ type Window interface {
 	Keys() pane.Keys
 	// ModalOpen tells whether a dialog or the finder is over the window, taking the input.
 	ModalOpen() bool
-	Projects() []*workspace.Project
+	Projects() []*codebase.Project
 	// ProjectIndex is a project's place in Projects, by its path; -1 when it is not open.
 	ProjectIndex(path string) int
 	// Hidden tells whether a project is left out of the list: one with no changes, while only the
 	// projects with changes are shown.
-	Hidden(project *workspace.Project) bool
+	Hidden(project *codebase.Project) bool
 	ShowEveryProject()
 	// ToggleChangedFilter shows only the changes, projects and files, or everything again.
 	ToggleChangedFilter()
-	OpenFile(file workspace.FileReference)
+	OpenFile(file codebase.FileReference)
 	// ExploreFolder shows a folder chosen in the sidebar in the file's place, "" a project's top.
 	ExploreFolder(project int, folder string)
 	// OpenedFile is the file the viewer shows, if any.
-	OpenedFile() (workspace.FileReference, bool)
-	IsOpened(file workspace.FileReference) bool
+	OpenedFile() (codebase.FileReference, bool)
+	IsOpened(file codebase.FileReference) bool
 	// Unsaved tells whether a file has edits not saved.
-	Unsaved(file workspace.FileReference) bool
+	Unsaved(file codebase.FileReference) bool
 	FocusViewer()
 	FocusSidebar()
 	SidebarFocused() bool
@@ -49,7 +49,7 @@ type Window interface {
 type ClassReader interface {
 	// ClassKind is what a file declares, once read; asking for one not read yet has it read in
 	// the background. ReadingKinds tells whether some are being read.
-	ClassKind(file workspace.FileReference) java.ClassKind
+	ClassKind(file codebase.FileReference) java.ClassKind
 	ReadingKinds() bool
 }
 
@@ -70,7 +70,7 @@ type Sidebar struct {
 	expanded map[expansionKey]bool
 	// trees are each project's tree as listed, kept until the projects change; filters are the
 	// filters whose trees are kept, the oldest first (trees.go)
-	trees map[treeKey]*workspace.Folder
+	trees map[treeKey]*codebase.Folder
 	// nesting are the paths of the plain folders whose trees hold the projects found in them, as
 	// the rows are made now (nesting.go)
 	nesting map[string]bool
@@ -114,12 +114,12 @@ type Sidebar struct {
 
 // New is a sidebar with nothing listed yet, which lists the projects at its first frame.
 func New() Sidebar {
-	return Sidebar{expanded: map[expansionKey]bool{}, trees: map[treeKey]*workspace.Folder{}, Stale: true, Width: 380, list: pane.Scroller{RowHeight: RowHeight}}
+	return Sidebar{expanded: map[expansionKey]bool{}, trees: map[treeKey]*codebase.Folder{}, Stale: true, Width: 380, list: pane.Scroller{RowHeight: RowHeight}}
 }
 
 // Invalidate forgets the trees, as the projects changed, and lists them again at the next frame.
 func (sidebar *Sidebar) Invalidate() {
-	sidebar.trees = map[treeKey]*workspace.Folder{}
+	sidebar.trees = map[treeKey]*codebase.Folder{}
 	sidebar.filters = sidebar.filters[:0]
 	sidebar.Stale = true
 }

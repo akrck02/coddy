@@ -3,8 +3,8 @@ package settings
 import (
 	"strings"
 
+	"github.com/akrck02/coddy/editor/internal/controls"
 	"github.com/akrck02/coddy/editor/internal/plugins"
-	"github.com/akrck02/coddy/editor/internal/theme"
 	"github.com/akrck02/go-renderer/draw2d"
 	ui "github.com/akrck02/go-ui"
 )
@@ -196,14 +196,14 @@ func (screen *Screen) buildPluginBar(context *ui.Context, window Window, plugin 
 		case plugin.Installing:
 			context.Text("Installing…", ui.TextStyle{Size: palette.SmallTextSize, Color: palette.InkSoft})
 		case plugin.Installable:
-			if theme.ToolButton(context, "Install what it needs", "download", false) {
+			if controls.ToolButton(context, "Install what it needs", "download", false) {
 				window.InstallMissing(plugin)
 			}
 		}
 		if plugin.Warning != "" && buildWarning(context, plugin.Warning) && len(plugin.Missing) > 0 {
 			screen.OpenPrerequisites(plugin)
 		}
-		if len(plugin.Settings) > 0 && theme.ToolButton(context, "Settings", "settings", false) {
+		if len(plugin.Settings) > 0 && controls.ToolButton(context, "Settings", "settings", false) {
 			screen.OpenPluginSettings(plugin)
 		}
 	})

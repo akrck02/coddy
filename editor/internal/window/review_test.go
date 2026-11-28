@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/akrck02/coddy/editor/internal/codebase"
 	"github.com/akrck02/coddy/editor/internal/plugins"
-	"github.com/akrck02/coddy/editor/internal/workspace"
 )
 
 // makePullRequest is makeRepository with main checked out, and itself as its remote origin: the
@@ -32,7 +32,7 @@ func TestAPullRequestChosenShowsItsChangesAgainstItsBaseAndItsComments(test *tes
 	application := newReader(Settings{Folders: []string{makePullRequest(test)}, Synchronous: true, WorkingTree: true,
 		Plugins: []*plugins.Plugin{plugin}})
 	window := newWindow(test, application)
-	if changes := application.session.Projects[0].ChangedPaths(); len(changes) != 0 {
+	if changes := application.workspace.Projects[0].ChangedPaths(); len(changes) != 0 {
 		test.Fatalf("main has %v changed before a pull request is chosen", changes)
 	}
 	application.listReviews(plugin)
@@ -46,11 +46,11 @@ func TestAPullRequestChosenShowsItsChangesAgainstItsBaseAndItsComments(test *tes
 	}
 	application.chooseReview(plugin, dialog.project, dialog.reviews[0])
 	window.Frames(2)
-	project := application.session.Projects[0]
+	project := application.workspace.Projects[0]
 	if project.Head == "" || project.Base != "origin/main" || strings.Join(project.ChangedPaths(), " ") != "notes.txt src/beam.go src/lamp.go" {
 		test.Fatalf("the pull request reads base %q, changes %v (%v, %q)", project.Base, project.ChangedPaths(), project.Error, application.toast)
 	}
-	application.openFile(workspace.FileReference{Project: 0, Path: "src/lamp.go"})
+	application.openFile(codebase.FileReference{Project: 0, Path: "src/lamp.go"})
 	window.Frames(2)
 	document := application.viewer.Document
 	if document == nil || len(document.NewLines) < 4 || !strings.Contains(document.NewLines[3].Text(), "true") {
@@ -77,7 +77,7 @@ func TestAReviewSourceThatCrashesIsToldWithItsCodeAndThePullRequestStillShows(te
 	if !strings.Contains(application.shownToast, "plugins.crashed") || plugin.State != "Failed: plugins.crashed" {
 		test.Errorf("the crash was told %q, the plugin's state is %q", application.shownToast, plugin.State)
 	}
-	if len(application.session.Projects[0].Changes) != 3 {
-		test.Errorf("the pull request shows %d changes without its comments", len(application.session.Projects[0].Changes))
+	if len(application.workspace.Projects[0].Changes) != 3 {
+		test.Errorf("the pull request shows %d changes without its comments", len(application.workspace.Projects[0].Changes))
 	}
 }

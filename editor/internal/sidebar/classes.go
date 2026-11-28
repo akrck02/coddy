@@ -1,10 +1,10 @@
 package sidebar
 
 import (
+	"github.com/akrck02/coddy/editor/internal/codebase"
 	"github.com/akrck02/coddy/editor/internal/highlight"
 	"github.com/akrck02/coddy/editor/internal/java"
 	"github.com/akrck02/coddy/editor/internal/theme"
-	"github.com/akrck02/coddy/editor/internal/workspace"
 	"github.com/akrck02/go-renderer/draw2d"
 )
 
@@ -37,17 +37,17 @@ func folderIcon(row Row, look theme.Look) (string, draw2d.Color) {
 	quiet := look.Theme.InkQuiet
 	open := row.Expanded
 	switch row.Role {
-	case workspace.ModuleFolder:
+	case codebase.ModuleFolder:
 		return "package", look.Syntax.RoleColour(highlight.Function)
-	case workspace.SourceRoot:
+	case codebase.SourceRoot:
 		return "folder-code", look.Syntax.RoleColour(highlight.Function)
-	case workspace.TestRoot:
+	case codebase.TestRoot:
 		return "folder-code", look.Syntax.RoleColour(highlight.String)
-	case workspace.ResourceRoot:
+	case codebase.ResourceRoot:
 		return "folder-cog", look.Syntax.RoleColour(highlight.Number)
-	case workspace.TestResourceRoot:
+	case codebase.TestResourceRoot:
 		return "folder-cog", look.Syntax.RoleColour(highlight.String)
-	case workspace.PackageFolder:
+	case codebase.PackageFolder:
 		return "folder-dot", quiet
 	}
 	if open {

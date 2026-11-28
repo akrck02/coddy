@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/akrck02/coddy/editor/internal/codebase"
 	"github.com/akrck02/coddy/editor/internal/lsp"
-	"github.com/akrck02/coddy/editor/internal/workspace"
 )
 
 func TestADeclarationInAJarOpensItsSourceInAProjectOpen(test *testing.T) {
@@ -15,7 +15,7 @@ func TestADeclarationInAJarOpensItsSourceInAProjectOpen(test *testing.T) {
 	path := filepath.Join(folder, "src", "main", "java", "org", "lighthouse", "lamp", "Lamp.java")
 	os.MkdirAll(filepath.Dir(path), 0o755)
 	os.WriteFile(path, []byte(source), 0o644)
-	projects := []*workspace.Project{{Name: "lamp", Path: folder, Loaded: true,
+	projects := []*codebase.Project{{Name: "lamp", Path: folder, Loaded: true,
 		Files: []string{"src/main/java/org/lighthouse/lamp/Lamp.java"}}}
 	jar := lsp.Location{URI: "jdt://contents/lamp.jar/org.lighthouse.lamp/Lamp.java?=x", Range: lsp.Range{Start: lsp.Position{Line: 23}}}
 	cases := []struct {
@@ -44,14 +44,14 @@ func TestAKotlinDeclarationInAJarOpensItsSource(test *testing.T) {
 		"src/main/kotlin/org/lighthouse/lamp/Lamps.kt": "package org.lighthouse.lamp\n\nimport kotlin.math.max\n\ndata class Wick(val length: Int)\n\nobject Lamp {\n    fun beam() = 2\n}\n",
 		"src/main/kotlin/org/lighthouse/lamp/Light.kt": "package org.lighthouse.lamp\n\nfun Wick.glow(): Int = length\n",
 	}
-	project := &workspace.Project{Name: "lamp", Path: folder, Loaded: true}
+	project := &codebase.Project{Name: "lamp", Path: folder, Loaded: true}
 	for file, text := range files {
 		full := filepath.Join(folder, filepath.FromSlash(file))
 		os.MkdirAll(filepath.Dir(full), 0o755)
 		os.WriteFile(full, []byte(text), 0o644)
 		project.Files = append(project.Files, file)
 	}
-	projects := []*workspace.Project{project}
+	projects := []*codebase.Project{project}
 	cases := []struct {
 		class, name, file string
 		line, column      int

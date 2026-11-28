@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/akrck02/coddy/editor/internal/pane"
-	"github.com/akrck02/coddy/editor/internal/session"
 	"github.com/akrck02/coddy/editor/internal/viewer"
+	"github.com/akrck02/coddy/editor/internal/workspace"
 	ui "github.com/akrck02/go-ui"
 )
 
@@ -124,7 +124,7 @@ func (application *Window) findInProject() {
 		application.finder.Show(finder.ContentScope)
 		return
 	}
-	application.finder.ShowIn(finder.ContentScope, project, application.session.Projects[project].Name)
+	application.finder.ShowIn(finder.ContentScope, project, application.workspace.Projects[project].Name)
 }
 
 // currentProject is the place of the project you are in, -1 for none.
@@ -238,13 +238,13 @@ func (application *Window) buildMenu(context *ui.Context) {
 }
 
 func (application *Window) title() string {
-	switch len(application.session.Folders) {
+	switch len(application.workspace.Folders) {
 	case 0:
 		return "Coddy"
 	case 1:
-		return session.BaseName(application.session.Folders[0])
+		return workspace.BaseName(application.workspace.Folders[0])
 	}
-	return fmt.Sprintf("%s and %d more", session.BaseName(application.session.Folders[0]), len(application.session.Folders)-1)
+	return fmt.Sprintf("%s and %d more", workspace.BaseName(application.workspace.Folders[0]), len(application.workspace.Folders)-1)
 }
 
 // showToast shows the last note for a few seconds, longer for a longer one, and draws again when it

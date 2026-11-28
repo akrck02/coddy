@@ -3,7 +3,7 @@ package sidebar
 import (
 	"strings"
 
-	"github.com/akrck02/coddy/editor/internal/theme"
+	"github.com/akrck02/coddy/editor/internal/controls"
 	ui "github.com/akrck02/go-ui"
 )
 
@@ -27,7 +27,7 @@ func (sidebar *Sidebar) SetChangedFilter(on bool) {
 // buildChangedFilter is the button that shows only the changes: the projects with some, and in a
 // mode that lists every file, the changed files.
 func (sidebar *Sidebar) buildChangedFilter(context *ui.Context, window Window) {
-	if theme.ToolButton(context, "Only the changes: projects and files (⌘⇧G)", "file-diff", sidebar.onlyChanged) {
+	if controls.ToolButton(context, "Only the changes: projects and files (⌘⇧G)", "file-diff", sidebar.onlyChanged) {
 		window.ToggleChangedFilter()
 	}
 }
@@ -94,7 +94,7 @@ func (sidebar *Sidebar) buildFilter(context *ui.Context, window Window) {
 			if filter != sidebar.Filter {
 				sidebar.SetFilter(filter)
 			}
-			if sidebar.Filter != "" && theme.ToolButton(context, "Clear the filter", "x", false) {
+			if sidebar.Filter != "" && controls.ToolButton(context, "Clear the filter", "x", false) {
 				sidebar.SetFilter("")
 			}
 			if submitted {

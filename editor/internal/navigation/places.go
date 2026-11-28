@@ -7,13 +7,13 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/akrck02/coddy/editor/internal/codebase"
 	"github.com/akrck02/coddy/editor/internal/lsp"
-	"github.com/akrck02/coddy/editor/internal/workspace"
 )
 
 // ReferenceOf is the file of a project open at a path on disk: in the project nearest to it, as
 // projects may hold others.
-func ReferenceOf(projects []*workspace.Project, path string) (workspace.FileReference, bool) {
+func ReferenceOf(projects []*codebase.Project, path string) (codebase.FileReference, bool) {
 	best, bestLength := -1, 0
 	for index, project := range projects {
 		relative, err := filepath.Rel(project.Path, path)
@@ -25,10 +25,10 @@ func ReferenceOf(projects []*workspace.Project, path string) (workspace.FileRefe
 		}
 	}
 	if best < 0 {
-		return workspace.FileReference{}, false
+		return codebase.FileReference{}, false
 	}
 	relative, _ := filepath.Rel(projects[best].Path, path) // it was worked out above without an error
-	return workspace.FileReference{Project: best, Path: filepath.ToSlash(relative)}, true
+	return codebase.FileReference{Project: best, Path: filepath.ToSlash(relative)}, true
 }
 
 // Declares tells whether a location is the declaration at a place of a file: the name asked about

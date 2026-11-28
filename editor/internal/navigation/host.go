@@ -4,14 +4,14 @@
 package navigation
 
 import (
+	"github.com/akrck02/coddy/editor/internal/codebase"
 	"github.com/akrck02/coddy/editor/internal/lsp"
-	"github.com/akrck02/coddy/editor/internal/workspace"
 )
 
 // Host is what navigation asks of the window it runs in.
 type Host interface {
 	// Projects are the projects open, in the sidebar's order.
-	Projects() []*workspace.Project
+	Projects() []*codebase.Project
 	// LineOf is a line of a file on disk, from 0, as the reader has it: with the edits not saved
 	// of the file open.
 	LineOf(path string, line int) string

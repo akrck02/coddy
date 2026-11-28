@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/akrck02/coddy/editor/internal/codebase"
 	"github.com/akrck02/coddy/editor/internal/lsp"
 	"github.com/akrck02/coddy/editor/internal/viewer"
-	"github.com/akrck02/coddy/editor/internal/workspace"
 	"github.com/akrck02/go-renderer/input"
 )
 
@@ -77,7 +77,7 @@ func TestAServerStartsOnFirstUse(test *testing.T) {
 	if application.servers.RunningCount() != 0 {
 		test.Fatal("a server started before a file of its language was opened")
 	}
-	application.openFile(workspace.FileReference{Project: 0, Path: "src/lamp.go"})
+	application.openFile(codebase.FileReference{Project: 0, Path: "src/lamp.go"})
 	window.Frames(2)
 	if application.servers.RunningCount() != 1 || !logSays(test, log, "opened lamp.go package lamp") {
 		test.Fatalf("opening lamp.go ran %d servers", application.servers.RunningCount())
@@ -99,7 +99,7 @@ func TestServersStopWithTheWindow(test *testing.T) {
 	log := filepath.Join(test.TempDir(), "log")
 	application := readerWithServers(test, "lighthouse/src/lamp.go", fakeGo(test, log))
 	newWindow(test, application)
-	client := application.servers.Running("fakels " + application.session.Projects[0].Path)
+	client := application.servers.Running("fakels " + application.workspace.Projects[0].Path)
 	if client == nil {
 		test.Fatalf("no server runs for lamp.go: %s", application.servers.Status())
 	}
@@ -119,12 +119,12 @@ func TestAMissingServerIsNamed(test *testing.T) {
 		Install: "brew install nols"}}
 	application := readerWithServers(test, "lighthouse/notes.txt", servers)
 	window := newWindow(test, application)
-	application.openFile(workspace.FileReference{Project: 0, Path: "src/lamp.go"})
+	application.openFile(codebase.FileReference{Project: 0, Path: "src/lamp.go"})
 	window.Frames(1)
 	if shown := strings.Join(window.Texts(), " "); !strings.Contains(shown, "nols is not installed: brew install nols") {
 		test.Errorf("the window shows %q", shown)
 	}
-	if application.servers.Snapshot(application.session.Projects[0].Path) != nil {
+	if application.servers.Snapshot(application.workspace.Projects[0].Path) != nil {
 		test.Error("a server that never ran left a snapshot, which would take later changes for its own")
 	}
 	if application.servers.Status() != "nols not installed" {
@@ -154,7 +154,7 @@ func TestFilesWrittenByAServerAreNotChanges(test *testing.T) {
 	}
 	application.reloadAll()
 	window.Frames(2)
-	project := application.session.Projects[0]
+	project := application.workspace.Projects[0]
 	if _, changed := project.ChangeOf(".classpath"); changed || len(project.ServerFiles) != 1 || project.ServerFiles[0].Server != "fakels" {
 		test.Fatalf("the server's .classpath is a change (%t); its files are %+v", changed, project.ServerFiles)
 	}
@@ -163,7 +163,7 @@ func TestFilesWrittenByAServerAreNotChanges(test *testing.T) {
 	}
 	again := newReader(Settings{Folders: []string{folder}, WorkingTree: true, Synchronous: true, ServersWrote: record})
 	newWindow(test, again)
-	if _, changed := again.session.Projects[0].ChangeOf(".classpath"); changed {
+	if _, changed := again.workspace.Projects[0].ChangeOf(".classpath"); changed {
 		test.Error("after a restart, the server's .classpath counts as a change")
 	}
 }
@@ -206,8 +206,8 @@ func TestACommitWhileAServerRunsStaysAChange(test *testing.T) {
 	}
 	application.reloadAll()
 	window.Frames(2)
-	if _, changed := application.session.Projects[0].ChangeOf("src/keeper.go"); !changed {
-		test.Errorf("a commit made while the server ran left the review; the server's files are %+v", application.session.Projects[0].ServerFiles)
+	if _, changed := application.workspace.Projects[0].ChangeOf("src/keeper.go"); !changed {
+		test.Errorf("a commit made while the server ran left the review; the server's files are %+v", application.workspace.Projects[0].ServerFiles)
 	}
 }
 
@@ -215,7 +215,7 @@ func TestAServerThatStopsIsStartedAgain(test *testing.T) {
 	log := filepath.Join(test.TempDir(), "log")
 	application := readerWithServers(test, "lighthouse/src/lamp.go", fakeGo(test, log))
 	window := newWindow(test, application)
-	key := "fakels " + application.session.Projects[0].Path
+	key := "fakels " + application.workspace.Projects[0].Path
 	first := application.servers.Running(key)
 	first.Stop() // as if it had crashed
 	for attempt := 0; attempt < 100 && application.servers.Running(key) == first; attempt++ {
@@ -231,7 +231,7 @@ func TestAServerThatStopsIsStartedAgain(test *testing.T) {
 func TestAProjectWhereOnlyAServerWroteStaysListed(test *testing.T) {
 	application := newReader(Settings{Synchronous: true})
 	application.onlyChanged = true
-	project := &workspace.Project{Loaded: true, ServerFiles: []workspace.ServerFile{{Path: ".classpath", Server: "jdtls"}}}
+	project := &codebase.Project{Loaded: true, ServerFiles: []codebase.ServerFile{{Path: ".classpath", Server: "jdtls"}}}
 	if application.hidden(project) {
 		test.Error("a project with only a server's files is hidden, and its badge with it")
 	}
@@ -264,7 +264,7 @@ func TestAServerWaitsForAnotherToHaveImportedTheProjects(test *testing.T) {
 	application := readerWithServers(test, "lighthouse/src/lamp.go", []lsp.Server{first, second})
 	window := newWindow(test, application)
 	window.Frames(1)
-	project := application.session.Projects[0].Path
+	project := application.workspace.Projects[0].Path
 	application.servers.Start(second, "", "second", project)
 	if application.servers.Starting("second") || !strings.Contains(application.servers.Status(), "second waits for fakels") {
 		test.Fatalf("second started while fakels imported; the status says %q", application.servers.Status())
@@ -304,7 +304,7 @@ func TestTheFileLeftIsClosedOnItsServer(test *testing.T) {
 	application := readerWithServers(test, "lighthouse/src/lamp.go", fakeGo(test, log))
 	window := newWindow(test, application)
 	window.Frames(2)
-	application.openFile(workspace.FileReference{Project: 0, Path: "src/beam.go"})
+	application.openFile(codebase.FileReference{Project: 0, Path: "src/beam.go"})
 	window.Frames(2)
 	if !logSays(test, log, "opened beam.go") || !logSays(test, log, "closed lamp.go") {
 		test.Error("opening beam.go did not close lamp.go on the server")

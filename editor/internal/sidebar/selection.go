@@ -1,13 +1,13 @@
 package sidebar
 
 import (
+	"github.com/akrck02/coddy/editor/internal/codebase"
 	"github.com/akrck02/coddy/editor/internal/pane"
-	"github.com/akrck02/coddy/editor/internal/workspace"
 	ui "github.com/akrck02/go-ui"
 )
 
 // RevealFile opens the folders around a file and selects it.
-func (sidebar *Sidebar) RevealFile(window Window, reference workspace.FileReference) {
+func (sidebar *Sidebar) RevealFile(window Window, reference codebase.FileReference) {
 	project := window.Projects()[reference.Project]
 	if sidebar.Entered != "" && sidebar.Entered != project.Path {
 		sidebar.Entered = "" // a file of another project: back to every project to show it
@@ -74,7 +74,7 @@ func (sidebar *Sidebar) activate(window Window, index int) {
 	row := sidebar.Rows[index]
 	switch row.Kind {
 	case FileRow:
-		window.OpenFile(workspace.FileReference{Project: row.Project, Path: row.Path})
+		window.OpenFile(codebase.FileReference{Project: row.Project, Path: row.Path})
 	case ProjectRow, FolderRow:
 		sidebar.SetExpanded(row, !row.Expanded)
 		window.ExploreFolder(row.Project, folderPath(row))
@@ -141,7 +141,7 @@ func (sidebar *Sidebar) previewSelected(window Window) {
 	row := sidebar.Rows[sidebar.Selected]
 	switch row.Kind {
 	case FileRow:
-		window.OpenFile(workspace.FileReference{Project: row.Project, Path: row.Path})
+		window.OpenFile(codebase.FileReference{Project: row.Project, Path: row.Path})
 	case ProjectRow, FolderRow:
 		window.ExploreFolder(row.Project, folderPath(row))
 	}
@@ -180,7 +180,7 @@ func (sidebar *Sidebar) followPointer(context *ui.Context, window Window) {
 		sidebar.Enter(window, row.Project)
 	case sidebar.onCheck(index, x):
 		if presser := sidebar.powers.presser; presser != nil {
-			presser.Press(workspace.FileReference{Project: row.Project, Path: row.Path}, false)
+			presser.Press(codebase.FileReference{Project: row.Project, Path: row.Path}, false)
 		}
 	default:
 		sidebar.activate(window, index)

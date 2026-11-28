@@ -4,33 +4,33 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/akrck02/coddy/editor/internal/codebase"
 	"github.com/akrck02/coddy/editor/internal/pane"
 	"github.com/akrck02/coddy/editor/internal/theme"
-	"github.com/akrck02/coddy/editor/internal/workspace"
 )
 
 // testWindow is a window with its projects and nothing else: it remembers what it was asked to
 // show, as the real one would show it.
 type testWindow struct {
-	projects []*workspace.Project
-	opened   []workspace.FileReference
+	projects []*codebase.Project
+	opened   []codebase.FileReference
 	explored []string
 }
 
-func (window *testWindow) Look() theme.Look                      { return theme.Look{} }
-func (window *testWindow) Keys() pane.Keys                       { return pane.Keys{} }
-func (window *testWindow) ModalOpen() bool                       { return false }
-func (window *testWindow) Projects() []*workspace.Project        { return window.projects }
-func (window *testWindow) Hidden(*workspace.Project) bool        { return false }
-func (window *testWindow) ShowEveryProject()                     {}
-func (window *testWindow) ToggleChangedFilter()                  {}
-func (window *testWindow) IsOpened(workspace.FileReference) bool { return false }
-func (window *testWindow) Unsaved(workspace.FileReference) bool  { return false }
-func (window *testWindow) FocusViewer()                          {}
-func (window *testWindow) FocusSidebar()                         {}
-func (window *testWindow) SidebarFocused() bool                  { return true }
-func (window *testWindow) ListEveryFile()                        {}
-func (window *testWindow) Loading() bool                         { return false }
+func (window *testWindow) Look() theme.Look                     { return theme.Look{} }
+func (window *testWindow) Keys() pane.Keys                      { return pane.Keys{} }
+func (window *testWindow) ModalOpen() bool                      { return false }
+func (window *testWindow) Projects() []*codebase.Project        { return window.projects }
+func (window *testWindow) Hidden(*codebase.Project) bool        { return false }
+func (window *testWindow) ShowEveryProject()                    {}
+func (window *testWindow) ToggleChangedFilter()                 {}
+func (window *testWindow) IsOpened(codebase.FileReference) bool { return false }
+func (window *testWindow) Unsaved(codebase.FileReference) bool  { return false }
+func (window *testWindow) FocusViewer()                         {}
+func (window *testWindow) FocusSidebar()                        {}
+func (window *testWindow) SidebarFocused() bool                 { return true }
+func (window *testWindow) ListEveryFile()                       {}
+func (window *testWindow) Loading() bool                        { return false }
 
 func (window *testWindow) ProjectIndex(path string) int {
 	for index, project := range window.projects {
@@ -41,7 +41,7 @@ func (window *testWindow) ProjectIndex(path string) int {
 	return -1
 }
 
-func (window *testWindow) OpenFile(file workspace.FileReference) {
+func (window *testWindow) OpenFile(file codebase.FileReference) {
 	window.opened = append(window.opened, file)
 }
 
@@ -49,9 +49,9 @@ func (window *testWindow) ExploreFolder(project int, folder string) {
 	window.explored = append(window.explored, fmt.Sprint(project, ":", folder))
 }
 
-func (window *testWindow) OpenedFile() (workspace.FileReference, bool) {
+func (window *testWindow) OpenedFile() (codebase.FileReference, bool) {
 	if len(window.opened) == 0 {
-		return workspace.FileReference{}, false
+		return codebase.FileReference{}, false
 	}
 	return window.opened[len(window.opened)-1], true
 }
@@ -65,7 +65,7 @@ func (everyFile) Decorate(Row) Decoration { return Decoration{} }
 func (listing everyFile) Header() string  { return listing.header }
 
 // newTestSidebar is a sidebar listing every file of made-up projects, read and without changes.
-func newTestSidebar(projects ...*workspace.Project) (*Sidebar, *testWindow) {
+func newTestSidebar(projects ...*codebase.Project) (*Sidebar, *testWindow) {
 	sidebar := New()
 	sidebar.SetListing(everyFile{})
 	window := &testWindow{projects: projects}
@@ -73,13 +73,13 @@ func newTestSidebar(projects ...*workspace.Project) (*Sidebar, *testWindow) {
 	return &sidebar, window
 }
 
-func lighthouse() *workspace.Project {
-	return &workspace.Project{Name: "lighthouse", Path: "/projects/lighthouse", Loaded: true,
+func lighthouse() *codebase.Project {
+	return &codebase.Project{Name: "lighthouse", Path: "/projects/lighthouse", Loaded: true,
 		Files: []string{"README.md", "docs/guide.md", "src/lamp.go", "src/wick.go"}}
 }
 
-func harbour() *workspace.Project {
-	return &workspace.Project{Name: "harbour", Path: "/projects/harbour", Loaded: true, Files: []string{"pier.go"}}
+func harbour() *codebase.Project {
+	return &codebase.Project{Name: "harbour", Path: "/projects/harbour", Loaded: true, Files: []string{"pier.go"}}
 }
 
 // labels are the rows' labels, in order.

@@ -5,7 +5,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/akrck02/coddy/editor/internal/workspace"
+	"github.com/akrck02/coddy/editor/internal/codebase"
 	"github.com/akrck02/go-renderer/draw2d"
 	ui "github.com/akrck02/go-ui"
 )
@@ -22,7 +22,7 @@ type source interface {
 	// find lists what the query finds, at once or as a job of the window.
 	find(finder *Finder, window Window)
 	// chosen is the file and line a row opens, the line 0 for the file's top.
-	chosen(finder *Finder, row int) (workspace.FileReference, int)
+	chosen(finder *Finder, row int) (codebase.FileReference, int)
 	// summary says what was found, and a note in the accent, "" for none.
 	summary(finder *Finder) (words, note string)
 	// nothingFound is what the empty list says, "" for nothing.
@@ -55,9 +55,9 @@ func (namesSource) find(finder *Finder, window Window) {
 	finder.matches = FuzzyFind(window.Candidates(), finder.Query, finderLimit)
 }
 
-func (namesSource) chosen(finder *Finder, row int) (workspace.FileReference, int) {
+func (namesSource) chosen(finder *Finder, row int) (codebase.FileReference, int) {
 	candidate := finder.matches[row].Candidate
-	return workspace.FileReference{Project: candidate.Project, Path: candidate.Path}, 0
+	return codebase.FileReference{Project: candidate.Project, Path: candidate.Path}, 0
 }
 
 func (namesSource) summary(finder *Finder) (string, string) {
@@ -76,9 +76,9 @@ func (hitsSource) mostRows() int            { return contentRows }
 func (hitsSource) count(finder *Finder) int { return len(finder.Hits) }
 func (hitsSource) tabbed() Scope            { return NamesScope }
 
-func (hitsSource) chosen(finder *Finder, row int) (workspace.FileReference, int) {
+func (hitsSource) chosen(finder *Finder, row int) (codebase.FileReference, int) {
 	hit := finder.Hits[row]
-	return workspace.FileReference{Project: hit.project, Path: hit.Path}, hit.Line
+	return codebase.FileReference{Project: hit.project, Path: hit.Path}, hit.Line
 }
 
 func (hitsSource) paintRow(finder *Finder, context *ui.Context, window Window, drawing *draw2d.List, row int, area draw2d.Rectangle) {

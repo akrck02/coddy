@@ -3,17 +3,17 @@ package sidebar
 import (
 	"testing"
 
-	"github.com/akrck02/coddy/editor/internal/workspace"
+	"github.com/akrck02/coddy/editor/internal/codebase"
 )
 
 func TestTheBadgeCountsTheFilesOfEachServer(test *testing.T) {
-	project := &workspace.Project{ServerFiles: []workspace.ServerFile{
+	project := &codebase.Project{ServerFiles: []codebase.ServerFile{
 		{Path: ".classpath", Server: "jdtls"}, {Path: ".project", Server: "jdtls"}, {Path: "go.work", Server: "gopls"},
 	}}
 	if badge := serverBadge(project); badge != "gopls · 1  jdtls · 2" {
 		test.Errorf("the badge says %q", badge)
 	}
-	if badge := serverBadge(&workspace.Project{}); badge != "" {
+	if badge := serverBadge(&codebase.Project{}); badge != "" {
 		test.Errorf("a project no server wrote in has the badge %q", badge)
 	}
 }

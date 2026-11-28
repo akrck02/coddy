@@ -1,8 +1,8 @@
 package viewer
 
 import (
+	"github.com/akrck02/coddy/editor/internal/codebase"
 	"github.com/akrck02/coddy/editor/internal/highlight"
-	"github.com/akrck02/coddy/editor/internal/workspace"
 	"github.com/akrck02/go-renderer/draw2d"
 )
 
@@ -16,8 +16,8 @@ func (usesPresentation) layOut(view *Viewer) {
 	for number := range view.Uses {
 		focus[number] = true
 	}
-	view.rows, view.diff = workspace.FocusRows(len(view.lines()), focus, view.foldContext(), view.openedFolds)
-	view.Hunks = workspace.FocusStarts(view.rows, focus)
+	view.rows, view.diff = codebase.FocusRows(len(view.lines()), focus, view.foldContext(), view.openedFolds)
+	view.Hunks = codebase.FocusStarts(view.rows, focus)
 }
 
 func (usesPresentation) showsRows() bool { return true }

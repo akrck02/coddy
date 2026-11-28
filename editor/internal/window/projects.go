@@ -3,9 +3,9 @@ package window
 import (
 	"context"
 
+	"github.com/akrck02/coddy/editor/internal/codebase"
 	"github.com/akrck02/coddy/editor/internal/finder"
 	"github.com/akrck02/coddy/editor/internal/plugins"
-	"github.com/akrck02/coddy/editor/internal/workspace"
 )
 
 // openFolders adds repositories, or the repositories inside folders, and reads them.
@@ -14,9 +14,9 @@ func (application *Window) openFolders(folders []string) {
 		application.keepingEdits(func() { application.openFolders(folders) })
 		return
 	}
-	application.session.Marked = application.markedVersionControls()
-	application.session.GitOff = plugins.GitOff(application.settings.Plugins)
-	application.session.AddFolders(folders)
+	application.workspace.Marked = application.markedVersionControls()
+	application.workspace.GitOff = plugins.GitOff(application.settings.Plugins)
+	application.workspace.AddFolders(folders)
 	application.viewer.Close()
 	application.reloadAll()
 }
@@ -27,14 +27,14 @@ func (application *Window) closeAll() {
 		application.keepingEdits(application.closeAll)
 		return
 	}
-	application.session.Clear()
+	application.workspace.Clear()
 	application.viewer.Close()
 	application.projectsChanged()
 }
 
 // reloadAll reads every project again: after a change of base, or to see new commits.
 func (application *Window) reloadAll() {
-	for index := range application.session.Projects {
+	for index := range application.workspace.Projects {
 		application.reload(index)
 	}
 	application.projectsChanged()
@@ -42,16 +42,16 @@ func (application *Window) reloadAll() {
 
 // reload reads one project again, on another goroutine.
 func (application *Window) reload(index int) {
-	path := application.session.Unread(index)
+	path := application.workspace.Unread(index)
 	options := application.LoadOptions(path)
 	application.loading++
 	settle := func() { application.loading-- } // also when a newer reading replaced this one
 	snapshot, written := application.servers.Snapshot(path), application.servers.Written()
 	application.work.RunSettling("project "+path, func(stop context.Context) func() {
-		var loaded *workspace.Project
+		var loaded *codebase.Project
 		var sorting error
 		if !application.work.Read(stop, func() {
-			loaded = workspace.LoadProject(stop, path, options)
+			loaded = codebase.LoadProject(stop, path, options)
 			sorting = written.SortOut(loaded, snapshot, options.WorkingTree)
 		}) {
 			return nil
@@ -61,7 +61,7 @@ func (application *Window) reload(index int) {
 				application.toast = sorting.Error()
 			}
 			application.forgetClassKinds(path)
-			application.session.Loaded(loaded)
+			application.workspace.Loaded(loaded)
 			application.projectsChanged()
 			application.viewer.Reopen(path, application.openFile)
 		}
@@ -69,8 +69,8 @@ func (application *Window) reload(index int) {
 }
 
 // LoadOptions are how a project is read: against its base, with the changes not committed yet or not.
-func (application *Window) LoadOptions(path string) workspace.LoadOptions {
-	return application.session.LoadOptions(path)
+func (application *Window) LoadOptions(path string) codebase.LoadOptions {
+	return application.workspace.LoadOptions(path)
 }
 
 // projectsChanged rebuilds what is made from the projects: the finder's files, the order of the
@@ -79,7 +79,7 @@ func (application *Window) projectsChanged() {
 	application.servers.ProjectsChanged()
 	application.candidates = application.candidates[:0]
 	application.changedOrder = application.changedOrder[:0]
-	for index, project := range application.session.Projects {
+	for index, project := range application.workspace.Projects {
 		if application.hidden(project) {
 			continue
 		}
@@ -89,19 +89,19 @@ func (application *Window) projectsChanged() {
 				Project: index, Path: path, Label: project.Name + "/" + path, Changed: changed,
 			})
 		}
-		tree := workspace.BuildTree(project.ChangedPaths(), nil)
+		tree := codebase.BuildTree(project.ChangedPaths(), nil)
 		walkFiles(tree, func(path string) {
-			application.changedOrder = append(application.changedOrder, workspace.FileReference{Project: index, Path: path})
+			application.changedOrder = append(application.changedOrder, codebase.FileReference{Project: index, Path: path})
 		})
 	}
 	application.finder.Stale = true
 	application.sidebar.Invalidate()
-	application.folder.shown = application.folder.shown && application.folder.project < len(application.session.Projects)
+	application.folder.shown = application.folder.shown && application.folder.project < len(application.workspace.Projects)
 }
 
 // projectIndex is where a project is in the list, by its path; -1 when it is not open.
 func (application *Window) projectIndex(path string) int {
-	for index, project := range application.session.Projects {
+	for index, project := range application.workspace.Projects {
 		if project.Path == path {
 			return index
 		}
@@ -111,15 +111,15 @@ func (application *Window) projectIndex(path string) int {
 
 // inScope tells whether a file is among those n, m and v go through: every project's, or only
 // those of the project the sidebar is in.
-func (application *Window) inScope(reference workspace.FileReference) bool {
+func (application *Window) inScope(reference codebase.FileReference) bool {
 	entered := application.sidebar.Entered
-	return entered == "" || application.session.Projects[reference.Project].Path == entered
+	return entered == "" || application.workspace.Projects[reference.Project].Path == entered
 }
 
 // projectsWithChanges counts the projects the development changed.
 func (application *Window) projectsWithChanges() int {
 	count := 0
-	for _, project := range application.session.Projects {
+	for _, project := range application.workspace.Projects {
 		if len(project.Changes) > 0 {
 			count++
 		}
@@ -130,7 +130,7 @@ func (application *Window) projectsWithChanges() int {
 // hidden tells whether a project is left out of the sidebar and the finder: in the mode that shows
 // only the projects with changes, one that was read and has none. A project still being read, or
 // that could not be read, stays in sight.
-func (application *Window) hidden(project *workspace.Project) bool {
+func (application *Window) hidden(project *codebase.Project) bool {
 	// a project where only a server wrote stays, to show its files (badge and list)
 	return application.onlyChanged && project.Loaded && len(project.Changes) == 0 && len(project.ServerFiles) == 0 && project.Error == nil
 }

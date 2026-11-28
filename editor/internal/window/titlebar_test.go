@@ -4,7 +4,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/akrck02/coddy/editor/internal/theme"
+	"github.com/akrck02/coddy/editor/internal/controls"
 	"github.com/akrck02/go-renderer/input"
 	"github.com/akrck02/go-ui/uitest"
 )
@@ -65,7 +65,7 @@ func TestTheMenuReadsTheProjectsAgain(test *testing.T) {
 		test.Fatal(err)
 	}
 	window.Frames(2)
-	if len(application.session.Projects[0].Changes) != 4 {
+	if len(application.workspace.Projects[0].Changes) != 4 {
 		test.Error("after the menu's item the file added since the start is not among the changes")
 	}
 }
@@ -88,7 +88,7 @@ func TestTheBarSitsOverTheViewerAlone(test *testing.T) {
 	if search.Rect.X < sidebarRight {
 		test.Errorf("the search begins at %v, over the sidebar ending at %v", search.Rect.X, sidebarRight)
 	}
-	if search.Rect.Y+search.Rect.Height > theme.BarHeight || filter.Rect.Y > theme.BarHeight+20 {
+	if search.Rect.Y+search.Rect.Height > controls.BarHeight || filter.Rect.Y > controls.BarHeight+20 {
 		test.Errorf("the search is at %v, the sidebar's filter at %v: the sidebar does not begin at the top", search.Rect, filter.Rect)
 	}
 	refresh, err := window.Element("Settings (⌘,)")

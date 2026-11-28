@@ -3,7 +3,7 @@ package sidebar
 import (
 	"path/filepath"
 
-	"github.com/akrck02/coddy/editor/internal/workspace"
+	"github.com/akrck02/coddy/editor/internal/codebase"
 )
 
 // findNesting works out which plain folders hold the projects found in them in their trees: each
@@ -27,7 +27,7 @@ func (sidebar *Sidebar) findNesting(window Window) {
 
 // nestedAt is the place in the window of the project found in a plain folder at a path inside
 // it, or -1 when none is open there.
-func (sidebar *Sidebar) nestedAt(window Window, root *workspace.Project, place string) int {
+func (sidebar *Sidebar) nestedAt(window Window, root *codebase.Project, place string) int {
 	path := filepath.Join(root.Path, filepath.FromSlash(place))
 	for index, project := range window.Projects() {
 		if project.Root == root.Path && project.Path == path {
@@ -38,7 +38,7 @@ func (sidebar *Sidebar) nestedAt(window Window, root *workspace.Project, place s
 }
 
 // placesIn are the paths, inside a plain folder that nests them, of the projects found in it.
-func (sidebar *Sidebar) placesIn(window Window, root *workspace.Project) []string {
+func (sidebar *Sidebar) placesIn(window Window, root *codebase.Project) []string {
 	if !sidebar.nesting[root.Path] {
 		return nil
 	}

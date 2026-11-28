@@ -87,8 +87,8 @@ func TestTheFolderChosenInTheSystemsChooserIsOpened(test *testing.T) {
 	if chooser.opened != 1 || chooser.start != first {
 		test.Fatalf("the chooser opened %d times, in %q; want once, in %q", chooser.opened, chooser.start, first)
 	}
-	if !slices.Contains(application.session.Folders, second) {
-		test.Errorf("the folder chosen is not open: %v", application.session.Folders)
+	if !slices.Contains(application.workspace.Folders, second) {
+		test.Errorf("the folder chosen is not open: %v", application.workspace.Folders)
 	}
 }
 
@@ -99,8 +99,8 @@ func TestClosingTheChooserOpensNothing(test *testing.T) {
 	application := newReader(Settings{Folders: []string{folder}, Synchronous: true, ChooseFolder: chooser.choose})
 	window := newWindow(test, application)
 	press(window, input.KeyO, input.KeySuper)
-	if chooser.opened != 1 || len(application.session.Folders) != 1 {
-		test.Errorf("the chooser opened %d times; the folders open are %v", chooser.opened, application.session.Folders)
+	if chooser.opened != 1 || len(application.workspace.Folders) != 1 {
+		test.Errorf("the chooser opened %d times; the folders open are %v", chooser.opened, application.workspace.Folders)
 	}
 }
 
@@ -113,9 +113,9 @@ func TestAFolderOpenedIsTheWholeWorkspace(test *testing.T) {
 	window := newWindow(test, application)
 	press(window, input.KeyO, input.KeySuper)
 	window.Frame()
-	projects := application.session.Projects
-	if len(projects) != 1 || projects[0].Name != "src" || !slices.Equal(application.session.Folders, []string{inside}) {
-		test.Errorf("the workspace has the folders %v, want only %s", application.session.Folders, inside)
+	projects := application.workspace.Projects
+	if len(projects) != 1 || projects[0].Name != "src" || !slices.Equal(application.workspace.Folders, []string{inside}) {
+		test.Errorf("the workspace has the folders %v, want only %s", application.workspace.Folders, inside)
 	}
 }
 
@@ -134,7 +134,7 @@ func TestAFolderWithNoRepositoryOpensAsAPlainFolder(test *testing.T) {
 	press(window, input.KeyO, input.KeySuper)
 	window.Frame()
 	names := []string{}
-	for _, project := range application.session.Projects {
+	for _, project := range application.workspace.Projects {
 		names = append(names, project.Name)
 	}
 	if !slices.Equal(names, []string{"recipes"}) {

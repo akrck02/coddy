@@ -3,9 +3,9 @@ package sidebar
 import (
 	"fmt"
 
+	"github.com/akrck02/coddy/editor/internal/codebase"
 	"github.com/akrck02/coddy/editor/internal/git"
 	"github.com/akrck02/coddy/editor/internal/pane"
-	"github.com/akrck02/coddy/editor/internal/workspace"
 )
 
 // RowKind is what a row of the sidebar stands for.
@@ -29,7 +29,7 @@ type Row struct {
 	Status   git.Status
 	Changed  int // changed files inside a project or a folder
 	Quiet    bool
-	Role     workspace.FolderRole
+	Role     codebase.FolderRole
 }
 
 // Rebuild lays the projects out as rows, keeping the selected row on the same thing.
@@ -145,7 +145,7 @@ func (sidebar *Sidebar) chosenCount(project int) (int, bool) {
 }
 
 // addProjectContent lists a project's tree at a depth, or why it cannot be listed yet.
-func (sidebar *Sidebar) addProjectContent(window Window, index int, project *workspace.Project, depth int) {
+func (sidebar *Sidebar) addProjectContent(window Window, index int, project *codebase.Project, depth int) {
 	if !project.Loaded {
 		sidebar.Rows = append(sidebar.Rows, Row{Kind: NoteRow, Project: index, Label: "Reading…", Depth: depth, Quiet: true})
 		return
@@ -156,7 +156,7 @@ func (sidebar *Sidebar) addProjectContent(window Window, index int, project *wor
 	sidebar.addFolder(window, index, sidebar.tree(window, index), depth)
 }
 
-func (sidebar *Sidebar) addFolder(window Window, project int, folder *workspace.Folder, depth int) {
+func (sidebar *Sidebar) addFolder(window Window, project int, folder *codebase.Folder, depth int) {
 	model := window.Projects()[project]
 	for _, child := range folder.Folders {
 		if child.IsProject {
@@ -177,7 +177,7 @@ func (sidebar *Sidebar) addFolder(window Window, project int, folder *workspace.
 	for _, path := range folder.Files {
 		change, _ := model.ChangeOf(path)
 		sidebar.Rows = append(sidebar.Rows, Row{
-			Kind: FileRow, Project: project, Path: path, Label: workspace.BaseName(path), Depth: depth, Status: change.Status,
+			Kind: FileRow, Project: project, Path: path, Label: codebase.BaseName(path), Depth: depth, Status: change.Status,
 		})
 	}
 }
@@ -189,7 +189,7 @@ func (sidebar *Sidebar) hidesDeleted() bool {
 
 // LeavesOut tells whether a changed file is left out of the list whatever the filters: a file the
 // development deleted, in a mode that hides them.
-func (sidebar *Sidebar) LeavesOut(project *workspace.Project, path string) bool {
+func (sidebar *Sidebar) LeavesOut(project *codebase.Project, path string) bool {
 	if !sidebar.hidesDeleted() {
 		return false
 	}
@@ -198,7 +198,7 @@ func (sidebar *Sidebar) LeavesOut(project *workspace.Project, path string) bool 
 }
 
 // withoutDeleted are the paths of the files the development did not delete, in a new slice.
-func withoutDeleted(project *workspace.Project, paths []string) []string {
+func withoutDeleted(project *codebase.Project, paths []string) []string {
 	kept := make([]string, 0, len(paths))
 	for _, path := range paths {
 		if change, changed := project.ChangeOf(path); changed && change.Status == git.Deleted {

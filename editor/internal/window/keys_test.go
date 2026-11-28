@@ -147,7 +147,7 @@ func (clipboard *memoryClipboard) SetClipboardText(text string) { clipboard.text
 
 // addAFileUnseen adds a file to the first project after the reader has read it.
 func addAFileUnseen(test *testing.T, application *Window, window *uitest.Window) {
-	path := filepath.Join(application.session.Projects[0].Path, "src", "lens.go")
+	path := filepath.Join(application.workspace.Projects[0].Path, "src", "lens.go")
 	if err := os.WriteFile(path, []byte("package lamp\n"), 0o644); err != nil {
 		test.Fatal(err)
 	}
@@ -211,7 +211,7 @@ func openingShortcuts() []shortcut {
 // comparison and the theme, and copy a path.
 func stateShortcuts() []shortcut {
 	readAgain := func(application *Window) string {
-		return unless(len(application.session.Projects[0].Changes) == 4, "the file added since the start is not among the changes")
+		return unless(len(application.workspace.Projects[0].Changes) == 4, "the file added since the start is not among the changes")
 	}
 	return []shortcut{
 		{name: "⌘R reads the projects again", prepare: addAFileUnseen, press: pressing(input.KeyR, input.KeySuper), holds: readAgain},
@@ -225,7 +225,7 @@ func stateShortcuts() []shortcut {
 			}},
 		{name: "⌘⇧W compares the last commit only", press: pressing(input.KeyW, input.KeySuper, input.KeyShift),
 			holds: func(application *Window) string {
-				return unless(!application.session.WorkingTree, "the changes not committed are still counted")
+				return unless(!application.workspace.WorkingTree, "the changes not committed are still counted")
 			}},
 		{name: "⌘⇧C copies the path of the file open", open: "lighthouse/src/lamp.go", press: pressing(input.KeyC, input.KeySuper, input.KeyShift),
 			copies: "lighthouse/src/lamp.go"},

@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/akrck02/coddy/editor/internal/codebase"
 	"github.com/akrck02/coddy/editor/internal/highlight"
 	"github.com/akrck02/coddy/editor/internal/pane"
 	"github.com/akrck02/coddy/editor/internal/theme"
-	"github.com/akrck02/coddy/editor/internal/workspace"
 	"github.com/akrck02/go-renderer/draw2d"
 	ui "github.com/akrck02/go-ui"
 )
@@ -36,7 +36,7 @@ func (view *Viewer) paint(context *ui.Context, window Window, drawing *draw2d.Li
 	if document.Binary || (document.Error != nil && view.RowCount() == 0) {
 		message := "A binary file: nothing to show"
 		if !document.Binary {
-			message = view.problem.Of(document, func(document *workspace.Document) string { return document.Error.Error() })
+			message = view.problem.Of(document, func(document *codebase.Document) string { return document.Error.Error() })
 		}
 		drawing.Text(message, view.List.Area.X+24, view.List.Area.Y+32, context.Theme.TextSize, draw2d.Regular, context.Theme.InkQuiet)
 		return
@@ -115,7 +115,7 @@ func (view *Viewer) paintFileLine(painter painting, index int, top, baseline flo
 }
 
 // paintFold paints the row that stands for lines folded away.
-func (view *Viewer) paintFold(painter painting, row workspace.Row, top, baseline float32) {
+func (view *Viewer) paintFold(painter painting, row codebase.Row, top, baseline float32) {
 	palette, area := painter.context.Theme, painter.area
 	rowArea := draw2d.Rectangle{X: area.X, Y: top, Width: area.Width, Height: view.rowHeight}
 	painter.drawing.Rectangle(rowArea, 0, painter.look.Hover.WithAlpha(0.6), draw2d.Color{}, 0)
@@ -145,15 +145,15 @@ func (view *Viewer) foldWordsOf(label foldLabel) string {
 
 // paintMark paints a line's mark in the file view's gutter: a bar for a line added (green) or
 // changed (amber), a small wedge where lines were removed (red).
-func (view *Viewer) paintMark(drawing *draw2d.List, look theme.Look, mark workspace.Mark, x, top float32) {
+func (view *Viewer) paintMark(drawing *draw2d.List, look theme.Look, mark codebase.Mark, x, top float32) {
 	switch mark {
-	case workspace.AddedMark:
+	case codebase.AddedMark:
 		drawing.Rectangle(draw2d.Rectangle{X: x, Y: top, Width: gutterMarkWidth, Height: view.rowHeight}, 0, look.Created, draw2d.Color{}, 0)
-	case workspace.ModifiedMark:
+	case codebase.ModifiedMark:
 		drawing.Rectangle(draw2d.Rectangle{X: x, Y: top, Width: gutterMarkWidth, Height: view.rowHeight}, 0, look.Modified, draw2d.Color{}, 0)
-	case workspace.RemovedAbove:
+	case codebase.RemovedAbove:
 		drawing.Rectangle(draw2d.Rectangle{X: x - 1, Y: top - 2, Width: 8, Height: 4}, 2, look.Deleted, draw2d.Color{}, 0)
-	case workspace.RemovedBelow:
+	case codebase.RemovedBelow:
 		drawing.Rectangle(draw2d.Rectangle{X: x - 1, Y: top + view.rowHeight - 2, Width: 8, Height: 4}, 2, look.Deleted, draw2d.Color{}, 0)
 	}
 }

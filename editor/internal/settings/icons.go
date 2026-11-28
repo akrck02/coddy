@@ -1,8 +1,8 @@
 package settings
 
 import (
+	"github.com/akrck02/coddy/editor/internal/controls"
 	"github.com/akrck02/coddy/editor/internal/icons"
-	"github.com/akrck02/coddy/editor/internal/theme"
 	"github.com/akrck02/go-renderer/draw2d"
 	ui "github.com/akrck02/go-ui"
 )
@@ -43,9 +43,9 @@ func buildIconThemeCard(context *ui.Context, window Window, name string, iconThe
 	if iconTheme != nil {
 		look.Pictures = window.IconPictures(iconTheme)
 	}
-	samples := []icons.Icon{theme.FolderIcon("src", false, look)}
+	samples := []icons.Icon{controls.FolderIcon("src", false, look)}
 	for _, file := range iconSamples {
-		samples = append(samples, theme.FileIcon(file, look))
+		samples = append(samples, controls.FileIcon(file, look))
 	}
 	chosen := sameIconTheme(window.IconTheme(), iconTheme)
 	layout := ui.Layout{Direction: ui.Vertical, Width: ui.Fixed(themeCardWidth), Padding: ui.Pad(8), Gap: 8}

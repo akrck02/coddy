@@ -10,8 +10,8 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/akrck02/coddy/editor/internal/codebase"
 	"github.com/akrck02/coddy/editor/internal/plugins"
-	"github.com/akrck02/coddy/editor/internal/workspace"
 	"github.com/akrck02/go-renderer/draw2d"
 	"github.com/akrck02/go-renderer/failure"
 )
@@ -56,7 +56,7 @@ func TestAPluginsActionShowsItsNoteAndOffersTheFileItMade(test *testing.T) {
 	application := newReader(Settings{Folders: []string{makeRepository(test)}, Synchronous: true, WorkingTree: true,
 		Open: "lighthouse/src/lamp.go", Plugins: []*plugins.Plugin{plugin}})
 	newWindow(test, application)
-	file := filepath.Join(application.session.Projects[0].Path, "src", "lamp.go")
+	file := filepath.Join(application.workspace.Projects[0].Path, "src", "lamp.go")
 	application.runAction(plugin, "note")
 	if application.toast != "noted "+file {
 		test.Errorf("the action's note is %q", application.toast)
@@ -118,15 +118,15 @@ func makeFakeRepository(test *testing.T, alsoCrash bool) string {
 	return folder
 }
 
-// projectNamed is the session's project of that name.
-func projectNamed(test *testing.T, application *Window, name string) *workspace.Project {
+// projectNamed is the workspace's project of that name.
+func projectNamed(test *testing.T, application *Window, name string) *codebase.Project {
 	test.Helper()
-	for _, project := range application.session.Projects {
+	for _, project := range application.workspace.Projects {
 		if project.Name == name {
 			return project
 		}
 	}
-	test.Fatalf("no project %q among %d", name, len(application.session.Projects))
+	test.Fatalf("no project %q among %d", name, len(application.workspace.Projects))
 	return nil
 }
 
@@ -138,7 +138,7 @@ func TestAProjectAPluginMarksListsItsChangesAndShowsAFilesTwoSides(test *testing
 	if harbour.Error != nil || harbour.Branch != "trunk" || strings.Join(harbour.ChangedPaths(), " ") != "lamp.txt new.txt" {
 		test.Fatalf("the project reads branch %q, changes %v (%v)", harbour.Branch, harbour.ChangedPaths(), harbour.Error)
 	}
-	document := workspace.OpenDocument(harbour, "lamp.txt", true)
+	document := codebase.OpenDocument(harbour, "lamp.txt", true)
 	if document.Error != nil || len(document.OldLines) != 1 || len(document.NewLines) != 2 || len(document.Diff) != 3 {
 		test.Errorf("lamp.txt shows %d old lines, %d new, %d of diff (%v)", len(document.OldLines), len(document.NewLines), len(document.Diff), document.Error)
 	}

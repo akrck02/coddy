@@ -1,9 +1,9 @@
 package window
 
 import (
+	"github.com/akrck02/coddy/editor/internal/controls"
 	"github.com/akrck02/coddy/editor/internal/finder"
 	"github.com/akrck02/coddy/editor/internal/settings"
-	"github.com/akrck02/coddy/editor/internal/theme"
 	"github.com/akrck02/go-renderer/draw2d"
 	ui "github.com/akrck02/go-ui"
 )
@@ -31,8 +31,8 @@ func (application *Window) buildTitleBar(context *ui.Context) {
 	if file {
 		buttons += application.viewer.ButtonsWidth(context, compact, application.mode.ShowsChanges()) + 13
 	}
-	room := barWidth - 2*theme.BarPadding - barGap - buttons
-	context.Box(ui.Layout{Width: ui.Grow(), Height: ui.Fixed(theme.BarHeight), Padding: ui.PadXY(theme.BarPadding, 0), Gap: barGap, AlignY: ui.Center}, func() {
+	room := barWidth - 2*controls.BarPadding - barGap - buttons
+	context.Box(ui.Layout{Width: ui.Grow(), Height: ui.Fixed(controls.BarHeight), Padding: ui.PadXY(controls.BarPadding, 0), Gap: barGap, AlignY: ui.Center}, func() {
 		context.Box(ui.Layout{Width: ui.Grow(), Gap: 6, AlignY: ui.Center}, func() {
 			if application.showsFolder() {
 				application.folder.buildTitle(context)
@@ -49,7 +49,7 @@ func (application *Window) buildTitleBar(context *ui.Context) {
 				application.viewer.BuildButtons(context, application, compact, application.mode.ShowsChanges())
 				context.Frame(ui.Layout{Width: ui.Fixed(1), Height: ui.Fixed(20)}, ui.Look{Fill: context.Theme.Line}, nil)
 			}
-			if theme.ToolButton(context, searchName, "search", false) {
+			if controls.ToolButton(context, searchName, "search", false) {
 				application.finder.Show(finder.NamesScope)
 			}
 			application.buildModeButtons(context)
@@ -77,7 +77,7 @@ func (application *Window) showsFolder() bool {
 // buildWorkspaceTitle names the workspace, and what it is compared against when that was chosen.
 func (application *Window) buildWorkspaceTitle(context *ui.Context) {
 	context.Text(application.title(), ui.TextStyle{Weight: draw2d.Medium})
-	if base := application.session.Base; base != "" {
+	if base := application.workspace.Base; base != "" {
 		context.Text("against "+base, ui.TextStyle{Size: context.Theme.SmallTextSize, Color: context.Theme.InkQuiet})
 	}
 }
@@ -86,10 +86,10 @@ func (application *Window) buildWorkspaceTitle(context *ui.Context) {
 // the base; in the others, whether files are edited. The settings themselves are in every mode.
 func (application *Window) buildModeButtons(context *ui.Context) {
 	if application.mode.ShowsChanges() {
-		if theme.ToolButton(context, "Count the changes not committed yet (⌘⇧W)", "file-pen-line", application.session.WorkingTree) {
+		if controls.ToolButton(context, "Count the changes not committed yet (⌘⇧W)", "file-pen-line", application.workspace.WorkingTree) {
 			application.keepingEdits(application.toggleWorkingTree)
 		}
-		if theme.ToolButton(context, "Compare against another branch, tag or commit (b)", "git-branch", false) {
+		if controls.ToolButton(context, "Compare against another branch, tag or commit (b)", "git-branch", false) {
 			application.openBaseDialog()
 		}
 	} else {
@@ -97,11 +97,11 @@ func (application *Window) buildModeButtons(context *ui.Context) {
 		if application.settings.ReadOnly {
 			lock, tip = "lock", "Read-only: on, files are only read (⌘⇧L)"
 		}
-		if theme.ToolButton(context, tip, lock, application.settings.ReadOnly) {
+		if controls.ToolButton(context, tip, lock, application.settings.ReadOnly) {
 			application.setReadOnly(!application.settings.ReadOnly)
 		}
 	}
-	if theme.ToolButton(context, "Settings (⌘,)", "settings", application.settingsScreen.Open) {
+	if controls.ToolButton(context, "Settings (⌘,)", "settings", application.settingsScreen.Open) {
 		application.settingsScreen.Toggle(settings.Appearance)
 	}
 }

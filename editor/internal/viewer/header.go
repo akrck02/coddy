@@ -5,8 +5,8 @@ import (
 	"path"
 	"strings"
 
+	"github.com/akrck02/coddy/editor/internal/controls"
 	"github.com/akrck02/coddy/editor/internal/git"
-	"github.com/akrck02/coddy/editor/internal/theme"
 	"github.com/akrck02/go-renderer/draw2d"
 	ui "github.com/akrck02/go-ui"
 )
@@ -43,7 +43,7 @@ func (view *Viewer) buildChange(context *ui.Context, compact bool) {
 	change := view.Document.Change
 	context.Box(ui.Layout{Width: ui.Fixed(4)}, nil)
 	if !compact {
-		context.Text(statusName(change.Status), ui.TextStyle{Size: palette.SmallTextSize, Color: theme.StatusColour(palette, change.Status)})
+		context.Text(statusName(change.Status), ui.TextStyle{Size: palette.SmallTextSize, Color: controls.StatusColour(palette, change.Status)})
 	}
 	if change.OldPath != change.Path && !compact {
 		context.Text("from "+change.OldPath, ui.TextStyle{Size: palette.SmallTextSize, Color: palette.InkQuiet})
@@ -68,7 +68,7 @@ func (view *Viewer) buildViewButtons(context *ui.Context, window Window, compact
 		if view.Unfolded() {
 			icon, label, tip = "fold-vertical", "Fold", "Fold the unchanged lines (⌘U)"
 		}
-		if compact && theme.ToolButton(context, tip, icon, false) || !compact && theme.LabelledButton(context, tip, icon, label) {
+		if compact && controls.ToolButton(context, tip, icon, false) || !compact && controls.LabelledButton(context, tip, icon, label) {
 			view.ToggleContext()
 		}
 	}
@@ -78,7 +78,7 @@ func (view *Viewer) buildViewButtons(context *ui.Context, window Window, compact
 		return
 	}
 	if button, shown := marker.FileButton(view.Reference); shown {
-		if theme.ToolButton(context, button.Tip, button.Icon, button.On) {
+		if controls.ToolButton(context, button.Tip, button.Icon, button.On) {
 			marker.PressFileButton(view.Reference)
 		}
 	}
@@ -86,25 +86,25 @@ func (view *Viewer) buildViewButtons(context *ui.Context, window Window, compact
 
 // buildHunkArrows goes to the previous or the next run of changes, as [ and ] do.
 func (view *Viewer) buildHunkArrows(context *ui.Context) {
-	if theme.ToolButton(context, "Previous change (⇧F7, [)", "chevron-up", false) {
+	if controls.ToolButton(context, "Previous change (⇧F7, [)", "chevron-up", false) {
 		view.StepHunk(-1)
 	}
-	if theme.ToolButton(context, "Next change (F7, ])", "chevron-down", false) {
+	if controls.ToolButton(context, "Next change (F7, ])", "chevron-down", false) {
 		view.StepHunk(1)
 	}
 }
 
 // buildViewSwitch switches between the changes, or the uses, and the whole file.
 func (view *Viewer) buildViewSwitch(context *ui.Context) {
-	other, choice := DiffView, theme.IconChoice{Icon: "file-diff", Name: "The changes (⌘D)"}
+	other, choice := DiffView, controls.IconChoice{Icon: "file-diff", Name: "The changes (⌘D)"}
 	if len(view.Uses) > 0 {
-		other, choice = UsesView, theme.IconChoice{Icon: "file-search", Name: "The uses (⌘D)"}
+		other, choice = UsesView, controls.IconChoice{Icon: "file-search", Name: "The uses (⌘D)"}
 	}
 	chosen := 0
 	if view.Mode == FileView {
 		chosen = 1
 	}
-	if theme.IconSwitch(context, "view mode", &chosen, []theme.IconChoice{choice, {Icon: "file-code", Name: "The whole file (⌘D)"}}) {
+	if controls.IconSwitch(context, "view mode", &chosen, []controls.IconChoice{choice, {Icon: "file-code", Name: "The whole file (⌘D)"}}) {
 		if chosen == 1 {
 			view.SetMode(FileView)
 		} else {

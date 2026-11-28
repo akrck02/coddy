@@ -3,8 +3,8 @@ package viewer
 import (
 	"testing"
 
+	"github.com/akrck02/coddy/editor/internal/codebase"
 	"github.com/akrck02/coddy/editor/internal/git"
-	"github.com/akrck02/coddy/editor/internal/workspace"
 	"github.com/akrck02/go-renderer/draw2d"
 )
 
@@ -15,7 +15,7 @@ const (
 )
 
 // changedFile is a file of 20 lines whose tenth was replaced.
-func changedFile() *workspace.Document {
+func changedFile() *codebase.Document {
 	var diff []git.DiffLine
 	for number := 1; number <= presentedLines; number++ {
 		if number == changedLine {
@@ -24,16 +24,16 @@ func changedFile() *workspace.Document {
 		}
 		diff = append(diff, git.DiffLine{Kind: git.Context, OldNumber: number, NewNumber: number})
 	}
-	return &workspace.Document{Path: "lighthouse/lamp.txt", Changed: true, Change: git.Change{Path: "lighthouse/lamp.txt", Status: git.Modified},
+	return &codebase.Document{Path: "lighthouse/lamp.txt", Changed: true, Change: git.Change{Path: "lighthouse/lamp.txt", Status: git.Modified},
 		OldLines: lines(presentedLines), NewLines: lines(presentedLines), Diff: diff}
 }
 
 // presenting opens the changed file in a view of 200 by 100 pixels, on its changes when asked.
-func presenting(showChanges bool, uses map[int][]workspace.Span) *Viewer {
+func presenting(showChanges bool, uses map[int][]codebase.Span) *Viewer {
 	view := New()
 	view.List.Place(draw2d.Rectangle{Width: 200, Height: 100})
 	view.Uses = uses
-	view.Start(workspace.FileReference{Path: "lighthouse/lamp.txt"}, &workspace.Project{Name: "lighthouse"})
+	view.Start(codebase.FileReference{Path: "lighthouse/lamp.txt"}, &codebase.Project{Name: "lighthouse"})
 	view.Show(changedFile(), showChanges)
 	return &view
 }
@@ -82,7 +82,7 @@ func TestTheWholeFileShowsEveryLineAndStepsToItsMarkedRuns(test *testing.T) {
 	if view.Mode != FileView || view.RowCount() != presentedLines || view.showsRows() {
 		test.Fatalf("the whole file shows in mode %d with %d rows, want its %d lines", view.Mode, view.RowCount(), presentedLines)
 	}
-	if len(view.Hunks) != 1 || view.Hunks[0] != changedLine-1 || view.Marks[changedLine] != workspace.ModifiedMark {
+	if len(view.Hunks) != 1 || view.Hunks[0] != changedLine-1 || view.Marks[changedLine] != codebase.ModifiedMark {
 		test.Errorf("the whole file's runs are %v and line 10 is marked %v, want one run at row 9, modified", view.Hunks, view.Marks[changedLine])
 	}
 	view.StepHunk(1)
@@ -95,7 +95,7 @@ func TestTheWholeFileShowsEveryLineAndStepsToItsMarkedRuns(test *testing.T) {
 }
 
 func TestTheUsesFoldTheLinesWithoutUsesAndLeaveWithThem(test *testing.T) {
-	uses := map[int][]workspace.Span{changedLine: {{Start: 0, End: 4}}}
+	uses := map[int][]codebase.Span{changedLine: {{Start: 0, End: 4}}}
 	view := presenting(true, uses)
 	// three lines each side of the use, the use, and a fold above and below
 	if want := 3 + 1 + 3 + 2; view.Mode != UsesView || view.RowCount() != want {

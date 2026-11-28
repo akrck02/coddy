@@ -24,7 +24,7 @@ func (application *Window) buildStatusBar(context *ui.Context) {
 		if application.viewer.IsOpen() {
 			application.buildBranch(context, small)
 		}
-		if !application.session.WorkingTree {
+		if !application.workspace.WorkingTree {
 			context.Text("commits only", ui.TextStyle{Size: palette.SmallTextSize, Color: palette.Warning})
 		}
 		application.buildServersButton(context)
@@ -50,7 +50,7 @@ func (application *Window) buildCounts(context *ui.Context, small ui.TextStyle) 
 		context.Tooltip(words)
 	}
 	status := &application.status
-	files, changed, projects := len(application.changedOrder), application.projectsWithChanges(), len(application.session.Projects)
+	files, changed, projects := len(application.changedOrder), application.projectsWithChanges(), len(application.workspace.Projects)
 	counted("file-diff", status.files.Of(files, strconv.Itoa), status.filesWords.Of(files, changedFilesWords), nil)
 	counted("folder-git-2", status.projects.Of([2]int{changed, projects}, fraction),
 		status.projectsWords.Of([2]int{changed, projects}, projectsWords), nil)
@@ -79,7 +79,7 @@ func (application *Window) buildProgress(context *ui.Context, viewed, total int)
 // buildBranch says where the open file's branch stands against its base, as the project is now.
 func (application *Window) buildBranch(context *ui.Context, small ui.TextStyle) {
 	project := application.viewer.Project
-	for _, current := range application.session.Projects {
+	for _, current := range application.workspace.Projects {
 		if current.Path == project.Path {
 			project = current
 		}

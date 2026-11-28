@@ -11,10 +11,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/akrck02/coddy/editor/internal/codebase"
 	"github.com/akrck02/coddy/editor/internal/english"
 	"github.com/akrck02/coddy/editor/internal/lsp"
 	"github.com/akrck02/coddy/editor/internal/programs"
-	"github.com/akrck02/coddy/editor/internal/workspace"
 )
 
 // startWait is how long a server gets to start and answer initialize.
@@ -95,8 +95,8 @@ func bytesOf(size int64) string {
 }
 
 // optionsOf are how each of some projects is read, worked out on the interface's goroutine for a job.
-func (fleet *Fleet) optionsOf(projects []string) map[string]workspace.LoadOptions {
-	options := map[string]workspace.LoadOptions{}
+func (fleet *Fleet) optionsOf(projects []string) map[string]codebase.LoadOptions {
+	options := map[string]codebase.LoadOptions{}
 	for _, path := range projects {
 		options[path] = fleet.host.LoadOptions(path)
 	}
@@ -104,10 +104,10 @@ func (fleet *Fleet) optionsOf(projects []string) map[string]workspace.LoadOption
 }
 
 // takeSnapshots reads projects afresh and notes what they hold, before a server starts in them.
-func takeSnapshots(server string, options map[string]workspace.LoadOptions) map[string]*workspace.Snapshot {
-	snapshots := map[string]*workspace.Snapshot{}
+func takeSnapshots(server string, options map[string]codebase.LoadOptions) map[string]*codebase.Snapshot {
+	snapshots := map[string]*codebase.Snapshot{}
 	for path, asked := range options {
-		snapshot := workspace.TakeSnapshot(workspace.LoadProject(context.Background(), path, asked), server)
+		snapshot := codebase.TakeSnapshot(codebase.LoadProject(context.Background(), path, asked), server)
 		snapshots[path] = &snapshot
 	}
 	return snapshots
@@ -115,7 +115,7 @@ func takeSnapshots(server string, options map[string]workspace.LoadOptions) map[
 
 // keepSnapshots keeps the first snapshot of each project: a later one would take what a server
 // wrote already as the person's.
-func (fleet *Fleet) keepSnapshots(snapshots map[string]*workspace.Snapshot) {
+func (fleet *Fleet) keepSnapshots(snapshots map[string]*codebase.Snapshot) {
 	for path, snapshot := range snapshots {
 		if _, taken := fleet.snapshots[path]; !taken {
 			fleet.snapshots[path] = snapshot

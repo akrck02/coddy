@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/akrck02/coddy/editor/internal/codebase"
 	"github.com/akrck02/coddy/editor/internal/viewer"
-	"github.com/akrck02/coddy/editor/internal/workspace"
 	"github.com/akrck02/go-renderer/input"
 	"github.com/akrck02/go-ui/uitest"
 )
@@ -22,7 +22,7 @@ func editingKeeper(test *testing.T) (*Window, *uitest.Window, string) {
 	if !application.editing() {
 		test.Fatal("keeper.go is not being edited")
 	}
-	return application, window, filepath.Join(application.session.Projects[0].Path, "src", "keeper.go")
+	return application, window, filepath.Join(application.workspace.Projects[0].Path, "src", "keeper.go")
 }
 
 func TestASavedFileShowsAsChanged(test *testing.T) {
@@ -36,7 +36,7 @@ func TestASavedFileShowsAsChanged(test *testing.T) {
 	if application.viewer.Unsaved() {
 		test.Error("the file still has edits not saved")
 	}
-	if _, changed := application.session.Projects[0].ChangeOf("src/keeper.go"); !changed {
+	if _, changed := application.workspace.Projects[0].ChangeOf("src/keeper.go"); !changed {
 		test.Error("the project does not count the file saved as changed")
 	}
 	if application.viewer.Edit == nil || application.viewer.Edit.Caret().Column != 3 {
@@ -75,7 +75,7 @@ func TestTakingTheirsReadsTheFileAgain(test *testing.T) {
 func TestClosingAnEditedFileAsks(test *testing.T) {
 	application, window, path := editingKeeper(test)
 	typeText(window, "x")
-	other := workspace.FileReference{Project: 0, Path: "src/lamp.go"}
+	other := codebase.FileReference{Project: 0, Path: "src/lamp.go"}
 	application.openFile(other)
 	window.Frames(2)
 	if !application.questions.unsavedOpen || application.viewer.Reference == other {
@@ -145,7 +145,7 @@ func TestCountingOnlyCommitsAsksBeforeLosingEdits(test *testing.T) {
 	application, window, _ := editingKeeper(test)
 	typeText(window, "x")
 	press(window, input.KeyW, input.KeySuper, input.KeyShift)
-	if !application.questions.unsavedOpen || !application.session.WorkingTree {
+	if !application.questions.unsavedOpen || !application.workspace.WorkingTree {
 		test.Fatal("⌘⇧W read the files again without asking about the edits")
 	}
 	answer(test, window, "Cancel")
@@ -184,7 +184,7 @@ func TestSavingFromTheQuestionAfterAConflictStillOpensTheOtherFile(test *testing
 	application, window, path := editingKeeper(test)
 	typeText(window, "x")
 	os.WriteFile(path, []byte("theirs\n"), 0o644)
-	other := workspace.FileReference{Project: 0, Path: "src/lamp.go"}
+	other := codebase.FileReference{Project: 0, Path: "src/lamp.go"}
 	application.openFile(other)
 	window.Frames(2)
 	answer(test, window, "Save")

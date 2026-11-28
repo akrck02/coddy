@@ -3,14 +3,14 @@ package window
 import (
 	"path/filepath"
 
+	"github.com/akrck02/coddy/editor/internal/codebase"
 	"github.com/akrck02/coddy/editor/internal/servers"
-	"github.com/akrck02/coddy/editor/internal/workspace"
 )
 
 // The window is the servers' Host: what follows is what they ask of it.
 
 // InSight tells whether a project is shown in the sidebar, so a server for the whole window reads it.
-func (application *Window) InSight(project *workspace.Project) bool {
+func (application *Window) InSight(project *codebase.Project) bool {
 	return !application.hidden(project)
 }
 

@@ -3,9 +3,9 @@ package window
 import (
 	"context"
 
+	"github.com/akrck02/coddy/editor/internal/codebase"
 	"github.com/akrck02/coddy/editor/internal/git"
 	"github.com/akrck02/coddy/editor/internal/plugins"
-	"github.com/akrck02/coddy/editor/internal/workspace"
 	"github.com/akrck02/coddy/sdk"
 	ui "github.com/akrck02/go-ui"
 )
@@ -46,8 +46,8 @@ func (application *Window) buildReviewItems(context *ui.Context) {
 
 // reviewedProject is the project a pull request is chosen for: the one of the file open, or of the
 // row selected, or the first; nil with none open.
-func (application *Window) reviewedProject() *workspace.Project {
-	projects := application.session.Projects
+func (application *Window) reviewedProject() *codebase.Project {
+	projects := application.workspace.Projects
 	switch row, selected := application.sidebar.SelectedRow(); {
 	case application.viewer.IsOpen() && application.viewer.Project != nil:
 		return application.viewer.Project
@@ -117,7 +117,7 @@ func (application *Window) buildReviewDialog(context *ui.Context) {
 // TODO(akrck02): pull requests of projects read through a version control plugin.
 func (application *Window) chooseReview(plugin *plugins.Plugin, path string, chosen sdk.Review) {
 	index := application.projectIndex(path)
-	if index < 0 || application.session.Projects[index].Control != nil {
+	if index < 0 || application.workspace.Projects[index].Control != nil {
 		application.toast = "Only git projects can review a pull request yet"
 		return
 	}
@@ -141,7 +141,7 @@ func (application *Window) chooseReview(plugin *plugins.Plugin, path string, cho
 // turns on the first mode that shows the changes.
 func (application *Window) startReview(path, head, base string, comments []sdk.ReviewComment) {
 	application.review = pullRequest{project: path, comments: commentWords(comments)}
-	application.session.SetReview(path, head, base)
+	application.workspace.SetReview(path, head, base)
 	if index := application.projectIndex(path); index >= 0 {
 		application.reload(index)
 	}
@@ -178,7 +178,7 @@ func commentWords(comments []sdk.ReviewComment) map[string]map[int]string {
 }
 
 // commentsOf are the comments on a file of a project, when it is the project under review.
-func (reviewed pullRequest) commentsOf(project *workspace.Project, file string) map[int]string {
+func (reviewed pullRequest) commentsOf(project *codebase.Project, file string) map[int]string {
 	if project == nil || project.Path != reviewed.project {
 		return nil
 	}

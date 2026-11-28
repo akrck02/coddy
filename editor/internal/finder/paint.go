@@ -5,9 +5,9 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/akrck02/coddy/editor/internal/controls"
 	"github.com/akrck02/coddy/editor/internal/highlight"
 	"github.com/akrck02/coddy/editor/internal/pane"
-	"github.com/akrck02/coddy/editor/internal/theme"
 	"github.com/akrck02/go-renderer/draw2d"
 	ui "github.com/akrck02/go-ui"
 )
@@ -29,14 +29,14 @@ func (finder *Finder) paint(context *ui.Context, window Window, drawing *draw2d.
 	for index := first; index < last; index++ {
 		top := finder.list.RowTop(index)
 		rowArea := draw2d.Rectangle{X: area.X, Y: top + 1, Width: area.Width - pane.ScrollBarWidth - 2, Height: finder.from.rowHeight() - 2}
-		state := theme.RowPlain
+		state := controls.RowPlain
 		switch index {
 		case finder.selected:
-			state = theme.RowChosen
+			state = controls.RowChosen
 		case hovered:
-			state = theme.RowHovered
+			state = controls.RowHovered
 		}
-		theme.PaintRowBackground(drawing, window.Look(), rowArea, finderRowRadius, state)
+		controls.PaintRowBackground(drawing, window.Look(), rowArea, finderRowRadius, state)
 		finder.from.paintRow(finder, context, window, drawing, index, rowArea)
 	}
 	finder.list.PaintBar(drawing, window.Look().ScrollThumb)
@@ -54,10 +54,10 @@ func (finder *Finder) paintName(context *ui.Context, window Window, drawing *dra
 	candidate := match.Candidate
 	project := window.Projects()[candidate.Project]
 	change, changed := project.ChangeOf(candidate.Path)
-	theme.DrawIcon(drawing, window.Look(), theme.FileIcon(candidate.Path, window.Look()), row.X+12, row.Y+(row.Height-16)/2, 16)
+	controls.DrawIcon(drawing, window.Look(), controls.FileIcon(candidate.Path, window.Look()), row.X+12, row.Y+(row.Height-16)/2, 16)
 	nameInk := palette.Ink
 	if changed {
-		nameInk = theme.StatusColour(palette, change.Status)
+		nameInk = controls.StatusColour(palette, change.Status)
 		letter := change.Status.Letter()
 		width := measurer.MeasureText(letter, palette.SmallTextSize, draw2d.Mono, 1).Width
 		drawing.Text(letter, row.Right()-14-width, baseline, palette.SmallTextSize, draw2d.Mono, nameInk)
@@ -80,7 +80,7 @@ func (finder *Finder) paintHit(context *ui.Context, window Window, drawing *draw
 	const codeSize = 13
 	code := measurer.MeasureText("M", codeSize, draw2d.Mono, 1)
 	small := measurer.MeasureText("Ag", palette.SmallTextSize, draw2d.Regular, 1)
-	theme.DrawIcon(drawing, window.Look(), theme.FileIcon(hit.Path, window.Look()), row.X+12, row.Y+9, 16)
+	controls.DrawIcon(drawing, window.Look(), controls.FileIcon(hit.Path, window.Look()), row.X+12, row.Y+9, 16)
 	left := row.X + 40
 	drawing.PushClip(draw2d.Rectangle{X: row.X, Y: row.Y, Width: row.Width - 8, Height: row.Height})
 	// the line from its first letter, or from a little before what was found in a long line
@@ -101,7 +101,7 @@ func (finder *Finder) paintHit(context *ui.Context, window Window, drawing *draw
 	where := hit.where
 	whereInk := palette.InkQuiet
 	if hit.changed {
-		whereInk = theme.StatusColour(palette, hit.status).WithAlpha(0.85)
+		whereInk = controls.StatusColour(palette, hit.status).WithAlpha(0.85)
 	}
 	drawing.Text(where, left, row.Bottom()-8-small.Descent, palette.SmallTextSize, draw2d.Regular, whereInk)
 	drawing.PopClip()

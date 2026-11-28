@@ -3,7 +3,7 @@ package window
 import (
 	"errors"
 
-	"github.com/akrck02/coddy/editor/internal/session"
+	"github.com/akrck02/coddy/editor/internal/codebase"
 	"github.com/akrck02/coddy/editor/internal/workspace"
 	ui "github.com/akrck02/go-ui"
 	platform "github.com/akrck02/go-ui/window"
@@ -19,7 +19,7 @@ type questions struct {
 }
 
 // Unsaved tells whether a file has edits not saved: only the file open can.
-func (application *Window) Unsaved(file workspace.FileReference) bool {
+func (application *Window) Unsaved(file codebase.FileReference) bool {
 	return application.viewer.Unsaved() && application.viewer.Reference == file
 }
 
@@ -36,7 +36,7 @@ func (application *Window) keepingEdits(then func()) {
 // toggleWorkingTree counts the changes not committed yet, or the commits only; the files are read
 // again, from disk or from the last commit.
 func (application *Window) toggleWorkingTree() {
-	counted := application.session.ToggleWorkingTree()
+	counted := application.workspace.ToggleWorkingTree()
 	application.reloadAll()
 	application.toast = workingTreeNote(counted)
 }
@@ -55,11 +55,11 @@ func (application *Window) save() bool {
 
 // write saves the file being edited over the file on disk as read describes it, and reads its
 // project again so the tree, the counts and the diff show the change.
-func (application *Window) write(read workspace.Stamp) bool {
+func (application *Window) write(read codebase.Stamp) bool {
 	view := &application.viewer
 	content := view.Edit.Text()
-	stamp, err := workspace.Save(view.Project, view.Reference.Path, content, read)
-	if errors.Is(err, workspace.ChangedOnDisk) {
+	stamp, err := codebase.Save(view.Project, view.Reference.Path, content, read)
+	if errors.Is(err, codebase.ChangedOnDisk) {
 		application.questions.conflictOpen = true
 		return false
 	}
@@ -78,7 +78,7 @@ func (application *Window) write(read workspace.Stamp) bool {
 // keepMine saves over the file changed on disk, then does what was waiting for the save.
 func (application *Window) keepMine() {
 	view := &application.viewer
-	if now, err := workspace.StampOf(view.Project, view.Reference.Path); err == nil && application.write(now) {
+	if now, err := codebase.StampOf(view.Project, view.Reference.Path); err == nil && application.write(now) {
 		application.doWhatWasAsked()
 	}
 }
@@ -88,7 +88,7 @@ func (application *Window) keepMine() {
 func (application *Window) takeTheirs() {
 	view := &application.viewer
 	view.Edit = nil
-	application.session.Forget(view.Reference)
+	application.workspace.Forget(view.Reference)
 	view.Document = nil
 	application.openFile(view.Reference)
 	application.doWhatWasAsked()
@@ -106,7 +106,7 @@ func (application *Window) doWhatWasAsked() {
 // buildQuestions shows the dialog about edits that is open, if one is.
 func (application *Window) buildQuestions(context *ui.Context) {
 	asked := &application.questions
-	name := session.BaseName(application.viewer.Reference.Path)
+	name := workspace.BaseName(application.viewer.Reference.Path)
 	if asked.unsavedOpen {
 		application.ask(context, "Save the changes to "+name+"?", "Your changes are lost if you don't save them.",
 			[2]string{"Save", "Don't save"}, &asked.unsavedOpen, application.answerUnsaved)

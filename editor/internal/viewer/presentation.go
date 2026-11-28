@@ -1,8 +1,8 @@
 package viewer
 
 import (
+	"github.com/akrck02/coddy/editor/internal/codebase"
 	"github.com/akrck02/coddy/editor/internal/theme"
-	"github.com/akrck02/coddy/editor/internal/workspace"
 	"github.com/akrck02/go-renderer/draw2d"
 )
 
@@ -52,7 +52,7 @@ type wholeFilePresentation struct{}
 func (wholeFilePresentation) layOut(view *Viewer) {
 	view.countChanges()
 	for number := 1; number <= len(view.lines()); number++ {
-		if view.Marks[number] != workspace.NoMark && view.Marks[number-1] == workspace.NoMark {
+		if view.Marks[number] != codebase.NoMark && view.Marks[number-1] == codebase.NoMark {
 			view.Hunks = append(view.Hunks, number-1)
 		}
 	}
@@ -77,10 +77,10 @@ func (wholeFilePresentation) barMarks(view *Viewer) barMarks {
 	marks := barMarks{rows: count}
 	for number := 1; number <= count; number++ {
 		switch view.Marks[number] {
-		case workspace.NoMark:
-		case workspace.AddedMark:
+		case codebase.NoMark:
+		case codebase.AddedMark:
 			marks.add(number-1, createdBarMark)
-		case workspace.ModifiedMark:
+		case codebase.ModifiedMark:
 			marks.add(number-1, modifiedBarMark)
 		default:
 			marks.add(number-1, deletedBarMark)

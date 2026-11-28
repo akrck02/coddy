@@ -62,14 +62,14 @@ func TestNoErrorIsMadeWithoutACode(test *testing.T) {
 	}
 }
 
-// The reader writes inside a repository only through workspace.Save; the only other file that
+// The reader writes inside a repository only through codebase.Save; the only other file that
 // writes is the one keeping its own marks, in its own folder. Git itself runs read-only commands.
 func TestOnlyTheSaveWritesInARepository(test *testing.T) {
 	allowed := map[string]bool{
-		filepath.Join(moduleRoot, "internal/workspace/save.go"):  true,
-		filepath.Join(moduleRoot, "internal/review/reviewed.go"): true,
+		filepath.Join(moduleRoot, "internal/codebase/save.go"):        true,
+		filepath.Join(moduleRoot, "internal/mode/review/reviewed.go"): true,
 		// what language servers wrote, kept in the reader's own folder as the viewed marks are
-		filepath.Join(moduleRoot, "internal/workspace/written.go"): true,
+		filepath.Join(moduleRoot, "internal/codebase/written.go"): true,
 		// old indexes of servers, in their data folder: the reader's own, never a repository
 		filepath.Join(moduleRoot, "internal/lsp/indexes.go"): true,
 		// the Gradle home of a server that imports Gradle builds, in its data folder, and the models
@@ -95,7 +95,7 @@ func TestOnlyTheSaveWritesInARepository(test *testing.T) {
 	for path, source := range goSources(test) {
 		for _, writer := range writers {
 			if strings.Contains(source, writer) && !allowed[path] {
-				test.Errorf("%s writes with %s; only workspace.Save may write in a repository", path, writer)
+				test.Errorf("%s writes with %s; only codebase.Save may write in a repository", path, writer)
 			}
 		}
 	}
@@ -138,13 +138,12 @@ func TestTheDomainImportsNoInterface(test *testing.T) {
 	interfaces := []string{
 		"github.com/akrck02/go-ui",
 		"github.com/akrck02/coddy/editor/internal/theme",
+		"github.com/akrck02/coddy/editor/internal/controls",
 		"github.com/akrck02/coddy/editor/internal/pane",
 		"github.com/akrck02/coddy/editor/internal/window",
 		"github.com/akrck02/coddy/editor/internal/mode",
-		"github.com/akrck02/coddy/editor/internal/files",
-		"github.com/akrck02/coddy/editor/internal/review",
 	}
-	for _, domain := range []string{"workspace", "text", "lsp", "plugins"} {
+	for _, domain := range []string{"codebase", "text", "lsp", "plugins"} {
 		if found := importsAny(test, domain, interfaces...); found != "" {
 			test.Errorf("%s imports %s", domain, found)
 		}
@@ -154,10 +153,19 @@ func TestTheDomainImportsNoInterface(test *testing.T) {
 // A pane asks the window for what it needs through an interface of its own, so the arrows only
 // point down: the window knows its panes, and no pane knows the window.
 func TestNoPaneImportsTheWindow(test *testing.T) {
-	for _, pane := range []string{"theme", "pane", "viewer", "sidebar", "finder", "settings", "work", "session", "navigation", "servers", "plugins"} {
+	for _, pane := range []string{"theme", "controls", "pane", "viewer", "sidebar", "finder", "settings", "work", "workspace", "navigation", "servers", "plugins"} {
 		if found := importsAny(test, pane, "github.com/akrck02/coddy/editor/internal/window"); found != "" {
 			test.Errorf("%s imports %s", pane, found)
 		}
+	}
+}
+
+// A theme is colours, read from a file: the controls drawn with them build on it, and it knows
+// nothing of them, nor of git, whose states only the controls colour.
+func TestTheThemeKnowsNeitherTheControlsNorGit(test *testing.T) {
+	forbidden := []string{"github.com/akrck02/coddy/editor/internal/controls", "github.com/akrck02/coddy/editor/internal/git"}
+	if found := importsAny(test, "theme", forbidden...); found != "" {
+		test.Errorf("theme imports %s", found)
 	}
 }
 
@@ -182,7 +190,7 @@ func TestGradleKnowsNothingOfTheLanguageServers(test *testing.T) {
 // A mode is one package and one line in main: the window holds the modes it is given and imports
 // none of them.
 func TestTheWindowImportsNoMode(test *testing.T) {
-	modes := []string{"github.com/akrck02/coddy/editor/internal/files", "github.com/akrck02/coddy/editor/internal/review"}
+	modes := []string{"github.com/akrck02/coddy/editor/internal/mode/files", "github.com/akrck02/coddy/editor/internal/mode/review", "github.com/akrck02/coddy/editor/internal/mode/uses"}
 	if found := importsAny(test, "window", modes...); found != "" {
 		test.Errorf("window imports %s", found)
 	}

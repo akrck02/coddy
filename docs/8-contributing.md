@@ -7,13 +7,13 @@ piece lives, how to build and test it, and how to add a mode.
 
 Coddy writes a file of a repository only when someone saves it, and git only reads.
 
-- `workspace.Save` is the one function that writes inside a repository: the whole file at once,
+- `codebase.Save` is the one function that writes inside a repository: the whole file at once,
   through a file beside it renamed over it, and never over a change made on disk since it was read
   (`workspace.changed-on-disk`). `TestOnlyTheSaveWritesInARepository` fails on a file write
   anywhere else; the marks of the files viewed and the record of what language servers wrote,
   both kept in the reader's own folder, are the only other places allowed.
 - Language servers are other programs and may write in a repository (`jdtls` does). What they
-  write is never the person's change: `workspace.Written.SortOut` takes it out of the review, and
+  write is never the person's change: `codebase.Written.SortOut` takes it out of the review, and
   the sidebar lists it. A server never edits a file the person reads: the client answers every
   `workspace/applyEdit` with "not applied".
 - Every git command goes through `editor/internal/git`, which runs only the commands on its read-only
@@ -33,9 +33,10 @@ sdk/jsonrpc           the connection to another program: language servers and pl
 plugins/              a module of its own: the official plugins, built on the sdk alone
 editor/               a module of its own: Coddy, built on the sdk; its packages, below, are in it
 cmd/coddy             the program: flags, the modes it registers, the window
-internal/files        the files mode: read any file
-internal/review       the review mode: the changes, each marked as viewed
-internal/uses         the uses mode: every use of a name across the projects in sight
+internal/mode/files   the files mode: read any file
+internal/mode/review  the review mode: the changes, each marked as viewed
+internal/mode/uses    the uses mode: every use of a name across the projects in sight
+internal/mode/pluginmode  a mode a plugin gives, its screen drawn by the plugin
 internal/window       the window: layout, mode rail, commands, dialogs
 internal/mode         what a mode is, and what it asks of the window
 internal/viewer       a file's view: whole, as its changes, or as the uses of a name
@@ -46,13 +47,14 @@ internal/work         background jobs, and what they give back to the frame
 internal/servers      the language servers a window runs: start, tell, rest, install
 internal/plugins      the plugins installed: their manifests, their programs, their actions
 internal/navigation   following names: declarations, the trail back, uses across projects
-internal/session      what is open: folders, projects, their bases, the documents read
+internal/workspace    what is open: folders, projects, their bases, the documents read
 internal/english      a count of things and a first capital, in English
 internal/pane         what every pane shares: the keys, key presses, a scrolling list
-internal/theme        colour themes in Zed's format, each file's icon in their colours, the reader's own controls
+internal/theme        colour themes in Zed's format, and the look made of them
+internal/controls     the reader's own controls, drawn in the theme's colours: key caps, buttons, rows, file icons
 internal/icons        what files and folders are drawn as: Lucide's kinds, Zed's icon themes, their pictures
 internal/java         the IntelliJ-style tree and the kinds of class
-internal/workspace    projects, changes, a file's two sides and its diff, the tree
+internal/codebase     a project's code: its files, changes, a file's two sides and its diff, the tree
 internal/text         a file being edited: lines, caret, selection, undo
 internal/lsp          language servers: what to ask them, over jsonrpc, and how to run one
 internal/gradle       what servers that import Gradle builds need: their own Gradle home, its daemons, kept models
@@ -68,9 +70,10 @@ How these lean on each other, floor by floor, is in [how it is made](4-how-it-is
 
 | Test | It checks |
 |---|---|
-| `TestTheDomainImportsNoInterface` | `workspace`, `text`, `lsp` and `plugins` import no Go UI, pane, window or mode |
-| `TestNoPaneImportsTheWindow` | no pane, nor `work`, `session`, `navigation`, `servers` or `plugins`, imports `window` |
-| `TestTheWindowImportsNoMode` | `window` imports neither `files` nor `review` |
+| `TestTheDomainImportsNoInterface` | `codebase`, `text`, `lsp` and `plugins` import no Go UI, pane, window or mode |
+| `TestNoPaneImportsTheWindow` | no pane, nor `work`, `workspace`, `navigation`, `servers` or `plugins`, imports `window` |
+| `TestTheWindowImportsNoMode` | `window` imports none of `files`, `review` and `uses` |
+| `TestTheThemeKnowsNeitherTheControlsNorGit` | `theme` imports neither `controls` nor `git` |
 | `TestTheLanguageTableImportsNothingOfTheReader` | `language` is data, and imports nothing of Coddy |
 | `TestGradleKnowsNothingOfTheLanguageServers` | `gradle` does not import `lsp` |
 

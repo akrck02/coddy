@@ -8,12 +8,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/akrck02/coddy/editor/internal/files"
+	"github.com/akrck02/coddy/editor/internal/codebase"
 	"github.com/akrck02/coddy/editor/internal/finder"
-	"github.com/akrck02/coddy/editor/internal/review"
+	"github.com/akrck02/coddy/editor/internal/mode/files"
+	"github.com/akrck02/coddy/editor/internal/mode/review"
 	"github.com/akrck02/coddy/editor/internal/sidebar"
 	"github.com/akrck02/coddy/editor/internal/viewer"
-	"github.com/akrck02/coddy/editor/internal/workspace"
 	"github.com/akrck02/go-renderer/input"
 	"github.com/akrck02/go-ui/uitest"
 )
@@ -70,10 +70,10 @@ func newWindow(test *testing.T, application *Window) *uitest.Window {
 func TestAWorkspaceListsTheChangedFilesOfItsRepositories(test *testing.T) {
 	application := newReader(Settings{Folders: []string{makeRepository(test)}, WorkingTree: true, Synchronous: true, Mode: "Review"})
 	newWindow(test, application)
-	if len(application.session.Projects) != 1 {
-		test.Fatalf("found %d projects, want 1", len(application.session.Projects))
+	if len(application.workspace.Projects) != 1 {
+		test.Fatalf("found %d projects, want 1", len(application.workspace.Projects))
 	}
-	project := application.session.Projects[0]
+	project := application.workspace.Projects[0]
 	if project.Base != "main" || len(project.Changes) != 3 {
 		test.Fatalf("base %q with %d changes, want main with 3 (%s)", project.Base, len(project.Changes), project.Error)
 	}
@@ -217,8 +217,8 @@ func TestOnlyTheProjectsWithChangesAreShownInBothModesAndTheFinder(test *testing
 	addUntouchedRepository(test, folder)
 	application := newReader(Settings{Folders: []string{folder}, WorkingTree: true, Synchronous: true, OnlyChanged: true})
 	window := newWindow(test, application)
-	if len(application.session.Projects) != 2 {
-		test.Fatalf("found %d projects, want 2", len(application.session.Projects))
+	if len(application.workspace.Projects) != 2 {
+		test.Fatalf("found %d projects, want 2", len(application.workspace.Projects))
 	}
 	for _, each := range application.modes {
 		application.setMode(each)
@@ -247,7 +247,7 @@ func TestTheFilesModeShowsAChangedFileWholeWithItsChangesMarked(test *testing.T)
 	if view.Mode != viewer.FileView || view.RowCount() != 6 {
 		test.Fatalf("lamp.go opened in mode %d with %d rows, want the whole file of 5 lines and an empty one", view.Mode, view.RowCount())
 	}
-	if view.Marks[4] != workspace.ModifiedMark {
+	if view.Marks[4] != codebase.ModifiedMark {
 		test.Errorf("the changed line 4 is marked %d, want modified", view.Marks[4])
 	}
 	if len(view.Hunks) != 1 || view.Hunks[0] != 3 {
@@ -271,7 +271,7 @@ func TestMarkingAFileViewedOpensTheNextOneNotViewed(test *testing.T) {
 	press(window, input.KeyV, input.KeySuper, input.KeyShift)
 	window.Frames(2)
 	reviewing := application.mode.(*review.Mode)
-	if !reviewing.IsViewed(workspace.FileReference{Project: 0, Path: "src/lamp.go"}) {
+	if !reviewing.IsViewed(codebase.FileReference{Project: 0, Path: "src/lamp.go"}) {
 		test.Fatal("v did not mark lamp.go as viewed")
 	}
 	if document := application.viewer.Document; document == nil || document.Path != "notes.txt" {
@@ -300,7 +300,7 @@ func TestEnteringAProjectListsOnlyItsTree(test *testing.T) {
 		test.Fatal("Enter on a project did not enter it")
 	}
 	inside := application.projectIndex(tree.Entered)
-	if application.session.Projects[inside].Name != "lighthouse" {
+	if application.workspace.Projects[inside].Name != "lighthouse" {
 		test.Fatalf("entered %s, want lighthouse", tree.Entered)
 	}
 	for _, row := range tree.Rows {
@@ -420,7 +420,7 @@ func TestTheFilesModeHasNothingOfTheReview(test *testing.T) {
 	application := newReader(Settings{Folders: []string{makeRepository(test)}, WorkingTree: true, Synchronous: true,
 		Open: "lighthouse/src/lamp.go"})
 	window := newWindow(test, application)
-	file := workspace.FileReference{Project: 0, Path: "src/lamp.go"}
+	file := codebase.FileReference{Project: 0, Path: "src/lamp.go"}
 	if application.mode.Name() != "Files" {
 		test.Fatalf("the reader started in the %s mode, want Files", application.mode.Name())
 	}
@@ -451,7 +451,7 @@ func TestMarkingAFileViewedUpdatesTheCountsAtOnce(test *testing.T) {
 	window := newWindow(test, application)
 	window.Frames(2)
 	reviewing := application.mode.(*review.Mode)
-	reviewing.Press(workspace.FileReference{Project: 0, Path: "src/lamp.go"}, false)
+	reviewing.Press(codebase.FileReference{Project: 0, Path: "src/lamp.go"}, false)
 	window.Frames(2)
 	if viewed, total, _ := application.progress(); viewed != 1 || total != 3 {
 		test.Errorf("the status bar counts %d of %d viewed, want 1 of 3", viewed, total)

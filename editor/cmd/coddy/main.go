@@ -18,15 +18,15 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/akrck02/coddy/editor/internal/files"
+	"github.com/akrck02/coddy/editor/internal/codebase"
 	"github.com/akrck02/coddy/editor/internal/icons"
 	"github.com/akrck02/coddy/editor/internal/lsp"
+	"github.com/akrck02/coddy/editor/internal/mode/files"
+	"github.com/akrck02/coddy/editor/internal/mode/review"
+	"github.com/akrck02/coddy/editor/internal/mode/uses"
 	"github.com/akrck02/coddy/editor/internal/plugins"
-	"github.com/akrck02/coddy/editor/internal/review"
 	"github.com/akrck02/coddy/editor/internal/theme"
-	"github.com/akrck02/coddy/editor/internal/uses"
 	"github.com/akrck02/coddy/editor/internal/window"
-	"github.com/akrck02/coddy/editor/internal/workspace"
 	"github.com/akrck02/go-renderer/opengl/overlay"
 	ui "github.com/akrck02/go-ui"
 	platform "github.com/akrck02/go-ui/window"
@@ -138,7 +138,7 @@ func settingsOf(asked commandLine, options platform.Options) window.Settings {
 		HidesStatus:   remembered(statusPreference),
 		Servers:       serversFor(options.CapturePath, *asked.serverMemory, *asked.keepIndexes, installed),
 		// what language servers wrote stays theirs after a restart
-		ServersWrote: workspace.DefaultWrittenPath(),
+		ServersWrote: codebase.DefaultWrittenPath(),
 		ServerData:   serverData(*asked.serverData),
 		// a missing or unknown budget keeps the default
 		DocumentMegabytes: rememberedNumber(documentsPreference),

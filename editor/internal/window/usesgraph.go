@@ -13,7 +13,7 @@ import (
 // asking the file's own server: the graph of the name opened a level further. done gets the
 // declaration's name and its uses, once known; none when the use is in no declaration.
 func (application *Window) UsersOf(use mode.Use, done func(declaration string, users []mode.Use)) bool {
-	project := application.session.Projects[use.File.Project]
+	project := application.workspace.Projects[use.File.Project]
 	path := filepath.Join(project.Path, filepath.FromSlash(use.File.Path))
 	text := application.LineOf(path, use.Line-1)
 	at := lsp.Position{Line: use.Line - 1, Character: lsp.UTF16Column(text, use.Start)}

@@ -1,11 +1,11 @@
 package window
 
 import (
+	"github.com/akrck02/coddy/editor/internal/codebase"
 	"github.com/akrck02/coddy/editor/internal/lsp"
 	"github.com/akrck02/coddy/editor/internal/mode"
 	"github.com/akrck02/coddy/editor/internal/navigation"
 	"github.com/akrck02/coddy/editor/internal/viewer"
-	"github.com/akrck02/coddy/editor/internal/workspace"
 )
 
 // usesHolder is the mode that shows the uses of a name, when the reader has one; otherwise the
@@ -66,7 +66,7 @@ func (application *Window) markUses() {
 }
 
 // usesOfFile are the uses to mark in a file: those of the uses mode, while it is on.
-func (application *Window) usesOfFile(file workspace.FileReference) map[int][]workspace.Span {
+func (application *Window) usesOfFile(file codebase.FileReference) map[int][]codebase.Span {
 	if holder := application.powers.uses; holder != nil {
 		return holder.UsesIn(file)
 	}
@@ -74,7 +74,7 @@ func (application *Window) usesOfFile(file workspace.FileReference) map[int][]wo
 }
 
 // RevealLine opens a file at a line, marked, and shows it in the sidebar.
-func (application *Window) RevealLine(file workspace.FileReference, line int) {
+func (application *Window) RevealLine(file codebase.FileReference, line int) {
 	application.openFileAt(file, line)
 	application.sidebar.RevealFile(application, file)
 }

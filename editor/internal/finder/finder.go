@@ -8,10 +8,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/akrck02/coddy/editor/internal/codebase"
+	"github.com/akrck02/coddy/editor/internal/controls"
 	"github.com/akrck02/coddy/editor/internal/git"
 	"github.com/akrck02/coddy/editor/internal/pane"
 	"github.com/akrck02/coddy/editor/internal/theme"
-	"github.com/akrck02/coddy/editor/internal/workspace"
 	"github.com/akrck02/go-renderer/draw2d"
 	"github.com/akrck02/go-renderer/input"
 	ui "github.com/akrck02/go-ui"
@@ -30,7 +31,7 @@ const (
 type Window interface {
 	Look() theme.Look
 	Keys() pane.Keys
-	Projects() []*workspace.Project
+	Projects() []*codebase.Project
 	// Candidates are every file the names search can find.
 	Candidates() []Candidate
 	// Searchable tells whether the content search looks in a project: one read, shown and in
@@ -46,7 +47,7 @@ type Window interface {
 	Cancel(key string)
 	Read(stop context.Context, reading func()) bool
 	// OpenAt opens a file at a line, shows it in the sidebar and gives it the keyboard.
-	OpenAt(file workspace.FileReference, line int)
+	OpenAt(file codebase.FileReference, line int)
 }
 
 // Finder is the finder: type part of a file's name, or a text it holds, from any project,
@@ -245,7 +246,7 @@ func (finder *Finder) buildQuery(context *ui.Context, window Window) bool {
 		}
 		submitted = context.EntryField("query", &finder.Query, ui.TextFieldOptions{Placeholder: placeholder, Plain: true, Width: ui.Grow()})
 		scope := int(finder.Scope)
-		if theme.IconSwitch(context, "finder scope", &scope, []theme.IconChoice{
+		if controls.IconSwitch(context, "finder scope", &scope, []controls.IconChoice{
 			{Icon: "file-search", Name: "File names (Tab)"}, {Icon: "text-search", Name: "File content (Tab)"},
 		}) {
 			finder.setScope(Scope(scope))
@@ -266,7 +267,7 @@ func (finder *Finder) buildFooter(context *ui.Context) {
 		}
 		context.Spacer()
 		for _, hint := range [][2]string{{"↑↓", "choose"}, {"Enter", "open"}, {"Tab", "names or content"}, {"Esc", "close"}} {
-			theme.KeyCaps(context, hint[0])
+			controls.KeyCaps(context, hint[0])
 			context.Text(hint[1], quiet)
 			context.Box(ui.Layout{Width: ui.Fixed(4)}, nil)
 		}

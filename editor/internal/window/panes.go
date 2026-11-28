@@ -3,13 +3,14 @@ package window
 import (
 	"context"
 
+	"github.com/akrck02/coddy/editor/internal/codebase"
+	"github.com/akrck02/coddy/editor/internal/controls"
 	"github.com/akrck02/coddy/editor/internal/finder"
 	"github.com/akrck02/coddy/editor/internal/java"
 	"github.com/akrck02/coddy/editor/internal/pane"
 	"github.com/akrck02/coddy/editor/internal/sidebar"
 	"github.com/akrck02/coddy/editor/internal/theme"
 	"github.com/akrck02/coddy/editor/internal/viewer"
-	"github.com/akrck02/coddy/editor/internal/workspace"
 	ui "github.com/akrck02/go-ui"
 )
 
@@ -34,7 +35,7 @@ func (application *Window) Look() theme.Look { return application.look }
 func (application *Window) Keys() pane.Keys { return application.keys }
 
 // HasProjects tells whether any repository is open.
-func (application *Window) HasProjects() bool { return len(application.session.Projects) > 0 }
+func (application *Window) HasProjects() bool { return len(application.workspace.Projects) > 0 }
 
 // The system's folder chooser: its title, the job that waits for it, and what Coddy says where
 // the computer has none.
@@ -49,7 +50,7 @@ const (
 func (application *Window) OpenFolder() {
 	choose := application.settings.ChooseFolder
 	start := ""
-	if folders := application.session.Folders; len(folders) > 0 {
+	if folders := application.workspace.Folders; len(folders) > 0 {
 		start = folders[len(folders)-1]
 	}
 	application.Run(chooseFolderJob, func(stop context.Context) func() {
@@ -73,7 +74,7 @@ func (application *Window) OpenFolder() {
 // one open: the folder itself when it is a repository or holds none, else the repositories in it.
 func (application *Window) openChosenFolder(folder string) {
 	application.keepingEdits(func() {
-		application.session.Clear()
+		application.workspace.Clear()
 		application.openFolders([]string{folder})
 	})
 }
@@ -88,19 +89,19 @@ func (application *Window) BuildInsteadOfAFile(context *ui.Context) bool {
 }
 
 // Projects are the repositories open, in the order the sidebar lists them.
-func (application *Window) Projects() []*workspace.Project { return application.session.Projects }
+func (application *Window) Projects() []*codebase.Project { return application.workspace.Projects }
 
 // Candidates are every file the finder can find by name.
 func (application *Window) Candidates() []finder.Candidate { return application.candidates }
 
 // Searchable tells whether the finder's content search looks in a project.
 func (application *Window) Searchable(index int) bool {
-	project := application.session.Projects[index]
-	return project.Loaded && !application.hidden(project) && application.inScope(workspace.FileReference{Project: index})
+	project := application.workspace.Projects[index]
+	return project.Loaded && !application.hidden(project) && application.inScope(codebase.FileReference{Project: index})
 }
 
 // WorkingTree tells whether the changes not committed yet count.
-func (application *Window) WorkingTree() bool { return application.session.WorkingTree }
+func (application *Window) WorkingTree() bool { return application.workspace.WorkingTree }
 
 // Synchronous tells whether work runs at once, for a capture or a test.
 func (application *Window) Synchronous() bool { return application.settings.Synchronous }
@@ -119,7 +120,7 @@ func (application *Window) Read(stop context.Context, reading func()) bool {
 }
 
 // OpenAt opens a file at a line, shows it in the sidebar and gives it the keyboard.
-func (application *Window) OpenAt(file workspace.FileReference, line int) {
+func (application *Window) OpenAt(file codebase.FileReference, line int) {
 	application.openFileAt(file, line)
 	application.sidebar.RevealFile(application, file)
 	application.focus = viewerPane
@@ -129,7 +130,7 @@ func (application *Window) OpenAt(file workspace.FileReference, line int) {
 func (application *Window) ProjectIndex(path string) int { return application.projectIndex(path) }
 
 // Hidden tells whether a project is left out of the lists.
-func (application *Window) Hidden(project *workspace.Project) bool {
+func (application *Window) Hidden(project *codebase.Project) bool {
 	return application.hidden(project)
 }
 
@@ -137,15 +138,15 @@ func (application *Window) Hidden(project *workspace.Project) bool {
 func (application *Window) ShowEveryProject() { application.setOnlyChanged(false) }
 
 // OpenFile shows a file in the viewer.
-func (application *Window) OpenFile(file workspace.FileReference) { application.openFile(file) }
+func (application *Window) OpenFile(file codebase.FileReference) { application.openFile(file) }
 
 // OpenedFile is the file the viewer shows, if any.
-func (application *Window) OpenedFile() (workspace.FileReference, bool) {
+func (application *Window) OpenedFile() (codebase.FileReference, bool) {
 	return application.viewer.Reference, application.viewer.IsOpen()
 }
 
 // IsOpened tells whether the viewer shows a file.
-func (application *Window) IsOpened(file workspace.FileReference) bool {
+func (application *Window) IsOpened(file codebase.FileReference) bool {
 	return application.viewer.IsOpen() && application.viewer.Reference == file
 }
 
@@ -156,7 +157,7 @@ func (application *Window) FocusSidebar() { application.focus = sidebarPane }
 func (application *Window) SidebarFocused() bool { return application.focus == sidebarPane }
 
 // ClassKind is what a Java or Kotlin file declares, once read.
-func (application *Window) ClassKind(file workspace.FileReference) java.ClassKind {
+func (application *Window) ClassKind(file codebase.FileReference) java.ClassKind {
 	return application.classKind(file)
 }
 
@@ -168,7 +169,7 @@ func (application *Window) ReadingKinds() bool { return len(application.kindsWan
 
 // FileButton is the viewer header's button for a file: the one of the mode that is on, and none
 // when that mode has no button.
-func (application *Window) FileButton(file workspace.FileReference) (viewer.Button, bool) {
+func (application *Window) FileButton(file codebase.FileReference) (viewer.Button, bool) {
 	if owner := application.powers.button; owner != nil {
 		return owner.FileButton(file)
 	}
@@ -176,7 +177,7 @@ func (application *Window) FileButton(file workspace.FileReference) (viewer.Butt
 }
 
 // PressFileButton presses the header's button for the file open, moving on as a reviewer would.
-func (application *Window) PressFileButton(file workspace.FileReference) {
+func (application *Window) PressFileButton(file codebase.FileReference) {
 	owner := application.powers.button
 	if owner == nil {
 		return
@@ -199,13 +200,13 @@ func (application *Window) ListEveryFile() {
 }
 
 // ChangedFiles are the files the development changed, in the order n goes through them.
-func (application *Window) ChangedFiles() []workspace.FileReference { return application.changedOrder }
+func (application *Window) ChangedFiles() []codebase.FileReference { return application.changedOrder }
 
 // Shows tells whether a file is in the project entered, if any.
-func (application *Window) Shows(file workspace.FileReference) bool { return application.inScope(file) }
+func (application *Window) Shows(file codebase.FileReference) bool { return application.inScope(file) }
 
 // Reveal opens a file and shows it in the sidebar.
-func (application *Window) Reveal(file workspace.FileReference) {
+func (application *Window) Reveal(file codebase.FileReference) {
 	application.openFile(file)
 	application.sidebar.RevealFile(application, file)
 }
@@ -213,8 +214,8 @@ func (application *Window) Reveal(file workspace.FileReference) {
 // ExploreFolder shows, in the viewer's place, a hint to choose a file of a folder chosen in the
 // sidebar, "" a project's top.
 func (application *Window) ExploreFolder(project int, folder string) {
-	if project < len(application.session.Projects) {
-		application.folder.show(project, application.session.Projects[project].Name, folder)
+	if project < len(application.workspace.Projects) {
+		application.folder.show(project, application.workspace.Projects[project].Name, folder)
 	}
 }
 
@@ -227,11 +228,11 @@ func (application *Window) RevealFolder(project int, folder string) {
 
 // Target is the file a key acts on: the one selected in the sidebar while it has the keyboard,
 // else the one open. inViewer tells whether it is the one open, or the viewer has the keyboard.
-func (application *Window) Target() (file workspace.FileReference, inViewer bool, found bool) {
+func (application *Window) Target() (file codebase.FileReference, inViewer bool, found bool) {
 	switch {
 	case application.focus == sidebarPane:
 		if row, ok := application.sidebar.SelectedRow(); ok && row.Kind == sidebar.FileRow {
-			file, found = workspace.FileReference{Project: row.Project, Path: row.Path}, true
+			file, found = codebase.FileReference{Project: row.Project, Path: row.Path}, true
 		} else if application.viewer.IsOpen() {
 			file, found = application.viewer.Reference, true
 		}
@@ -280,7 +281,7 @@ func (application *Window) buildFoldButton(context *ui.Context) {
 	if application.sidebarFolded {
 		name, icon = "Show the sidebar (⌘⇧E)", "panel-left-open"
 	}
-	if theme.ToolButton(context, name, icon, false) {
+	if controls.ToolButton(context, name, icon, false) {
 		application.toggleSidebar()
 	}
 }

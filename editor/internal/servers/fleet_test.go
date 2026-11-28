@@ -3,25 +3,25 @@ package servers
 import (
 	"testing"
 
+	"github.com/akrck02/coddy/editor/internal/codebase"
 	"github.com/akrck02/coddy/editor/internal/lsp"
 	"github.com/akrck02/coddy/editor/internal/work"
-	"github.com/akrck02/coddy/editor/internal/workspace"
 )
 
 // quietHost is a window with no projects, which never reads any.
 type quietHost struct{ toasts []string }
 
-func (host *quietHost) Loading() bool                            { return false }
-func (host *quietHost) Projects() []*workspace.Project           { return nil }
-func (host *quietHost) InSight(*workspace.Project) bool          { return true }
-func (host *quietHost) LoadOptions(string) workspace.LoadOptions { return workspace.LoadOptions{} }
-func (host *quietHost) Toast(words string)                       { host.toasts = append(host.toasts, words) }
+func (host *quietHost) Loading() bool                           { return false }
+func (host *quietHost) Projects() []*codebase.Project           { return nil }
+func (host *quietHost) InSight(*codebase.Project) bool          { return true }
+func (host *quietHost) LoadOptions(string) codebase.LoadOptions { return codebase.LoadOptions{} }
+func (host *quietHost) Toast(words string)                      { host.toasts = append(host.toasts, words) }
 
 // A file of a language no server of the table reads starts nothing, and a question about it says so.
 func TestAFileNoServerReadsStartsNothing(test *testing.T) {
 	table := []lsp.Server{{Name: "lampls", Command: "no-such-lamp-server-here", Languages: []string{"go"}}}
 	fleet := New(Settings{Table: table}, &quietHost{}, work.New(true, func() {}), func() {})
-	open := OpenFile{Project: "/lighthouse", Path: "/lighthouse/notes.txt", Document: &workspace.Document{Text: "a note"}}
+	open := OpenFile{Project: "/lighthouse", Path: "/lighthouse/notes.txt", Document: &codebase.Document{Text: "a note"}}
 	if client, _ := fleet.Serve(open); client != nil || fleet.Starting("lampls") {
 		test.Fatal("a text file started a server")
 	}
@@ -35,7 +35,7 @@ func TestAMissingServerIsToldOnceAndNotTriedAgain(test *testing.T) {
 	table := []lsp.Server{{Name: "lampls", Command: "no-such-lamp-server-here", Languages: []string{"go"}, Install: "brew install lampls"}}
 	host := &quietHost{}
 	fleet := New(Settings{Table: table}, host, work.New(true, func() {}), func() {})
-	open := OpenFile{Project: "/lighthouse", Path: "/lighthouse/lamp.go", Document: &workspace.Document{Text: "package lamp"}}
+	open := OpenFile{Project: "/lighthouse", Path: "/lighthouse/lamp.go", Document: &codebase.Document{Text: "package lamp"}}
 	for range 3 {
 		fleet.Serve(open)
 		fleet.work.Take()

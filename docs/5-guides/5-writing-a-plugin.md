@@ -25,7 +25,7 @@ when there is work.
 
 Git is the one exception: its code is compiled into Coddy, so it has no program at all. To the
 rest of Coddy it looks the same as a version control plugin, since both answer the same
-`workspace.VersionControl` questions. A plugin that crashes
+`codebase.VersionControl` questions. A plugin that crashes
 cannot take the window with it; Coddy says so, with the error's code, and starts it again the
 next time it is used.
 

@@ -3,7 +3,7 @@ package java
 import (
 	"testing"
 
-	"github.com/akrck02/coddy/editor/internal/workspace"
+	"github.com/akrck02/coddy/editor/internal/codebase"
 )
 
 func TestAJavaTreeMarksRootsAndJoinsPackages(test *testing.T) {
@@ -16,20 +16,20 @@ func TestAJavaTreeMarksRootsAndJoinsPackages(test *testing.T) {
 		"core/src/test/java/com/example/lighthouse/LampTest.java",
 	}, nil)
 	core := tree.Folders[0]
-	if core.Name != "core" || core.Role != workspace.ModuleFolder {
+	if core.Name != "core" || core.Role != codebase.ModuleFolder {
 		test.Fatalf("the module is %q with role %d", core.Name, core.Role)
 	}
 	main := core.Folders[0].Folders[0] // core/src/main
 	java, resources := main.Folders[0], main.Folders[1]
-	if java.Role != workspace.SourceRoot || resources.Role != workspace.ResourceRoot {
+	if java.Role != codebase.SourceRoot || resources.Role != codebase.ResourceRoot {
 		test.Errorf("src/main's roots are %d and %d", java.Role, resources.Role)
 	}
 	packages := java.Folders[0]
-	if packages.Name != "com.example.lighthouse" || packages.Role != workspace.PackageFolder || packages.Path != "core/src/main/java/com/example/lighthouse" {
+	if packages.Name != "com.example.lighthouse" || packages.Role != codebase.PackageFolder || packages.Path != "core/src/main/java/com/example/lighthouse" {
 		test.Errorf("the packages are %q (%d) at %s", packages.Name, packages.Role, packages.Path)
 	}
 	testRoot := core.Folders[0].Folders[1].Folders[0]
-	if testRoot.Role != workspace.TestRoot {
+	if testRoot.Role != codebase.TestRoot {
 		test.Errorf("src/test/java has role %d", testRoot.Role)
 	}
 }

@@ -7,9 +7,9 @@ import (
 	"strings"
 
 	"github.com/akrck02/coddy/editor/internal/builds"
+	"github.com/akrck02/coddy/editor/internal/codebase"
 	"github.com/akrck02/coddy/editor/internal/git"
 	"github.com/akrck02/coddy/editor/internal/language"
-	"github.com/akrck02/coddy/editor/internal/workspace"
 )
 
 // sourceRoot matches the folders Gradle and Maven take sources and resources from:
@@ -19,7 +19,7 @@ var sourceRoot = regexp.MustCompile(`(^|/)src/([A-Za-z0-9_-]+)/(java|kotlin|groo
 // IsProject tells whether a project's files are laid out as Gradle or Maven lay them out.
 func IsProject(paths []string) bool {
 	for _, path := range paths {
-		if builds.IsBuildFile(workspace.BaseName(path)) || strings.Contains(path, "src/main/java/") || strings.Contains(path, "src/main/kotlin/") {
+		if builds.IsBuildFile(codebase.BaseName(path)) || strings.Contains(path, "src/main/java/") || strings.Contains(path, "src/main/kotlin/") {
 			return true
 		}
 	}
@@ -29,39 +29,39 @@ func IsProject(paths []string) bool {
 // BuildTree makes a project's tree as IntelliJ shows a Java or Kotlin project: modules and
 // source roots marked, folders outside the roots one by one, and inside a source root the
 // packages that hold only one package joined with dots ("com.example.lighthouse.lamp").
-func BuildTree(paths []string, isChanged func(path string) bool) *workspace.Folder {
-	root := workspace.BuildFolders(paths, isChanged)
-	markRoles(root, workspace.PlainFolder)
+func BuildTree(paths []string, isChanged func(path string) bool) *codebase.Folder {
+	root := codebase.BuildFolders(paths, isChanged)
+	markRoles(root, codebase.PlainFolder)
 	return root
 }
 
 // markRoles marks each folder's role from where it is, and joins the packages of source roots.
-func markRoles(folder *workspace.Folder, inside workspace.FolderRole) {
+func markRoles(folder *codebase.Folder, inside codebase.FolderRole) {
 	for _, path := range folder.Files {
-		if builds.IsBuildFile(workspace.BaseName(path)) && folder.Path != "" {
-			folder.Role = workspace.ModuleFolder
+		if builds.IsBuildFile(codebase.BaseName(path)) && folder.Path != "" {
+			folder.Role = codebase.ModuleFolder
 		}
 	}
 	for _, child := range folder.Folders {
 		switch {
-		case inside == workspace.SourceRoot || inside == workspace.TestRoot:
-			child.Role = workspace.PackageFolder
+		case inside == codebase.SourceRoot || inside == codebase.TestRoot:
+			child.Role = codebase.PackageFolder
 			compactPackages(child)
 			markRoles(child, inside)
 			continue
-		case inside == workspace.PlainFolder:
+		case inside == codebase.PlainFolder:
 			if match := sourceRoot.FindStringSubmatch(child.Path); match != nil {
 				test := strings.Contains(strings.ToLower(match[2]), "test")
 				resources := match[3] == "resources" || match[3] == "res" || match[3] == "assets"
 				switch {
 				case resources && test:
-					child.Role = workspace.TestResourceRoot
+					child.Role = codebase.TestResourceRoot
 				case resources:
-					child.Role = workspace.ResourceRoot
+					child.Role = codebase.ResourceRoot
 				case test:
-					child.Role = workspace.TestRoot
+					child.Role = codebase.TestRoot
 				default:
-					child.Role = workspace.SourceRoot
+					child.Role = codebase.SourceRoot
 				}
 				markRoles(child, child.Role)
 				continue
@@ -72,7 +72,7 @@ func markRoles(folder *workspace.Folder, inside workspace.FolderRole) {
 }
 
 // compactPackages joins a package with its only package while it holds no files, with a dot.
-func compactPackages(folder *workspace.Folder) {
+func compactPackages(folder *codebase.Folder) {
 	for len(folder.Files) == 0 && len(folder.Folders) == 1 {
 		only := folder.Folders[0]
 		folder.Name += "." + only.Name
@@ -100,7 +100,7 @@ var declaration = regexp.MustCompile(`(?m)^[ \t]*(?:(?:public|private|protected|
 
 // KindOf reads what a source file declares under its own name (Lamp for Lamp.java).
 func KindOf(path string, content []byte) ClassKind {
-	name := workspace.BaseName(path)
+	name := codebase.BaseName(path)
 	if dot := strings.LastIndexByte(name, '.'); dot > 0 {
 		name = name[:dot]
 	}

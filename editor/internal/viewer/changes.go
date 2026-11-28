@@ -1,10 +1,10 @@
 package viewer
 
 import (
+	"github.com/akrck02/coddy/editor/internal/codebase"
 	"github.com/akrck02/coddy/editor/internal/git"
 	"github.com/akrck02/coddy/editor/internal/highlight"
 	"github.com/akrck02/coddy/editor/internal/theme"
-	"github.com/akrck02/coddy/editor/internal/workspace"
 	"github.com/akrck02/go-renderer/draw2d"
 )
 
@@ -17,9 +17,9 @@ type changesPresentation struct{}
 func (changesPresentation) layOut(view *Viewer) {
 	view.countChanges()
 	document := view.Document
-	view.rows, view.diff = workspace.DiffRows(document.Diff, view.foldContext(), view.openedFolds), document.Diff
-	view.Hunks = workspace.HunkStarts(view.rows)
-	view.Inline = workspace.InlineChanges(view.rows, func(line git.DiffLine) []rune {
+	view.rows, view.diff = codebase.DiffRows(document.Diff, view.foldContext(), view.openedFolds), document.Diff
+	view.Hunks = codebase.HunkStarts(view.rows)
+	view.Inline = codebase.InlineChanges(view.rows, func(line git.DiffLine) []rune {
 		if line.Kind == git.Removal {
 			return []rune(lineAt(document.OldLines, line.OldNumber).Text())
 		}

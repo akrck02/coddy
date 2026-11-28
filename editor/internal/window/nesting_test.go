@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/akrck02/coddy/editor/internal/codebase"
 	"github.com/akrck02/coddy/editor/internal/sidebar"
-	"github.com/akrck02/coddy/editor/internal/workspace"
 )
 
 // folderWithLooseFiles is makeRepository's folder, with a loose file and a folder of no
@@ -53,7 +53,7 @@ func TestARepositoryInsideTheTreeKeepsItsChanges(test *testing.T) {
 	window := newWindow(test, application)
 	selectRow(test, application, "lighthouse")
 	row := application.sidebar.Rows[application.sidebar.Selected]
-	if row.Kind != sidebar.ProjectRow || row.Changed != 3 || application.session.Projects[row.Project].Branch != "feature/brighter" {
+	if row.Kind != sidebar.ProjectRow || row.Changed != 3 || application.workspace.Projects[row.Project].Branch != "feature/brighter" {
 		test.Fatalf("the row of lighthouse is %+v, want a project with 3 changes on feature/brighter", row)
 	}
 	application.sidebar.SetExpanded(row, true)
@@ -80,7 +80,7 @@ func TestAFileOfARepositoryInsideTheTreeIsRevealed(test *testing.T) {
 	window := newWindow(test, application)
 	lighthouse := application.ProjectIndex(filepath.Join(folder, "lighthouse"))
 	application.sidebar.SetExpanded(application.sidebar.Rows[0], false)
-	application.Reveal(workspace.FileReference{Project: lighthouse, Path: "src/lamp.go"})
+	application.Reveal(codebase.FileReference{Project: lighthouse, Path: "src/lamp.go"})
 	window.Frame()
 	row, found := application.sidebar.SelectedRow()
 	if !found || row.Project != lighthouse || row.Path != "src/lamp.go" {

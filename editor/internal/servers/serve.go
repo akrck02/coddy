@@ -3,10 +3,10 @@ package servers
 import (
 	"context"
 
+	"github.com/akrck02/coddy/editor/internal/codebase"
 	"github.com/akrck02/coddy/editor/internal/language"
 	"github.com/akrck02/coddy/editor/internal/lsp"
 	"github.com/akrck02/coddy/editor/internal/text"
-	"github.com/akrck02/coddy/editor/internal/workspace"
 )
 
 // OpenFile is the file a person has open, as its server is told it. Path is "" while the file
@@ -14,7 +14,7 @@ import (
 type OpenFile struct {
 	Project  string // the folder of the project of the file open, "" for none
 	Path     string // the file on disk
-	Document *workspace.Document
+	Document *codebase.Document
 	Buffer   *text.Buffer // what edits it, nil while it is not edited
 }
 
@@ -30,7 +30,7 @@ func (open OpenFile) Text() string {
 // editing it, at a version of the buffer, and the version it was told at.
 type told struct {
 	path        string
-	document    *workspace.Document
+	document    *codebase.Document
 	buffer      *text.Buffer
 	editVersion int
 	version     int

@@ -5,13 +5,13 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/akrck02/coddy/editor/internal/workspace"
+	"github.com/akrck02/coddy/editor/internal/codebase"
 	"github.com/akrck02/go-renderer/draw2d"
 )
 
 // serverBadge is what a project's badge says of the files language servers wrote in it: each
 // server with how many, "jdtls · 4"; "" when they wrote none.
-func serverBadge(project *workspace.Project) string {
+func serverBadge(project *codebase.Project) string {
 	counts := map[string]int{}
 	for _, file := range project.ServerFiles {
 		counts[file.Server]++

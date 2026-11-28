@@ -6,6 +6,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/akrck02/coddy/editor/internal/codebase"
 	"github.com/akrck02/coddy/editor/internal/finder"
 	"github.com/akrck02/coddy/editor/internal/icons"
 	"github.com/akrck02/coddy/editor/internal/java"
@@ -16,7 +17,6 @@ import (
 	"github.com/akrck02/coddy/editor/internal/pane"
 	"github.com/akrck02/coddy/editor/internal/plugins"
 	"github.com/akrck02/coddy/editor/internal/servers"
-	"github.com/akrck02/coddy/editor/internal/session"
 	"github.com/akrck02/coddy/editor/internal/settings"
 	"github.com/akrck02/coddy/editor/internal/sidebar"
 	"github.com/akrck02/coddy/editor/internal/theme"
@@ -86,7 +86,7 @@ type Settings struct {
 	// ServerData is the folder the servers keep their indexes in, one folder each; "" is the
 	// reader's own folder. kotlin-lsp's take gigabytes: another disk may be better.
 	ServerData string
-	// DocumentMegabytes is how much memory the files read may keep, kept within the session's
+	// DocumentMegabytes is how much memory the files read may keep, kept within the workspace's
 	// least and most in whole steps; 0 keeps the default.
 	DocumentMegabytes int
 	// Plugins are the plugins installed, on or off; their actions are in the menu.
@@ -108,11 +108,11 @@ const (
 // back to that goroutine.
 type Window struct {
 	settings Settings
-	// session is what is open: the folders, their projects and bases, the documents read
-	session      session.Session
+	// workspace is what is open: the folders, their projects and bases, the documents read
+	workspace    workspace.Workspace
 	loading      int
 	candidates   []finder.Candidate
-	changedOrder []workspace.FileReference
+	changedOrder []codebase.FileReference
 	work         *work.Queue
 	// made is the file a plugin's action made last, which the menu offers to open
 	made made
@@ -178,8 +178,8 @@ type Window struct {
 	look     theme.Look
 	// classKinds are what the Java and Kotlin files declare, read as they come into sight;
 	// kindsWanted are those asked for since the last frame
-	classKinds  map[workspace.FileReference]java.ClassKind
-	kindsWanted []workspace.FileReference
+	classKinds  map[codebase.FileReference]java.ClassKind
+	kindsWanted []codebase.FileReference
 	tap         *inputTap
 	keys        pane.Keys
 	toast       string // a note to show, taken by the next frame
@@ -211,15 +211,15 @@ func New(settings Settings, modes ...mode.Mode) (*Window, error) {
 	}
 	application := &Window{
 		settings:      settings,
-		session:       session.New(settings.Base, settings.WorkingTree),
+		workspace:     workspace.New(settings.Base, settings.WorkingTree),
 		work:          work.New(settings.Synchronous, wake),
 		tap:           &inputTap{},
 		onlyChanged:   settings.OnlyChanged,
 		focus:         sidebarPane,
 		sidebarFolded: settings.SidebarFolded,
-		classKinds:    map[workspace.FileReference]java.ClassKind{},
+		classKinds:    map[codebase.FileReference]java.ClassKind{},
 	}
-	application.session.SetDocumentMegabytes(settings.DocumentMegabytes)
+	application.workspace.SetDocumentMegabytes(settings.DocumentMegabytes)
 	application.servers = servers.New(servers.Settings{Table: settings.Servers, Wrote: settings.ServersWrote, Data: settings.ServerData},
 		application, application.work, wake)
 	application.overlays = overlaysOf(application)
@@ -247,7 +247,7 @@ func New(settings Settings, modes ...mode.Mode) (*Window, error) {
 func (application *Window) Driver() uidrive.Driver { return application.tap }
 
 // Folders are the folders opened, to remember them for the next time.
-func (application *Window) Folders() []string { return application.session.Folders }
+func (application *Window) Folders() []string { return application.workspace.Folders }
 
 // startThemes chooses the theme and the icon theme the window starts in, among those offered.
 func (application *Window) startThemes(settings Settings) {

@@ -1,7 +1,7 @@
 package sidebar
 
 import (
-	"github.com/akrck02/coddy/editor/internal/workspace"
+	"github.com/akrck02/coddy/editor/internal/codebase"
 	"github.com/akrck02/go-renderer/draw2d"
 	ui "github.com/akrck02/go-ui"
 )
@@ -22,7 +22,7 @@ type Headed interface {
 // Presser is a listing whose file rows have a mark to press, such as marking a file as viewed.
 type Presser interface {
 	// Press acts on a file's mark; moveOn goes on to the next file.
-	Press(file workspace.FileReference, moveOn bool)
+	Press(file codebase.FileReference, moveOn bool)
 }
 
 // DeletedHider is a listing that leaves out the files the development deleted: a mode for reading

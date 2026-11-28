@@ -6,11 +6,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/akrck02/coddy/editor/internal/controls"
 	"github.com/akrck02/coddy/editor/internal/english"
 	"github.com/akrck02/coddy/editor/internal/language"
 	"github.com/akrck02/coddy/editor/internal/lsp"
 	"github.com/akrck02/coddy/editor/internal/servers"
-	"github.com/akrck02/coddy/editor/internal/theme"
 	"github.com/akrck02/go-renderer/draw2d"
 	ui "github.com/akrck02/go-ui"
 )
@@ -84,7 +84,7 @@ func (application *Window) buildServerCard(context *ui.Context, view servers.Vie
 		}
 		quiet := ui.TextStyle{Size: palette.SmallTextSize, Color: palette.InkSoft}
 		if view.Client == nil {
-			measure := func(text string) float32 { return theme.TextWidth(context, text, quiet) }
+			measure := func(text string) float32 { return controls.TextWidth(context, text, quiet) }
 			for _, line := range wrapLines([]string{view.Why}, serversPanelWidth-60, measure) {
 				context.Text(line, quiet)
 			}
@@ -95,7 +95,7 @@ func (application *Window) buildServerCard(context *ui.Context, view servers.Vie
 		buildModelsLine(context, view)
 		buildLeftOut(context, view.LeftOut)
 		if activity := strings.TrimSpace(view.Progress.Detail); activity != "" && view.State != servers.Ready {
-			if fitted := theme.FitText(context, activity, quiet, serversPanelWidth-80); fitted != "" {
+			if fitted := controls.FitText(context, activity, quiet, serversPanelWidth-80); fitted != "" {
 				context.Text(fitted, ui.TextStyle{Size: palette.SmallTextSize, Color: palette.InkQuiet})
 			}
 		}
@@ -275,7 +275,7 @@ func buildLeftOut(context *ui.Context, left []servers.LeftOutProject) {
 		context.Text(fmt.Sprintf("Left out of this server (%d): text only", len(left)), ui.TextStyle{Size: palette.SmallTextSize, Weight: draw2d.Medium, Color: palette.Warning})
 	})
 	small := ui.TextStyle{Size: palette.SmallTextSize, Color: palette.InkSoft}
-	measure := func(text string) float32 { return theme.TextWidth(context, text, small) }
+	measure := func(text string) float32 { return controls.TextWidth(context, text, small) }
 	for _, project := range left {
 		context.Box(ui.Layout{Width: ui.Grow(), Gap: 12}, func() {
 			context.Box(ui.Layout{Width: ui.Fixed(200)}, func() { context.Text(project.Name, ui.TextStyle{Size: palette.SmallTextSize}) })

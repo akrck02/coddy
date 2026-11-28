@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/akrck02/coddy/editor/internal/workspace"
+	"github.com/akrck02/coddy/editor/internal/codebase"
 )
 
 // expansionKey is a project's or a folder's place in a mode's listing, where it was opened or
@@ -82,7 +82,7 @@ func (sidebar *Sidebar) expandTo(window Window, project int, path string) string
 	sidebar.expanded[sidebar.expandedKey(project, "")] = true
 	folder, row := sidebar.tree(window, project), ""
 	for strings.HasPrefix(path, row+"/") || row == "" {
-		var inside *workspace.Folder
+		var inside *codebase.Folder
 		for _, child := range folder.Folders {
 			if child.Path == path || strings.HasPrefix(path, child.Path+"/") || strings.HasPrefix(child.Path, path+"/") {
 				inside = child
@@ -139,7 +139,7 @@ func (sidebar *Sidebar) setAllOpen(window Window, open bool) {
 }
 
 // setFoldersOpen opens or folds folders and every folder inside them.
-func (sidebar *Sidebar) setFoldersOpen(project int, folders []*workspace.Folder, open bool) {
+func (sidebar *Sidebar) setFoldersOpen(project int, folders []*codebase.Folder, open bool) {
 	for _, folder := range folders {
 		sidebar.expanded[sidebar.expandedKey(project, folder.Path)] = open
 		sidebar.setFoldersOpen(project, folder.Folders, open)

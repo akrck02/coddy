@@ -8,10 +8,10 @@ import (
 
 	"github.com/akrck02/coddy/editor/internal/keyring"
 	"github.com/akrck02/coddy/editor/internal/mode"
-	"github.com/akrck02/coddy/editor/internal/pluginmode"
+	"github.com/akrck02/coddy/editor/internal/mode/pluginmode"
 	"github.com/akrck02/coddy/editor/internal/plugins"
 	"github.com/akrck02/coddy/editor/internal/programs"
-	"github.com/akrck02/coddy/editor/internal/session"
+	"github.com/akrck02/coddy/editor/internal/workspace"
 	"github.com/akrck02/coddy/sdk"
 	ui "github.com/akrck02/go-ui"
 	platform "github.com/akrck02/go-ui/window"
@@ -119,11 +119,11 @@ func installEach(stop context.Context, missing []plugins.Missing) error {
 // markedVersionControls are the version controls of the plugins on, each with its marker; git,
 // built in, reads its repositories itself. A plugin turned on later reads the folders opened
 // after it.
-func (application *Window) markedVersionControls() []session.Marked {
-	var marked []session.Marked
+func (application *Window) markedVersionControls() []workspace.Marked {
+	var marked []workspace.Marked
 	for _, plugin := range application.settings.Plugins {
 		if control := plugin.Contributes.VersionControl; plugin.Ready() && !plugin.BuiltIn && control != nil {
-			marked = append(marked, session.Marked{Marker: control.Marker, Control: plugin.VersionControl()})
+			marked = append(marked, workspace.Marked{Marker: control.Marker, Control: plugin.VersionControl()})
 		}
 	}
 	return marked
@@ -173,10 +173,10 @@ func (application *Window) buildPluginItems(context *ui.Context) {
 // runAction asks a plugin to run an action on the file open, off the frame, and shows its answer.
 func (application *Window) runAction(plugin *plugins.Plugin, action string) {
 	reference := application.viewer.Reference
-	if reference.Project < 0 || reference.Project >= len(application.session.Projects) {
+	if reference.Project < 0 || reference.Project >= len(application.workspace.Projects) {
 		return
 	}
-	project := application.session.Projects[reference.Project]
+	project := application.workspace.Projects[reference.Project]
 	params := sdk.ActionParams{Action: action, File: filepath.Join(project.Path, reference.Path)}
 	application.work.Run(pluginWork, func(stop context.Context) func() {
 		result, err := plugin.Run(stop, params)

@@ -1,13 +1,14 @@
 package sidebar
 
 import (
+	"github.com/akrck02/coddy/editor/internal/codebase"
+	"github.com/akrck02/coddy/editor/internal/controls"
 	"github.com/akrck02/coddy/editor/internal/git"
 	"github.com/akrck02/coddy/editor/internal/icons"
 	"github.com/akrck02/coddy/editor/internal/java"
 	"github.com/akrck02/coddy/editor/internal/language"
 	"github.com/akrck02/coddy/editor/internal/pane"
 	"github.com/akrck02/coddy/editor/internal/theme"
-	"github.com/akrck02/coddy/editor/internal/workspace"
 	"github.com/akrck02/go-renderer/draw2d"
 	ui "github.com/akrck02/go-ui"
 )
@@ -116,18 +117,18 @@ func (sidebar *Sidebar) paintRow(painter painting, index int) {
 func (sidebar *Sidebar) paintRowBackground(painter painting, index int, rowArea draw2d.Rectangle) {
 	row := sidebar.Rows[index]
 	look := painter.look
-	reference := workspace.FileReference{Project: row.Project, Path: row.Path}
+	reference := codebase.FileReference{Project: row.Project, Path: row.Path}
 	isOpen := row.Kind == FileRow && painter.window.IsOpened(reference)
-	state := theme.RowPlain
+	state := controls.RowPlain
 	switch {
 	case index == sidebar.Selected && painter.window.SidebarFocused():
-		state = theme.RowChosen
+		state = controls.RowChosen
 	case index == sidebar.Selected, isOpen:
-		state = theme.RowChosenQuietly // the selection of a pane without the keyboard
+		state = controls.RowChosenQuietly // the selection of a pane without the keyboard
 	case index == painter.hovered:
-		state = theme.RowHovered
+		state = controls.RowHovered
 	}
-	theme.PaintRowBackground(painter.drawing, look, rowArea, sidebarRowRadius, state)
+	controls.PaintRowBackground(painter.drawing, look, rowArea, sidebarRowRadius, state)
 }
 
 // sidebarRowRadius is how round a row's background is, in pixels.
@@ -144,7 +145,7 @@ func paintFolderIcons(painter painting, row Row, text rowText, iconTop float32) 
 	if iconTheme != nil {
 		chevron.Picture = iconTheme.ChevronPicture(row.Expanded)
 	}
-	theme.DrawIcon(painter.drawing, painter.look, chevron, text.x, iconTop, treeIconSize)
+	controls.DrawIcon(painter.drawing, painter.look, chevron, text.x, iconTop, treeIconSize)
 	text.x += treeIconSize + 4
 	name, ink := folderIcon(row, painter.look)
 	folder := icons.Icon{Name: name, Ink: ink, Opacity: 1}
@@ -154,10 +155,10 @@ func paintFolderIcons(painter painting, row Row, text rowText, iconTop float32) 
 	case iconTheme != nil: // an icon theme draws folders by their name, as Zed does: roles are Lucide's
 		folder.Picture = iconTheme.FolderPicture(row.Label, row.Expanded)
 	}
-	if row.Role == workspace.ModuleFolder {
+	if row.Role == codebase.ModuleFolder {
 		text.weight = draw2d.Medium
 	}
-	theme.DrawIcon(painter.drawing, painter.look, folder, text.x, iconTop, treeIconSize)
+	controls.DrawIcon(painter.drawing, painter.look, folder, text.x, iconTop, treeIconSize)
 	text.x += treeIconSize + 7
 	return text
 }
@@ -189,13 +190,13 @@ func paintFileIcons(painter painting, row Row, decoration Decoration, text rowTe
 	// the name may say how the file changed, as Zed's project panel does; where every file
 	// listed changed, the colour is kept for its counts
 	if row.Status != git.Unchanged && decoration.Tinted {
-		text.ink = theme.StatusColour(palette, row.Status)
+		text.ink = controls.StatusColour(palette, row.Status)
 	}
 	return text
 }
 
 // classKind is what a file declares, UnknownKind when the window reads no classes.
-func (painter painting) classKind(file workspace.FileReference) java.ClassKind {
+func (painter painting) classKind(file codebase.FileReference) java.ClassKind {
 	if painter.classes == nil {
 		return java.UnknownKind
 	}
@@ -207,16 +208,16 @@ func (painter painting) classKind(file workspace.FileReference) java.ClassKind {
 // been read.
 func paintFileIcon(painter painting, row Row, text rowText, iconTop float32) string {
 	quiet := text.ink == painter.context.Theme.InkQuiet
-	reference := workspace.FileReference{Project: row.Project, Path: row.Path}
+	reference := codebase.FileReference{Project: row.Project, Path: row.Path}
 	if kind := painter.classKind(reference); kind != java.UnknownKind && kind != java.NoClass {
 		paintClassBadge(painter.drawing, painter.look, kind, text.x, iconTop, treeIconSize, quiet)
 		return language.ClassName(row.Label)
 	}
-	icon := theme.FileIcon(row.Label, painter.look)
+	icon := controls.FileIcon(row.Label, painter.look)
 	if quiet {
 		icon = icon.Faded()
 	}
-	theme.DrawIcon(painter.drawing, painter.look, icon, text.x, iconTop, treeIconSize)
+	controls.DrawIcon(painter.drawing, painter.look, icon, text.x, iconTop, treeIconSize)
 	return text.label
 }
 
@@ -268,13 +269,13 @@ func (sidebar *Sidebar) paintRight(painter painting, row Row, index int, right, 
 	side := &rightSide{painter: painter, right: right, baseline: baseline}
 	switch row.Kind {
 	case FileRow:
-		if painter.window.Unsaved(workspace.FileReference{Project: row.Project, Path: row.Path}) {
+		if painter.window.Unsaved(codebase.FileReference{Project: row.Project, Path: row.Path}) {
 			side.text("●", palette.InkSoft)
 		}
 		if row.Status == git.Unchanged || !sidebar.ShowsStatus() {
 			return side.right
 		}
-		side.text(row.Status.Letter(), theme.StatusColour(palette, row.Status))
+		side.text(row.Status.Letter(), controls.StatusColour(palette, row.Status))
 	case ProjectRow:
 		if !painter.window.Projects()[row.Project].Loaded {
 			side.text("…", palette.InkQuiet)

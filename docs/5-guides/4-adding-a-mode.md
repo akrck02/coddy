@@ -6,7 +6,7 @@ and reviewing changes. A mode is one package and one line in `main`.
 ## The shortest way
 
 1. Make a package, say `editor/internal/usages`, with a type that implements `mode.Mode`. The files mode,
-   `editor/internal/files/files.go`, is the smallest example.
+   `editor/internal/mode/files/files.go`, is the smallest example.
 2. Answer what every mode answers. `ChangesOnly` and `ShowsChanges` decide what is listed and how a
    file opens. `Decorate(row)` says what a row shows beside its name.
 3. Reach the window through the `mode.Window` it is given in `Start`, never by importing `window`.

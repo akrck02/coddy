@@ -11,16 +11,17 @@ A package only imports packages of its own floor or lower, so you can read the c
 bottom up and never meet a name you have not seen yet.
 
 ```
-cmd/coddy                                              the program: flags, preferences, wiring
-files · review · uses                                  the modes
-window                                                 the shell: layout, focus, keys, overlays
-navigation · servers · session · plugins               what the window does besides drawing
-mode                                                   what a mode is, and what it may do
-viewer · sidebar · finder · settings                   the panes
-theme · pane                                           what every pane shares
-icons                                                  what files and folders are drawn as
-workspace · java · lsp · gradle · builds · text · highlight · markdown     the domain
-git · language · work · english                        the base
+cmd/coddy                                                               the program: flags, preferences, wiring
+mode/files · mode/review · mode/uses · mode/pluginmode                  the modes
+window                                                                  the shell: layout, focus, keys, overlays
+navigation · servers · workspace · plugins                              what the window does besides drawing
+mode                                                                    what a mode is, and what it may do
+viewer · sidebar · finder · settings                                    the panes
+controls · pane                                                         what every pane shares
+theme                                                                   the colours
+icons                                                                   what files and folders are drawn as
+codebase · java · lsp · gradle · builds · text · highlight · markdown   the domain
+git · language · work · english                                         the base
 ```
 
 All of them live in `editor/internal/`, but for the program in `editor/cmd/coddy`. The
@@ -32,11 +33,11 @@ The official plugins are the third module, `plugins/`, built on the sdk alone. T
 plugins both depend on the sdk and never on each other, and Go keeps them from reaching into the
 editor's `editor/internal/`. The [contributing guide](8-contributing.md)
 says in one line what each one holds; `editor/cmd/coddy/rules_test.go` checks the floors that
-matter most: no pane, and none of `navigation`, `servers`, `session`, `plugins` or `work`, imports `window`;
+matter most: no pane, and none of `navigation`, `servers`, `workspace`, `plugins` or `work`, imports `window`;
 the window imports no mode; the domain imports nothing of the interface; the language table
 imports nothing at all.
 
-Why so many floors? Because each one can be tested alone. `session` reads projects without a
+Why so many floors? Because each one can be tested alone. `workspace` reads projects without a
 window. `servers` runs language servers for a fake host. A pane draws for a test window that
 answers a handful of questions.
 
@@ -87,18 +88,18 @@ its result.
 ## 🌿 Git, and other version controls
 
 Everything Coddy knows of a development comes from its version control, read off the frame. Git
-is built in (`editor/internal/git`, which runs the `git` command). `workspace.VersionControl` is the
+is built in (`editor/internal/git`, which runs the `git` command). `codebase.VersionControl` is the
 little contract a project can also be read through, six questions (the branch, the default base, the files, the changes, a file at a
-revision, a file's diff). `workspace.Git` answers them with git; a plugin can answer them for
-another version control, over the sdk's `versionControl/…` messages. `session` decides which
+revision, a file's diff). `codebase.Git` answers them with git; a plugin can answer them for
+another version control, over the sdk's `versionControl/…` messages. `workspace` decides which
 one reads each folder opened: git where there is a `.git`, else the plugin whose marker is there.
-A folder none of them reads is a plain folder, read by `workspace.FolderControl`: every file on
+A folder none of them reads is a plain folder, read by `codebase.FolderControl`: every file on
 disk, no change. When such a folder holds repositories and loose files too, it is a project of its
 own that leaves the repositories' folders out (`LeftOut`); each repository keeps the folder's path
 in `Project.Root`, and the sidebar draws the repository's rows where its folder would be. A list of
 changes only has no use for places, so there the repositories are listed flat, as always.
 Git is still listed as a plugin, a built-in one (`plugins.BuiltIn`), so a person can turn it off
-like any other; turned off, `session` reads no `.git`. It stays compiled in: no program between,
+like any other; turned off, `workspace` reads no `.git`. It stays compiled in: no program between,
 the same speed.
 
 Why so few questions? A contract asks only what every version control can give. Git gives more
@@ -123,14 +124,14 @@ What is kept, and what makes it stale:
 | The trees per filter typed | `sidebar` | kept for the last 4 filters, so Backspace is instant |
 | The command table | `window.startModes` | never: it is made once, when the window starts |
 | Markdown laid out | `viewer` | the document or its edit version changes |
-| The documents read | `session` | the file's time or size on disk changed, checked when it is opened |
+| The documents read | `workspace` | the file's time or size on disk changed, checked when it is opened |
 | What each server was told | `servers` | the open file's text changed |
 | The servers' views (status bar, panel) | `servers.Fleet.Views` | a server says something new (`lsp.Client.Version`), one starts, stops or rests, the projects change; each second while one is at work |
 
 Two of these deserve a word more.
 
 **The documents** are kept up to a budget a person chooses in *Settings › Memory* (a slider from 32
-to 512 MB in steps of 32; `DefaultDocumentMegabytes`, 64, until then, in `editor/internal/session/cache.go`), and the
+to 512 MB in steps of 32; `DefaultDocumentMegabytes`, 64, until then, in `editor/internal/workspace/cache.go`), and the
 least recently opened go first, at once when the budget shrinks. A file of code takes about 100
 to 350 KB once read: its two versions, its diff and its colours weigh far more than its text. Their size is an estimate
 from their text and lines, not a measure. Each remembers its file's time and size, so a file

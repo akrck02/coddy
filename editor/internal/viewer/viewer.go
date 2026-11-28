@@ -6,12 +6,12 @@ import (
 	"context"
 	"time"
 
+	"github.com/akrck02/coddy/editor/internal/codebase"
 	"github.com/akrck02/coddy/editor/internal/git"
 	"github.com/akrck02/coddy/editor/internal/highlight"
 	"github.com/akrck02/coddy/editor/internal/pane"
 	"github.com/akrck02/coddy/editor/internal/text"
 	"github.com/akrck02/coddy/editor/internal/theme"
-	"github.com/akrck02/coddy/editor/internal/workspace"
 	"github.com/akrck02/go-renderer/draw2d"
 	ui "github.com/akrck02/go-ui"
 )
@@ -51,8 +51,8 @@ type Window interface {
 // Marker is a window that puts a button of its own in the header for a file, such as Viewed.
 type Marker interface {
 	// FileButton is the button for a file, if it has one; PressFileButton presses it.
-	FileButton(file workspace.FileReference) (button Button, shown bool)
-	PressFileButton(file workspace.FileReference)
+	FileButton(file codebase.FileReference) (button Button, shown bool)
+	PressFileButton(file codebase.FileReference)
 }
 
 // Navigator is a window that knows where names are declared and what they are, as language
@@ -90,9 +90,9 @@ const codeMargin float32 = 10
 // Viewer is the view of the file open: what it shows, how (its Mode and the presentation chosen
 // for it), where it is scrolled to, and the file being edited.
 type Viewer struct {
-	Reference workspace.FileReference
-	Project   *workspace.Project
-	Document  *workspace.Document
+	Reference codebase.FileReference
+	Project   *codebase.Project
+	Document  *codebase.Document
 	Request   int // counts the files asked for, so a slow read that was overtaken is dropped
 	showing   bool
 
@@ -106,16 +106,16 @@ type Viewer struct {
 	unfolded    map[Mode]bool
 	openedFolds map[int]bool // folds opened by hand, by where they start in the diff
 
-	rows []workspace.Row // the diff's rows as shown
-	diff []git.DiffLine  // the diff the rows show: the file's, or the file unchanged for its uses
+	rows []codebase.Row // the diff's rows as shown
+	diff []git.DiffLine // the diff the rows show: the file's, or the file unchanged for its uses
 	// Uses are where the file uses a name searched, by line from 1, as spans of characters: shown
 	// in the uses view; nil when the mode that is on searches none
-	Uses  map[int][]workspace.Span
+	Uses  map[int][]codebase.Span
 	Hunks []int
 	Added int
 	Gone  int
 	// inline are the words that changed inside a replaced line, by row of the diff
-	Inline map[int]workspace.Span
+	Inline map[int]codebase.Span
 	// goTo is a line to show once the file is read, from the finder; markedLine is the line shown
 	// that way, painted as the line the reader is on
 	GoTo       int
@@ -123,7 +123,7 @@ type Viewer struct {
 	MarkedLine int
 	// marks say, in the file view, which lines the development added or changed and where it
 	// removed some, as Zed marks them in its gutter
-	Marks map[int]workspace.Mark
+	Marks map[int]codebase.Mark
 	// Comments are the words of the comments of a pull request on the file open, by line of the
 	// file as it is now (from 1), made when they come: shown beside their lines
 	Comments map[int]string
@@ -140,7 +140,7 @@ type Viewer struct {
 	foldWords    map[foldLabel]string
 	added, gone  pane.Words[int]
 	// problem is the open document's error in words, written once per document
-	problem pane.Words[*workspace.Document]
+	problem pane.Words[*codebase.Document]
 
 	// formatted shows a Markdown file as it reads, on from when one opens; formatting is its text
 	// laid out last
@@ -155,7 +155,7 @@ type Viewer struct {
 	indent          string // what Tab types: a tab, or spaces, as the file indents
 	// editedFrom is what the file was when the edits started from it: saving checks the disk
 	// against it, not against a file read again since
-	editedFrom workspace.Stamp
+	editedFrom codebase.Stamp
 	// reopening is the file read again where it is (Reopen), keeping its view
 	reopening bool
 	selecting bool // a press in the code is dragging a selection
@@ -198,7 +198,7 @@ func (view *Viewer) Close() {
 }
 
 // Start begins showing a file, before its text has been read.
-func (view *Viewer) Start(reference workspace.FileReference, project *workspace.Project) {
+func (view *Viewer) Start(reference codebase.FileReference, project *codebase.Project) {
 	if view.showing && view.Reference == reference && view.Document != nil {
 		return
 	}
@@ -221,7 +221,7 @@ func (view *Viewer) Start(reference workspace.FileReference, project *workspace.
 
 // Show puts a file's text in the view once it has been read: as its diff when showChanges asks for
 // it and the file changed, whole otherwise.
-func (view *Viewer) Show(document *workspace.Document, showChanges bool) {
+func (view *Viewer) Show(document *codebase.Document, showChanges bool) {
 	keepPlace := view.reopening || (view.Document != nil && view.Document.Path == document.Path)
 	view.reopening = false
 	view.Document = document
@@ -247,7 +247,7 @@ func (view *Viewer) Show(document *workspace.Document, showChanges bool) {
 }
 
 // SetUses gives the uses of the file open, or none, and shows them when the uses view is on.
-func (view *Viewer) SetUses(uses map[int][]workspace.Span) {
+func (view *Viewer) SetUses(uses map[int][]codebase.Span) {
 	view.Uses = uses
 	if view.Mode == UsesView && len(uses) == 0 {
 		view.Mode = FileView
@@ -260,7 +260,7 @@ func (view *Viewer) SetUses(uses map[int][]workspace.Span) {
 
 // Reopen opens the file again when its project was read again, as it may have changed, keeping
 // where it was scrolled to.
-func (view *Viewer) Reopen(path string, open func(file workspace.FileReference)) {
+func (view *Viewer) Reopen(path string, open func(file codebase.FileReference)) {
 	if view.showing && view.Project != nil && view.Project.Path == path {
 		offset, sideways := view.List.Offset, view.List.OffsetX
 		view.Document = nil

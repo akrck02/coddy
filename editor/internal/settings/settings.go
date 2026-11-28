@@ -4,6 +4,7 @@
 package settings
 
 import (
+	"github.com/akrck02/coddy/editor/internal/controls"
 	"github.com/akrck02/coddy/editor/internal/icons"
 	"github.com/akrck02/coddy/editor/internal/pane"
 	"github.com/akrck02/coddy/editor/internal/plugins"
@@ -208,10 +209,10 @@ func (screen *Screen) buildSectionHead(context *ui.Context) {
 			name = each.name
 		}
 	}
-	context.Box(ui.Layout{Width: ui.Grow(), Height: ui.Fixed(theme.BarHeight), Padding: ui.PadXY(theme.BarPadding, 0), AlignY: ui.Center}, func() {
+	context.Box(ui.Layout{Width: ui.Grow(), Height: ui.Fixed(controls.BarHeight), Padding: ui.PadXY(controls.BarPadding, 0), AlignY: ui.Center}, func() {
 		context.Text(name, ui.TextStyle{Weight: draw2d.Medium})
 		context.Spacer()
-		if theme.ToolButton(context, "Close the settings (Esc)", "x", false) {
+		if controls.ToolButton(context, "Close the settings (Esc)", "x", false) {
 			screen.Open = false
 		}
 	})

@@ -39,7 +39,7 @@ func javaRepository(test *testing.T, folder string, files map[string]string) {
 func usesListedIn(application *Window) string {
 	var listed []string
 	for _, use := range application.finder.Hits {
-		listed = append(listed, filepath.Base(application.session.Projects[use.Project()].Path)+"/"+use.Path+":"+strconv.Itoa(use.Line))
+		listed = append(listed, filepath.Base(application.workspace.Projects[use.Project()].Path)+"/"+use.Path+":"+strconv.Itoa(use.Line))
 	}
 	return strings.Join(listed, " ")
 }
@@ -93,7 +93,7 @@ func TestUsesAskedWhileTheServerReadsAreAskedAgainOnceItIsDone(test *testing.T) 
 	application.focus = viewerPane
 	application.viewer.SetMode(viewer.FileView)
 	window.Frames(1)
-	client := application.servers.Running("fakels " + application.session.Projects[0].Path)
+	client := application.servers.Running("fakels " + application.workspace.Projects[0].Path)
 	for deadline := time.Now().Add(2 * time.Second); client != nil && !client.Busy() && time.Now().Before(deadline); time.Sleep(10 * time.Millisecond) {
 	}
 	application.viewer.PlaceCaret(viewer.Place{Line: 2, Column: 6}) // on On

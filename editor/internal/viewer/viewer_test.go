@@ -3,9 +3,9 @@ package viewer
 import (
 	"testing"
 
+	"github.com/akrck02/coddy/editor/internal/codebase"
 	"github.com/akrck02/coddy/editor/internal/git"
 	"github.com/akrck02/coddy/editor/internal/highlight"
-	"github.com/akrck02/coddy/editor/internal/workspace"
 )
 
 func lines(count int) []highlight.Line {
@@ -18,9 +18,9 @@ func lines(count int) []highlight.Line {
 
 func TestAnUnchangedFileIsOnlyShownWhole(test *testing.T) {
 	view := New()
-	file := workspace.FileReference{Project: 0, Path: "lighthouse/lamp.txt"}
-	view.Start(file, &workspace.Project{Name: "lighthouse"})
-	view.Show(&workspace.Document{Path: file.Path, NewLines: lines(4)}, true)
+	file := codebase.FileReference{Project: 0, Path: "lighthouse/lamp.txt"}
+	view.Start(file, &codebase.Project{Name: "lighthouse"})
+	view.Show(&codebase.Document{Path: file.Path, NewLines: lines(4)}, true)
 	view.SetMode(DiffView)
 	if view.Mode != FileView || view.RowCount() != 4 {
 		test.Errorf("an unchanged file shows in mode %d with %d rows, want the whole file of 4 lines", view.Mode, view.RowCount())
@@ -29,9 +29,9 @@ func TestAnUnchangedFileIsOnlyShownWhole(test *testing.T) {
 
 func TestAChangedFileOpensOnItsChangesWhenAsked(test *testing.T) {
 	view := New()
-	file := workspace.FileReference{Project: 0, Path: "lighthouse/lamp.txt"}
-	view.Start(file, &workspace.Project{Name: "lighthouse"})
-	view.Show(&workspace.Document{
+	file := codebase.FileReference{Project: 0, Path: "lighthouse/lamp.txt"}
+	view.Start(file, &codebase.Project{Name: "lighthouse"})
+	view.Show(&codebase.Document{
 		Path: file.Path, Changed: true, Change: git.Change{Path: file.Path, Status: git.Modified},
 		OldLines: lines(1), NewLines: lines(1),
 		Diff: []git.DiffLine{{Kind: git.Removal, OldNumber: 1}, {Kind: git.Insertion, NewNumber: 1}},

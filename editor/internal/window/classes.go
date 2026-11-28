@@ -3,15 +3,15 @@ package window
 import (
 	"context"
 
+	"github.com/akrck02/coddy/editor/internal/codebase"
 	"github.com/akrck02/coddy/editor/internal/git"
 	"github.com/akrck02/coddy/editor/internal/java"
-	"github.com/akrck02/coddy/editor/internal/workspace"
 )
 
 // classKind is what a Java or Kotlin file declares under its own name, once read. A file not read
 // yet is asked for, to be read in the background with the others asked for in the same frame.
-func (application *Window) classKind(reference workspace.FileReference) java.ClassKind {
-	project := application.session.Projects[reference.Project]
+func (application *Window) classKind(reference codebase.FileReference) java.ClassKind {
+	project := application.workspace.Projects[reference.Project]
 	if !java.IsClassFile(reference.Path) {
 		return java.UnknownKind
 	}
@@ -40,7 +40,7 @@ func (application *Window) readClassKinds() {
 	application.kindsWanted = nil
 	paths := make([]string, len(wanted))
 	for index, reference := range wanted {
-		paths[index] = application.session.Projects[reference.Project].Path
+		paths[index] = application.workspace.Projects[reference.Project].Path
 	}
 	application.work.Run("", func(context.Context) func() {
 		kinds := make([]java.ClassKind, len(wanted))
@@ -49,7 +49,7 @@ func (application *Window) readClassKinds() {
 		}
 		return func() {
 			for index, reference := range wanted {
-				if reference.Project < len(application.session.Projects) && application.session.Projects[reference.Project].Path == paths[index] {
+				if reference.Project < len(application.workspace.Projects) && application.workspace.Projects[reference.Project].Path == paths[index] {
 					application.classKinds[reference] = kinds[index]
 				}
 			}
@@ -60,7 +60,7 @@ func (application *Window) readClassKinds() {
 // forgetClassKinds forgets what a project's files declare, when it is read again.
 func (application *Window) forgetClassKinds(path string) {
 	for reference := range application.classKinds {
-		if reference.Project >= len(application.session.Projects) || application.session.Projects[reference.Project].Path == path {
+		if reference.Project >= len(application.workspace.Projects) || application.workspace.Projects[reference.Project].Path == path {
 			delete(application.classKinds, reference)
 		}
 	}
