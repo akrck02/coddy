@@ -23,46 +23,53 @@ Coddy writes a file of a repository only when someone saves it, and git only rea
 
 ## Where things are
 
-Packages are named by what they are about, one line each:
+Packages are named by what they are about, and grouped by area: a folder inside another says
+"this is part of that". Everything that draws or reads the keyboard is under `internal/ui/`;
+everything else is the domain, which works without a window.
 
 ```
-sdk/                  a module of its own: what a plugin is written with
-sdk                   the protocol plugins speak
-sdk/screen            a plugin's mode drawn with Go UI
-sdk/jsonrpc           the connection to another program: language servers and plugins
-plugins/              a module of its own: the official plugins, built on the sdk alone
-editor/               a module of its own: Coddy, built on the sdk; its packages, below, are in it
-cmd/coddy             the program: flags, the modes it registers, the window
-internal/mode/files   the files mode: read any file
-internal/mode/review  the review mode: the changes, each marked as viewed
-internal/mode/uses    the uses mode: every use of a name across the projects in sight
-internal/mode/pluginmode  a mode a plugin gives, its screen drawn by the plugin
-internal/window       the window: layout, mode rail, commands, dialogs
-internal/mode         what a mode is, and what it asks of the window
-internal/viewer       a file's view: whole, as its changes, or as the uses of a name
-internal/sidebar      the projects' tree, its filter and the rows' decorations
-internal/finder       finding files by name, lines by content, and the uses of a name
-internal/settings     the settings screen
-internal/work         background jobs, and what they give back to the frame
-internal/servers      the language servers a window runs: start, tell, rest, install
-internal/plugins      the plugins installed: their manifests, their programs, their actions
-internal/navigation   following names: declarations, the trail back, uses across projects
-internal/workspace    what is open: folders, projects, their bases, the documents read
-internal/english      a count of things and a first capital, in English
-internal/pane         what every pane shares: the keys, key presses, a scrolling list
-internal/theme        colour themes in Zed's format, and the look made of them
-internal/controls     the reader's own controls, drawn in the theme's colours: key caps, buttons, rows, file icons
-internal/icons        what files and folders are drawn as: Lucide's kinds, Zed's icon themes, their pictures
-internal/java         the IntelliJ-style tree and the kinds of class
-internal/codebase     a project's code: its files, changes, a file's two sides and its diff, the tree
-internal/text         a file being edited: lines, caret, selection, undo
-internal/lsp          language servers: what to ask them, over jsonrpc, and how to run one
-internal/gradle       what servers that import Gradle builds need: their own Gradle home, its daemons, kept models
-internal/builds       what a project's builds publish and depend on, one reader per build system
-internal/highlight    Chroma's tokens, cut into lines of coloured pieces
-internal/markdown     a Markdown file read into blocks, for the viewer to lay out
-internal/language     what Coddy knows of each language: names, extensions, server, icon, fences
-internal/git          the read-only git commands
+sdk/                           a module of its own: what a plugin is written with
+  sdk                          the protocol plugins speak
+  screen/                      a plugin's mode drawn with Go UI
+  jsonrpc/                     the connection to another program: language servers and plugins
+plugins/                       a module of its own: the official plugins, built on the sdk alone
+editor/                        a module of its own: Coddy, built on the sdk
+  cmd/coddy/                   the program: flags, the modes it registers, the window
+  internal/
+    ui/                        the interface: a folder, not a package
+      window/                  the window: layout, mode rail, commands, dialogs
+      viewer/                  a file's view: whole, as its changes, or as the uses of a name
+      sidebar/                 the projects' tree, its filter and the rows' decorations
+      finder/                  finding files by name, lines by content, and the uses of a name
+      settings/                the settings screen
+      navigation/              following names: declarations, the trail back, uses across projects
+      mode/                    what a mode is, and what it asks of the window
+        files/                 the files mode: read any file
+        review/                the review mode: the changes, each marked as viewed
+        uses/                  the uses mode: every use of a name across the projects in sight
+        pluginmode/            a mode a plugin gives, its screen drawn by the plugin
+      shortcut/                a key and what it does: presses, chords and the profiles of them
+      pane/                    what every pane shares: the keys pressed, a scrolling list, Words
+      controls/                the reader's own controls: key caps, buttons, rows, file icons
+      theme/                   colour themes and icon themes in Zed's format, and Lucide's icons
+    codebase/                  a project's code: its files, changes, a file's two sides and its diff, the tree
+    workspace/                 what is open: folders, projects, their bases, the documents read
+    text/                      a file being edited: lines, caret, selection, undo
+    format/                    a count of things and a first capital, in English
+      highlight/               Chroma's tokens, cut into lines of coloured pieces
+      markdown/                a Markdown file read into blocks, for the viewer to lay out
+    lsp/                       language servers: what to ask them, over jsonrpc, and how to run one
+    servers/                   the language servers a window runs: start, tell, rest, install
+    plugins/                   the plugins installed: their manifests, their programs, their actions
+      keyring/                 the secrets plugins keep, in the system's keyring
+    execution/
+      programs/                finding the programs Coddy runs, and installing a missing one
+      work/                    background jobs, and what they give back to the frame
+    language/                  what Coddy knows of each language: names, extensions, server, icon, fences
+    java/                      the IntelliJ-style tree and the kinds of class
+    gradle/                    what servers that import Gradle builds need: their own Gradle home, its daemons, kept models
+    builds/                    what a project's builds publish and depend on, one reader per build system
+    git/                       the read-only git commands
 ```
 
 How these lean on each other, floor by floor, is in [how it is made](4-how-it-is-made.md).
@@ -70,8 +77,8 @@ How these lean on each other, floor by floor, is in [how it is made](4-how-it-is
 
 | Test | It checks |
 |---|---|
-| `TestTheDomainImportsNoInterface` | `codebase`, `text`, `lsp` and `plugins` import no Go UI, pane, window or mode |
-| `TestNoPaneImportsTheWindow` | no pane, nor `work`, `workspace`, `navigation`, `servers` or `plugins`, imports `window` |
+| `TestNothingOutsideTheInterfaceImportsIt` | no package outside `ui/` imports one inside it, nor Go UI |
+| `TestNoPaneImportsTheWindow` | no pane, nor `navigation`, imports `window` |
 | `TestTheWindowImportsNoMode` | `window` imports none of `files`, `review` and `uses` |
 | `TestTheThemeKnowsNeitherTheControlsNorGit` | `theme` imports neither `controls` nor `git` |
 | `TestTheLanguageTableImportsNothingOfTheReader` | `language` is data, and imports nothing of Coddy |
@@ -86,7 +93,7 @@ that has nothing to do with the program, and every change pays for it.
 
 A pane never imports `window`. Each pane declares an interface named `Window` with the little it
 needs, such as `Projects()` or `OpenFile(file)`, and `window.Window` implements all of them in
-`editor/internal/window/panes.go`. A new need is a new method on the pane's interface and its answer in
+`editor/internal/ui/window/panes.go`. A new need is a new method on the pane's interface and its answer in
 `panes.go`.
 
 What only some windows can do, such as going to a definition (`viewer.Navigator`) or reading Java

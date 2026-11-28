@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/akrck02/coddy/editor/internal/codebase"
+	"github.com/akrck02/coddy/editor/internal/execution/work"
 	"github.com/akrck02/coddy/editor/internal/lsp"
-	"github.com/akrck02/coddy/editor/internal/work"
 )
 
 // Host is what the servers need of the window that runs them.

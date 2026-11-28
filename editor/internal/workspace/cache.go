@@ -4,7 +4,7 @@ import (
 	"container/list"
 
 	"github.com/akrck02/coddy/editor/internal/codebase"
-	"github.com/akrck02/coddy/editor/internal/highlight"
+	"github.com/akrck02/coddy/editor/internal/format/highlight"
 )
 
 // DefaultDocumentMegabytes is how much memory, in megabytes, the documents kept may take unless

@@ -12,9 +12,9 @@ import (
 	"time"
 
 	"github.com/akrck02/coddy/editor/internal/codebase"
-	"github.com/akrck02/coddy/editor/internal/english"
+	"github.com/akrck02/coddy/editor/internal/execution/programs"
+	"github.com/akrck02/coddy/editor/internal/format"
 	"github.com/akrck02/coddy/editor/internal/lsp"
-	"github.com/akrck02/coddy/editor/internal/programs"
 )
 
 // startWait is how long a server gets to start and answer initialize.
@@ -58,7 +58,7 @@ func (fleet *Fleet) Start(server lsp.Server, root, key, project string) {
 		client, err := lsp.Start(requestContext, server, root, folders, data)
 		return func() {
 			if len(removed) > 0 {
-				fleet.host.Toast(server.Name + ": removed " + english.Count(len(removed), "old index") + " of projects no longer open")
+				fleet.host.Toast(server.Name + ": removed " + format.Count(len(removed), "old index") + " of projects no longer open")
 			}
 			if fleet.started(server, key, client, err) {
 				fleet.keepSnapshots(snapshots) // a server that never ran wrote nothing

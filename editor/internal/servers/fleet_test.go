@@ -4,8 +4,8 @@ import (
 	"testing"
 
 	"github.com/akrck02/coddy/editor/internal/codebase"
+	"github.com/akrck02/coddy/editor/internal/execution/work"
 	"github.com/akrck02/coddy/editor/internal/lsp"
-	"github.com/akrck02/coddy/editor/internal/work"
 )
 
 // quietHost is a window with no projects, which never reads any.

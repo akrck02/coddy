@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/akrck02/coddy/editor/internal/programs"
+	"github.com/akrck02/coddy/editor/internal/execution/programs"
 )
 
 // installWait is how long a server's install may take: go install builds it from its source.

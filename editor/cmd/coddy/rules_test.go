@@ -66,8 +66,8 @@ func TestNoErrorIsMadeWithoutACode(test *testing.T) {
 // writes is the one keeping its own marks, in its own folder. Git itself runs read-only commands.
 func TestOnlyTheSaveWritesInARepository(test *testing.T) {
 	allowed := map[string]bool{
-		filepath.Join(moduleRoot, "internal/codebase/save.go"):        true,
-		filepath.Join(moduleRoot, "internal/mode/review/reviewed.go"): true,
+		filepath.Join(moduleRoot, "internal/codebase/save.go"):           true,
+		filepath.Join(moduleRoot, "internal/ui/mode/review/reviewed.go"): true,
 		// what language servers wrote, kept in the reader's own folder as the viewed marks are
 		filepath.Join(moduleRoot, "internal/codebase/written.go"): true,
 		// old indexes of servers, in their data folder: the reader's own, never a repository
@@ -85,7 +85,7 @@ func TestOnlyTheSaveWritesInARepository(test *testing.T) {
 		// the values set for each plugin's settings, in the reader's own folder, when one changes
 		filepath.Join(moduleRoot, "internal/plugins/settings.go"): true,
 		// the profiles of keys, in the reader's own folder, when one is made, changed or removed
-		filepath.Join(moduleRoot, "internal/keymap/profile.go"): true,
+		filepath.Join(moduleRoot, "internal/ui/shortcut/profile.go"): true,
 		// the reader's own folder, moved once from its old name
 		filepath.Join(moduleRoot, "cmd/coddy/datafolder.go"): true,
 	}
@@ -132,29 +132,43 @@ func importsAny(test *testing.T, name string, forbidden ...string) string {
 	return ""
 }
 
-// The domain knows nothing of the window: what the reader opens, and the text being edited, can be
-// read and changed without one.
-func TestTheDomainImportsNoInterface(test *testing.T) {
-	interfaces := []string{
-		"github.com/akrck02/go-ui",
-		"github.com/akrck02/coddy/editor/internal/theme",
-		"github.com/akrck02/coddy/editor/internal/controls",
-		"github.com/akrck02/coddy/editor/internal/pane",
-		"github.com/akrck02/coddy/editor/internal/window",
-		"github.com/akrck02/coddy/editor/internal/mode",
-	}
-	for _, domain := range []string{"codebase", "text", "lsp", "plugins"} {
-		if found := importsAny(test, domain, interfaces...); found != "" {
-			test.Errorf("%s imports %s", domain, found)
+// What the reader opens, the text being edited, the servers and the plugins work without a window,
+// so each can be tested alone: no package outside ui/ imports one inside it, nor Go UI. The folder
+// makes the rule hold for every package, new ones too.
+func TestNothingOutsideTheInterfaceImportsIt(test *testing.T) {
+	const module = "github.com/akrck02/coddy/editor/"
+	interfaces := []string{module + "internal/ui", "github.com/akrck02/go-ui"}
+	for _, path := range internalPackages(test) {
+		if strings.HasPrefix(path, module+"internal/ui/") {
+			continue
+		}
+		for _, dependency := range dependenciesOf(test, path) {
+			for _, forbidden := range interfaces {
+				if dependency == forbidden || strings.HasPrefix(dependency, forbidden+"/") {
+					test.Errorf("%s imports %s", strings.TrimPrefix(path, module), dependency)
+				}
+			}
 		}
 	}
+}
+
+// internalPackages lists the import paths of every package under internal/.
+func internalPackages(test *testing.T) []string {
+	test.Helper()
+	command := exec.Command("go", "list", "./internal/...")
+	command.Dir = moduleRoot
+	output, err := command.Output()
+	if err != nil {
+		test.Fatalf("go list ./internal/...: %v", err)
+	}
+	return strings.Fields(string(output))
 }
 
 // A pane asks the window for what it needs through an interface of its own, so the arrows only
 // point down: the window knows its panes, and no pane knows the window.
 func TestNoPaneImportsTheWindow(test *testing.T) {
-	for _, pane := range []string{"theme", "controls", "pane", "viewer", "sidebar", "finder", "settings", "work", "workspace", "navigation", "servers", "plugins"} {
-		if found := importsAny(test, pane, "github.com/akrck02/coddy/editor/internal/window"); found != "" {
+	for _, pane := range []string{"ui/theme", "ui/controls", "ui/pane", "ui/shortcut", "ui/viewer", "ui/sidebar", "ui/finder", "ui/settings", "ui/navigation"} {
+		if found := importsAny(test, pane, "github.com/akrck02/coddy/editor/internal/ui/window"); found != "" {
 			test.Errorf("%s imports %s", pane, found)
 		}
 	}
@@ -163,8 +177,8 @@ func TestNoPaneImportsTheWindow(test *testing.T) {
 // A theme is colours, read from a file: the controls drawn with them build on it, and it knows
 // nothing of them, nor of git, whose states only the controls colour.
 func TestTheThemeKnowsNeitherTheControlsNorGit(test *testing.T) {
-	forbidden := []string{"github.com/akrck02/coddy/editor/internal/controls", "github.com/akrck02/coddy/editor/internal/git"}
-	if found := importsAny(test, "theme", forbidden...); found != "" {
+	forbidden := []string{"github.com/akrck02/coddy/editor/internal/ui/controls", "github.com/akrck02/coddy/editor/internal/git"}
+	if found := importsAny(test, "ui/theme", forbidden...); found != "" {
 		test.Errorf("theme imports %s", found)
 	}
 }
@@ -190,8 +204,8 @@ func TestGradleKnowsNothingOfTheLanguageServers(test *testing.T) {
 // A mode is one package and one line in main: the window holds the modes it is given and imports
 // none of them.
 func TestTheWindowImportsNoMode(test *testing.T) {
-	modes := []string{"github.com/akrck02/coddy/editor/internal/mode/files", "github.com/akrck02/coddy/editor/internal/mode/review", "github.com/akrck02/coddy/editor/internal/mode/uses"}
-	if found := importsAny(test, "window", modes...); found != "" {
+	modes := []string{"github.com/akrck02/coddy/editor/internal/ui/mode/files", "github.com/akrck02/coddy/editor/internal/ui/mode/review", "github.com/akrck02/coddy/editor/internal/ui/mode/uses"}
+	if found := importsAny(test, "ui/window", modes...); found != "" {
 		test.Errorf("window imports %s", found)
 	}
 }

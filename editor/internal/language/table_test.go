@@ -3,10 +3,10 @@ package language_test
 import (
 	"testing"
 
-	"github.com/akrck02/coddy/editor/internal/controls"
-	"github.com/akrck02/coddy/editor/internal/highlight"
+	"github.com/akrck02/coddy/editor/internal/format/highlight"
 	"github.com/akrck02/coddy/editor/internal/language"
-	"github.com/akrck02/coddy/editor/internal/theme"
+	"github.com/akrck02/coddy/editor/internal/ui/controls"
+	"github.com/akrck02/coddy/editor/internal/ui/theme"
 )
 
 // unhighlighted are the languages the highlighter does not know: their files stay plain text.

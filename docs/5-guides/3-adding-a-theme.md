@@ -18,9 +18,9 @@ takes its place.
 
 ## A colour theme for everyone
 
-The built-in themes are embedded from `editor/internal/theme/themes/`. Add the `.json` there, with its
+The built-in themes are embedded from `editor/internal/ui/theme/themes/`. Add the `.json` there, with its
 licence beside it as `name.LICENSE` when it is not ours, and say where it comes from in the
-comment above `builtIn` in `editor/internal/theme/themes.go`. Then add its name to
+comment above `builtIn` in `editor/internal/ui/theme/themes.go`. Then add its name to
 `TestTheReaderComesWithTheThemesOfZedIntelliJVisualStudioCodeDraculaAndMrPink`.
 
 A theme may give only some colours: the reader makes up the rest from the others
@@ -32,7 +32,7 @@ Icon themes are Zed's too: a folder with `icon_themes/*.json` and the SVG files 
 the folder into `~/.config/coddy/icon-themes/`, or install it in Zed: Coddy also lists Zed's
 installed extensions. [Get started](../2-get-started.md) says where they go on each system.
 
-Icon themes are read and matched in `editor/internal/icons`, apart from the colours: `icons.LoadThemes`
-lists them, `Theme.FilePicture` names a file's picture as Zed does, and `icons.Pictures` draws each
+Icon themes are read and matched in the same package, apart from the colours: `theme.LoadIconThemes`
+lists them, `IconTheme.FilePicture` names a file's picture as Zed does, and `theme.Pictures` draws each
 SVG once per size. The `controls` package only joins them to the look, in `controls.FileIcon` and
-`controls.DrawIcon`. A file of a kind Lucide has no icon for gets one in `icons/kinds.go`.
+`controls.DrawIcon`. A file of a kind Lucide has no icon for gets one in `ui/theme/kinds.go`.

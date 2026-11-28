@@ -3,7 +3,7 @@ package plugins
 import (
 	"strings"
 
-	"github.com/akrck02/coddy/editor/internal/programs"
+	"github.com/akrck02/coddy/editor/internal/execution/programs"
 )
 
 // Missing is a program a plugin requires that is not on this computer, with how to install it.

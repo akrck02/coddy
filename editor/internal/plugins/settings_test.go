@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/akrck02/coddy/editor/internal/keyring"
+	"github.com/akrck02/coddy/editor/internal/plugins/keyring"
 	"github.com/akrck02/coddy/sdk"
 )
 

@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/akrck02/coddy/editor/internal/codebase"
-	"github.com/akrck02/coddy/editor/internal/english"
+	"github.com/akrck02/coddy/editor/internal/format"
 	"github.com/akrck02/coddy/editor/internal/lsp"
 )
 
@@ -188,7 +188,7 @@ func ViewOf(progress lsp.Progress) View {
 		view.State, view.Headline, view.Fraction = Ready, "Ready", 1
 		return view
 	}
-	view.State, view.Headline = Working, english.Capitalised(progress.Phase)
+	view.State, view.Headline = Working, format.Capitalised(progress.Phase)
 	if progress.Phase == "starting" {
 		view.State = Starting
 	}

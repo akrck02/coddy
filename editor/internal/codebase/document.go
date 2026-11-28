@@ -7,8 +7,8 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/akrck02/coddy/editor/internal/format/highlight"
 	"github.com/akrck02/coddy/editor/internal/git"
-	"github.com/akrck02/coddy/editor/internal/highlight"
 )
 
 // largestShown is the largest file read into the viewer.

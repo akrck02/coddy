@@ -11,17 +11,19 @@ A package only imports packages of its own floor or lower, so you can read the c
 bottom up and never meet a name you have not seen yet.
 
 ```
-cmd/coddy                                                               the program: flags, preferences, wiring
-mode/files · mode/review · mode/uses · mode/pluginmode                  the modes
-window                                                                  the shell: layout, focus, keys, overlays
-navigation · servers · workspace · plugins                              what the window does besides drawing
-mode                                                                    what a mode is, and what it may do
-viewer · sidebar · finder · settings                                    the panes
-controls · pane                                                         what every pane shares
-theme                                                                   the colours
-icons                                                                   what files and folders are drawn as
-codebase · java · lsp · gradle · builds · text · highlight · markdown   the domain
-git · language · work · english                                         the base
+cmd/coddy                                               the program: flags, preferences, wiring
+ui/mode/files · review · uses · pluginmode              the modes
+ui/window                                               the shell: layout, focus, keys, overlays
+ui/navigation                                           following names, across the panes
+ui/mode                                                 what a mode is, and what it may do
+ui/viewer · sidebar · finder · settings                 the panes
+ui/shortcut · controls · pane                           what every pane shares
+ui/theme                                                the colours and the icons
+────────────────────────────────────────────────────────the interface above, the domain below
+servers · workspace · plugins                           what the window runs and keeps open
+codebase · java · lsp · gradle · builds · text          the domain
+format/highlight · format/markdown                      formatting text
+git · language · format · execution · plugins/keyring   the base
 ```
 
 All of them live in `editor/internal/`, but for the program in `editor/cmd/coddy`. The
@@ -33,7 +35,7 @@ The official plugins are the third module, `plugins/`, built on the sdk alone. T
 plugins both depend on the sdk and never on each other, and Go keeps them from reaching into the
 editor's `editor/internal/`. The [contributing guide](8-contributing.md)
 says in one line what each one holds; `editor/cmd/coddy/rules_test.go` checks the floors that
-matter most: no pane, and none of `navigation`, `servers`, `workspace`, `plugins` or `work`, imports `window`;
+matter most: no pane, and nothing outside `editor/internal/ui/` imports anything inside it, and no pane imports `window`;
 the window imports no mode; the domain imports nothing of the interface; the language table
 imports nothing at all.
 
@@ -45,7 +47,7 @@ answers a handful of questions.
 
 Go UI is *immediate mode*: it asks the program to describe the whole window again at every
 frame, as a sheet of paper redrawn from scratch rather than a board whose pieces are moved. The
-program's `Window.Build` (`editor/internal/window/build.go`) is that description. It runs in this order:
+program's `Window.Build` (`editor/internal/ui/window/build.go`) is that description. It runs in this order:
 
 1. **Take what came back.** `work.Take` applies the results of the background jobs that finished
    since the last frame (a repository read, a server's answer).
@@ -56,7 +58,7 @@ program's `Window.Build` (`editor/internal/window/build.go`) is that description
 4. **Describe the panes.** The mode rail, the sidebar, the title bar and the viewer (or the
    hint of a folder chosen in the sidebar, or a mode's own page), then the status bar.
 5. **Draw the overlays.** The dialogs over the window are one list, `overlaysOf`
-   (`editor/internal/window/overlays.go`): the finder, the base dialog, the servers' panel,
+   (`editor/internal/ui/window/overlays.go`): the finder, the base dialog, the servers' panel,
    the questions. Each says whether it is open and how it is drawn. `ModalOpen` walks the same
    list, so a new dialog is one line, and the panes stop taking keys while it is up.
 6. **Notes and toasts** go last, on top of everything.
@@ -69,7 +71,7 @@ fast as a short one.
 
 Only one goroutine touches the interface: the one that builds frames. Anything slow (reading a
 repository, asking a server, searching) runs elsewhere, through a `work.Queue`
-(`editor/internal/work/work.go`):
+(`editor/internal/execution/work/work.go`):
 
 - `Run(key, job)` starts the job on its own goroutine. The job returns a small function, and that
   function runs on the interface's goroutine at the next `Take`. So a job never changes the
@@ -111,7 +113,7 @@ without them for now.
 
 A frame that does nothing new should cost almost nothing. The rule is: **work that only changes
 with data is done when the data changes, not each time it is drawn.**
-`editor/internal/window/idle_test.go` holds the line: an idle frame may make at most 40 allocations in
+`editor/internal/ui/window/idle_test.go` holds the line: an idle frame may make at most 40 allocations in
 the files mode and 60 in the review mode, whatever the size of the file and the workspace. Most of
 those are Go UI's own and the test window's screen reader, not Coddy's.
 

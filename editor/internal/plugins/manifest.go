@@ -11,8 +11,8 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/akrck02/coddy/editor/internal/execution/programs"
 	"github.com/akrck02/coddy/editor/internal/lsp"
-	"github.com/akrck02/coddy/editor/internal/programs"
 	"github.com/akrck02/go-renderer/failure"
 )
 
